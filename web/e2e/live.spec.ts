@@ -113,5 +113,12 @@ test('a live tile reaches the live state and plays 640 px wide video', async ({ 
   const video = tile.locator('video');
   await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.videoWidth), { timeout: 30_000 }).toBe(640);
   expect(await video.evaluate((v: HTMLVideoElement) => v.muted)).toBe(true);
+
+  // Fullscreen takes the whole tile and keeps the session.
+  await tile.getByRole('button', { name: 'Fullscreen' }).click();
+  await expect.poll(() => page.evaluate(() => document.fullscreenElement?.getAttribute('data-testid'))).toBe('live-tile');
+  await tile.getByRole('button', { name: 'Exit fullscreen' }).click();
+  await expect.poll(() => page.evaluate(() => document.fullscreenElement)).toBeNull();
+  await expect(tile).toHaveAttribute('data-state', 'live');
   expect(errors).toEqual([]);
 });

@@ -851,3 +851,12 @@ This section supersedes the chaos results of "Task 29" (270.0 MiB peak, "breaker
 **Expected result:** after step 2 the Date becomes today in Jakarta, the 00:00-24:00 ruler, the event list times and the export file name (`<camera_id>_<YYYYMMDD-HHMMSS>.mp4`) read in WIB (UTC+7); the choice is still set after the reload; "My time" returns everything to the device zone.
 **If the result differs, update:** `Header.svelte`, `zonePref.ts` with `zonePref.test.ts`, and `setZone` in `web/src/routes/+page.svelte` with `routes/page.test.ts`; ui-spec §5 if the intended behaviour changes.
 **Status:** not run
+## Live tile fullscreen
+**Automated in this task:** `web/src/lib/live/fullscreen.ts` (element fullscreen on the tile where `document.fullscreenEnabled`, else the iPhone video player through `webkitEnterFullscreen`, else no button) and a Fullscreen / Exit fullscreen button plus double-click in `LiveTile.svelte`; the video fills the screen height while the tile is fullscreen. Tests first (red, then green): `fullscreen.test.ts` (modes, toggle, a refused request is handled, Esc and the iPhone Done button reset the state) and `LiveTile.test.ts` (button while connecting, labels, double-click, no button without an API, the WHEP session is not reopened); `e2e/live.spec.ts` enters and leaves fullscreen on Chromium. `make web` and `make web-e2e` passed. Not exercised: Safari, a real iPhone or iPad, a real camera.
+**Manual steps:**
+1. With the real camera, open Live in desktop Chrome and Safari. Press Fullscreen, then Esc; then double-click the video, and press Exit fullscreen.
+2. On an iPhone, press Fullscreen, then Done in the native player.
+3. On an iPad, press Fullscreen, then exit with the system gesture.
+**Expected result:** desktop and iPad: the whole tile fills the screen with the name, the Live badge and Mute visible, the video is letterboxed, not cropped; after Esc or a gesture the button reads Fullscreen again. iPhone: the native player opens with the live video and Done returns to the grid with the button reading Fullscreen. The stream does not reconnect in any case.
+**If the result differs, update:** `fullscreenMode`/`watchFullscreen` in `web/src/lib/live/fullscreen.ts` with `fullscreen.test.ts`; the fullscreen classes on the root of `LiveTile.svelte` with `LiveTile.test.ts`.
+**Status:** not run
