@@ -42,6 +42,10 @@ export function describeIntegrity(s: PlayerState): IntegrityView {
       if (s.message !== null) {
         return { kind: 'verifying', text: 'Could not verify this recording', title: 'Not verified', spinner: false, export: false };
       }
+      // Nothing selected yet: nothing is being verified.
+      if (s.clipId === null) {
+        return { kind: 'verifying', text: '', title: 'No recording selected', spinner: false, export: false };
+      }
       return { kind: 'verifying', text: 'Verifying…', title: 'Verifying the encrypted recording', spinner: true, export: false };
     case 'verified':
       return { kind: 'verified', text: 'Verified', title: 'Encrypted recording verified', spinner: false, export: true };

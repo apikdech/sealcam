@@ -14,7 +14,13 @@ describe('formatMmss', () => {
 
 describe('describeIntegrity (ui-spec §4.4 wording)', () => {
   it('verifying shows a spinner', () => {
-    expect(describeIntegrity(st({ integrity: 'verifying' }))).toMatchObject({ kind: 'verifying', spinner: true });
+    expect(describeIntegrity(st({ integrity: 'verifying', clipId: '01JC0000000000000000000000' }))).toMatchObject({
+      kind: 'verifying',
+      spinner: true,
+    });
+  });
+  it('no spinner before a clip is selected', () => {
+    expect(describeIntegrity(initialState()).spinner).toBe(false);
   });
   it('verifying stops spinning once opening failed', () => {
     const d = describeIntegrity(st({ integrity: 'verifying', message: 'ErrNoKey' }));
