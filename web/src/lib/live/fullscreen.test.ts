@@ -97,6 +97,15 @@ describe('toggleFullscreen', () => {
     expect(request).not.toHaveBeenCalled();
   });
 
+  it('ignores the iPhone player refusing before the video has loaded', () => {
+    iphoneVideo();
+    video.webkitEnterFullscreen = vi.fn(() => {
+      throw new DOMException('not ready', 'InvalidStateError');
+    });
+    expect(() => toggleFullscreen(el, video, asDoc())).not.toThrow();
+    expect(video.webkitEnterFullscreen).toHaveBeenCalledTimes(1);
+  });
+
   it('does nothing when no fullscreen API exists', () => {
     doc.fullscreenEnabled = false;
     expect(() => toggleFullscreen(el, video, asDoc())).not.toThrow();

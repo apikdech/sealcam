@@ -34,8 +34,13 @@ export function toggleFullscreen(el: HTMLElement, video: HTMLVideoElement, doc: 
       else el.requestFullscreen().catch(() => {});
       break;
     case 'video':
-      if (v.webkitDisplayingFullscreen) v.webkitExitFullscreen?.();
-      else v.webkitEnterFullscreen?.();
+      // WebKit throws InvalidStateError until the video has metadata.
+      try {
+        if (v.webkitDisplayingFullscreen) v.webkitExitFullscreen?.();
+        else v.webkitEnterFullscreen?.();
+      } catch {
+        // Not ready yet; the viewer can press again once the video plays.
+      }
       break;
   }
 }
