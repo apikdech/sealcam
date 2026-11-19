@@ -57,6 +57,13 @@ describe('App routing', () => {
     expect(screen.getByTestId('route-demo')).toHaveAttribute('data-clip', '01M6RXRJAQRJY105FSDF0QRBH1');
   });
 
+  it('keeps the demo page out of the nav', () => {
+    location.hash = '#/demo';
+    render(App);
+    const nav = screen.getByRole('navigation', { name: 'Views' });
+    expect([...nav.querySelectorAll('a')].map((a) => a.textContent)).toEqual(['Timeline', 'Live', 'Key']);
+  });
+
   it('follows hash changes', async () => {
     location.hash = '';
     render(App);

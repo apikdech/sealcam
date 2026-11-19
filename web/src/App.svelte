@@ -19,9 +19,9 @@
   });
 
   // Top-level views (design §7.2). The timeline is the home view.
-  // `#/demo?clip=<id>` is the playback engine's demo page.
-  const views = { '#/timeline': 'Timeline', '#/live': 'Live', '#/demo': 'Demo', '#/key': 'Key' } as const;
-  type Hash = keyof typeof views;
+  // `#/demo?clip=<id>` is the playback engine's test page (used by e2e); it is not in the nav.
+  const views = { '#/timeline': 'Timeline', '#/live': 'Live', '#/key': 'Key' } as const;
+  type Hash = keyof typeof views | '#/demo';
 
   /** The route part of the hash, without its query. */
   const route = (): Hash => {
