@@ -1,0 +1,94 @@
+# Local full stack (overlay on compose.yaml): adds a local S3 (RustFS) and a
+# one-shot job that makes the bucket, the policies and the zrelay and zview
+# users, so the production zrelay and zview-server containers run on this Mac
+# without the NAS. Start it with `make local-up`; stop it with `make local-down`
+# (the RustFS data volume stays).
+#
+# Needs the same files as compose.yaml, plus:
+#   secrets/rustfs_root_secret  the RustFS root secret key (user "rustfsadmin")
+# and in .env: S3_ENDPOINT=http://rustfs:9000
+#
+# s3-init creates the zrelay and zview users with the keys in
+# secrets/s3_secret_key and secrets/s3_ro_secret_key, so they always match.
+# RustFS listens on loopback only: S3 API on 9000, web console on 9001.
+# zview-server moves to 127.0.0.1:8081.
+
+services:
+  rustfs:
+    image: rustfs/rustfs:1.0.4
+    restart: unless-stopped
+    # RustFS reads its secret key from the environment only; export it from
+    # the secret file, then run the image's own entrypoint.
+    entrypoint:
+      - sh
+      - -c
+      - RUSTFS_SECRET_KEY="$$(cat /run/secrets/rustfs_root_secret)" exec /entrypoint.sh rustfs
+    environment:
+      RUSTFS_ACCESS_KEY: rustfsadmin
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
+    secrets:
+      - rustfs_root_secret
+    volumes:
+      - rustfs-data:/data
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "9000"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  # Idempotent: safe on every start.
+  s3-init:
+    image: pgsty/mc:RELEASE.2026-10-26T00-00-00Z
+    restart: "no"
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    secrets:
+      - rustfs_root_secret
+      - s3_secret_key
+      - s3_ro_secret_key
+    volumes:
+      - ./minio-relay-policy.json:/policies/relay.json:ro
+      - ./minio-zview-policy.json:/policies/zview.json:ro
+    entrypoint:
+      - sh
+      - -ec
+      - |
+        export MC_HOST_local="http://rustfsadmin:$$(cat /run/secrets/rustfs_root_secret)@rustfs:9000"
+        mc mb --ignore-existing local/cctv
+        mc admin policy create local zrelay-relay /policies/relay.json
+        mc admin policy create local zrelay-zview /policies/zview.json
+        mc admin user add local zrelay "$$(cat /run/secrets/s3_secret_key)"
+        mc admin user add local zview "$$(cat /run/secrets/s3_ro_secret_key)"
+        attach() {
+          mc admin policy attach local "$$1" --user "$$2" ||
+            mc admin policy entities local --user "$$2" | grep -q "$$1"
+        }
+        attach zrelay-relay zrelay
+        attach zrelay-zview zview
+        echo "s3-init: bucket cctv, users zrelay and zview ready"
+
+  zrelay:
+    depends_on:
+      s3-init:
+        condition: service_completed_successfully
+
+  zview-server:
+    depends_on:
+      s3-init:
+        condition: service_completed_successfully
+    ports: !override
+      - "127.0.0.1:8081:8080/tcp"         # 8080 is taken on this Mac
+
+secrets:
+  rustfs_root_secret:
+    file: ./secrets/rustfs_root_secret
+
+volumes:
+  rustfs-data: {}

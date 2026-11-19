@@ -1,11 +1,16 @@
 #!/bin/sh
 # Build and start the zrelay and zview-server containers (design §8.3).
 # TAILSCALE_IP is taken from `tailscale ip -4` when it is not set.
+# COMPOSE_FILE selects the compose files (default deploy/compose.yaml);
+# `make local-up` adds deploy/compose.local.yaml.
 set -eu
 cd "$(dirname "$0")/.."
 
 if [ -z "${TAILSCALE_IP:-}" ]; then
-	TAILSCALE_IP=$(tailscale ip -4 | head -n 1)
+	# The macOS app install puts the CLI inside the app bundle, not on PATH.
+	ts=tailscale
+	command -v tailscale >/dev/null 2>&1 || ts=/Applications/Tailscale.app/Contents/MacOS/Tailscale
+	TAILSCALE_IP=$("$ts" ip -4 2>/dev/null | head -n 1) || TAILSCALE_IP=
 fi
 if [ -z "$TAILSCALE_IP" ]; then
 	echo "deploy.sh: no Tailscale IPv4 address; set TAILSCALE_IP" >&2
@@ -28,5 +33,16 @@ for f in .env zrelay.yaml zview.yaml secrets/zrelay_master secrets/s3_secret_key
 	fi
 done
 
-# Builds and starts zrelay and zview-server.
-docker compose -f deploy/compose.yaml up -d --build
+COMPOSE_FILE="${COMPOSE_FILE:-deploy/compose.yaml}"
+export COMPOSE_FILE
+case "$COMPOSE_FILE" in
+*compose.local.yaml*)
+	if [ ! -e deploy/secrets/rustfs_root_secret ]; then
+		echo "deploy.sh: deploy/secrets/rustfs_root_secret is missing (see the header of deploy/compose.local.yaml)" >&2
+		exit 1
+	fi
+	;;
+esac
+
+# Builds and starts the services of the selected compose files.
+docker compose up -d --build

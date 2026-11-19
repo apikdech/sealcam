@@ -1,4 +1,4 @@
-.PHONY: test vet integration chaos vectors web web-e2e demo
+.PHONY: test vet integration chaos vectors web web-e2e demo local-up local-down local-logs
 
 # Unit tests with the race detector.
 test:
@@ -34,3 +34,19 @@ web-e2e:
 # configs and a throwaway key in .demo/ (README "Try it locally").
 demo:
 	go run ./internal/testutil/cmd/demo --dir .demo
+
+# Local full stack (README "Run the full stack on your Mac"): the production
+# containers plus RustFS, from deploy/compose.yaml and deploy/compose.local.yaml.
+LOCAL_COMPOSE = deploy/compose.yaml:deploy/compose.local.yaml
+
+# Build and start RustFS, the S3 setup job, zrelay and zview-server.
+local-up:
+	COMPOSE_FILE=$(LOCAL_COMPOSE) deploy/deploy.sh
+
+# Stop the local stack. The RustFS volume (the recordings) stays.
+local-down:
+	COMPOSE_FILE=$(LOCAL_COMPOSE) TAILSCALE_IP=$${TAILSCALE_IP:-0.0.0.0} docker compose down
+
+# Follow the logs of the local stack.
+local-logs:
+	COMPOSE_FILE=$(LOCAL_COMPOSE) TAILSCALE_IP=$${TAILSCALE_IP:-0.0.0.0} docker compose logs -f
