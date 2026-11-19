@@ -26,3 +26,6 @@ deploy/zview.yaml
 
 # Local demo (make demo): generated configs, throwaway key, recorded clips
 .demo/
+
+# Local end-to-end run: real camera + RustFS (configs, throwaway key, S3 secrets)
+.e2e/
