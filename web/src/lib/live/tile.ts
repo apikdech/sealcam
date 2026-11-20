@@ -28,6 +28,8 @@ export interface Tile {
   start(): void;
   destroy(): void;
   toggleMute(): void;
+  /** Mute unconditionally (audio focus), even when the audio track is gone. */
+  mute(): void;
   /** Cancel the timer, reset the backoff and open now. No-op while live or offline. */
   tryNow(): void;
   /** The relay reports the camera down (true) or back (false). */
@@ -179,6 +181,10 @@ export function createTile(opts: TileOptions): Tile {
       if (!canUnmute) return;
       video.muted = !video.muted;
       if (!video.muted) void video.play?.()?.catch?.(() => {});
+      emit();
+    },
+    mute() {
+      video.muted = true;
       emit();
     },
     tryNow() {

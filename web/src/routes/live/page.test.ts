@@ -55,7 +55,7 @@ describe('live page', () => {
     const client = new PageClient();
     client.offerFailures.push({ name: 'LiveBusy', status: 503 });
     render(LivePage, { client });
-    expect(await screen.findByText(/Too many people are watching/)).toBeInTheDocument();
+    expect(await screen.findByText(/Too many people are watching/, { selector: '[role="status"]' })).toBeInTheDocument();
   });
 
   it('says so when no key is loaded', async () => {

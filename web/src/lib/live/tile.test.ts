@@ -185,6 +185,24 @@ describe('tile', () => {
     tile.destroy();
   });
 
+  it('mute() mutes even when no audio track exists any more', async () => {
+    const video = fakeVideo();
+    const tile = make(video);
+    tile.start();
+    await flush();
+    FakePeer.instances[0]!.addRemoteTrack('audio');
+    tile.toggleMute();
+    expect(video.muted).toBe(false);
+    client.offerFailures.push({ name: 'LiveError', status: 502 });
+    tile.setOffline(true);
+    expect(tile.snapshot().canUnmute).toBe(false);
+    expect(video.muted).toBe(false);
+    tile.mute();
+    expect(video.muted).toBe(true);
+    expect(tile.snapshot().muted).toBe(true);
+    tile.destroy();
+  });
+
   it('destroy closes the session, stops timers and stops reacting to visibility', async () => {
     const tile = make();
     tile.start();

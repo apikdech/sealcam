@@ -43,7 +43,7 @@
       onChange: (s) => {
         snap = s;
         nowMs = Date.now();
-        if (!s.muted && !release) release = claimAudio(cameraId, () => t.toggleMute());
+        if (!s.muted && !release) release = claimAudio(cameraId, () => t.mute());
         else if (s.muted && release) {
           release();
           release = null;
@@ -80,6 +80,22 @@
 
   const seconds = $derived(snap.retryAt === null ? 0 : Math.max(0, Math.ceil((snap.retryAt - nowMs) / 1000)));
   const live = $derived(snap.state === 'live');
+  // The announced sentence: never includes the countdown, so it does not change as time passes.
+  const sentence = $derived(
+    snap.state === 'live'
+      ? 'Camera is live.'
+      : snap.state === 'connecting'
+        ? 'Connecting…'
+        : snap.state === 'reconnecting'
+          ? "Can't reach the camera. Trying again."
+          : snap.state === 'limit'
+            ? 'Too many people are watching. zview tries again.'
+            : snap.state === 'locked'
+              ? 'Key locked.'
+              : 'Camera offline. zview reconnects when it is back.',
+  );
+  // Over-video content is always drawn in the dark palette, in light mode too.
+  const overVideo = '--z-ov-ground:#0e1a1f;--z-ov-ink:#e6e2d6;--z-ov-muted:#93a6a4;--z-ov-line:#5fa8a0;--z-ov-rule:#22393f';
 </script>
 
 <div
@@ -90,59 +106,57 @@
   data-testid="live-tile"
   data-camera={cameraId}
   data-state={snap.state}
+  style={overVideo}
 >
-  <video bind:this={video} muted playsinline autoplay ondblclick={() => live && toggleFs()} class="aspect-video w-full bg-ground object-contain"></video>
+  <span role="status" class="sr-only">{sentence}</span>
+  <video bind:this={video} muted playsinline autoplay ondblclick={() => (live || fullscreen) && toggleFs()} class="aspect-video w-full bg-ground object-contain"></video>
 
   {#if !live}
-    <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ground/70 p-4 text-center text-ink">
-      <p>
+    <div class="ov-panel absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center text-(--z-ov-ink)">
+      <p aria-hidden="true">
         {#if snap.state === 'connecting'}
-          <span role="status">Connecting…</span>
+          Connecting…
         {:else if snap.state === 'reconnecting'}
-          <span role="status">Can't reach the camera. Trying again{seconds > 0 ? '' : '…'}</span>{#if seconds > 0}<span aria-hidden="true" class="num"> in {seconds} s.</span>{/if}
+          Can't reach the camera. Trying again{#if seconds > 0}<span class="num"> in {seconds} s.</span>{:else}…{/if}
         {:else if snap.state === 'limit'}
-          <span role="status">Too many people are watching. zview tries again{seconds > 0 ? '' : '…'}</span>{#if seconds > 0}<span aria-hidden="true" class="num"> in {seconds} s.</span>{/if}
+          Too many people are watching. zview tries again{#if seconds > 0}<span class="num"> in {seconds} s.</span>{:else}…{/if}
         {:else if snap.state === 'locked'}
-          <span role="status">Key locked.</span>
+          Key locked.
         {:else}
-          <span role="status">Camera offline. zview reconnects when it is back.</span>
+          Camera offline. zview reconnects when it is back.
         {/if}
       </p>
       {#if snap.state === 'reconnecting' || snap.state === 'limit'}
-        <button
-          type="button"
-          class="min-h-11 min-w-11 rounded-lg border border-rule bg-plate px-4 text-ink"
-          onclick={() => tile?.tryNow()}>Try now</button
-        >
+        <button type="button" class="ov-btn min-h-11 min-w-11 px-4" onclick={() => tile?.tryNow()}>Try now</button>
       {:else if snap.state === 'locked'}
-        <a href="#/key" class="inline-flex min-h-11 min-w-11 items-center rounded-lg border border-rule bg-plate px-4 text-ink">Unlock</a>
+        <a href="#/key" class="ov-btn inline-flex min-h-11 min-w-11 items-center px-4">Unlock</a>
       {/if}
     </div>
   {/if}
 
-  <div class="scrim absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 px-3 py-2.5 text-ink">
+  <div class="scrim absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 px-3 py-2.5 text-(--z-ov-ink)">
     <div class="flex min-w-0 flex-col">
       <span class="truncate font-semibold">{name}</span>
       {#if live}
-        <span class="num text-sm text-muted">as of {formatClock(nowMs, zone, true)}</span>
+        <span class="num text-sm text-(--z-ov-muted)">as of {formatClock(nowMs, zone, true)}</span>
       {/if}
     </div>
     <div class="flex items-center gap-2">
       {#if live}
-        <span class="rounded bg-line px-2 py-0.5 text-xs font-semibold tracking-wider text-ground">Live</span>
+        <span class="rounded bg-(--z-ov-line) px-2 py-0.5 text-xs font-semibold tracking-wider text-(--z-ov-ground)">Live</span>
       {/if}
       {#if snap.canUnmute}
         <button
           type="button"
-          class="inline-flex size-11 items-center justify-center rounded-[10px] border border-rule bg-ground/70 text-ink"
+          class="ov-btn inline-flex size-11 items-center justify-center"
           aria-label={snap.muted ? 'Turn sound on' : 'Turn sound off'}
           onclick={() => toggle()}><Icon name={snap.muted ? 'sound-off' : 'sound-on'} /></button
         >
       {/if}
-      {#if live && fsMode !== 'none'}
+      {#if (live || fullscreen) && fsMode !== 'none'}
         <button
           type="button"
-          class="inline-flex size-11 items-center justify-center rounded-[10px] border border-rule bg-ground/70 text-ink"
+          class="ov-btn inline-flex size-11 items-center justify-center"
           aria-label={fullscreen ? 'Exit full screen' : 'Full screen'}
           onclick={() => toggleFs()}><Icon name={fullscreen ? 'fullscreen-exit' : 'fullscreen'} /></button
         >
@@ -154,6 +168,15 @@
 <style>
   /* The one gradient allowed: it keeps the bottom bar legible over any picture. */
   .scrim {
-    background: linear-gradient(transparent, color-mix(in srgb, var(--z-ground) 85%, transparent));
+    background: linear-gradient(transparent, color-mix(in srgb, var(--z-ov-ground) 85%, transparent));
+  }
+  .ov-panel {
+    background: color-mix(in srgb, var(--z-ov-ground) 70%, transparent);
+  }
+  .ov-btn {
+    border: 1px solid var(--z-ov-rule);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--z-ov-ground) 70%, transparent);
+    color: var(--z-ov-ink);
   }
 </style>

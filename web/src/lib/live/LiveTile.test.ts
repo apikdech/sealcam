@@ -236,4 +236,63 @@ describe('LiveTile states', () => {
     expect(a!.muted).toBe(true);
     expect(screen.getByRole('button', { name: 'Turn sound off' })).toBeTruthy();
   });
+
+  it('a tile that went offline while unmuted is muted when another tile takes the sound', async () => {
+    const a = render(LiveTile, { cameraId: 'front', name: 'Front', client: new FakeClient(), zone: ZONE });
+    render(LiveTile, { cameraId: 'yard', name: 'Yard', client: new FakeClient(), zone: ZONE });
+    await flush();
+    FakePeer.instances.forEach((p) => p.addRemoteTrack('audio'));
+    await tick();
+    const [va, vb] = screen.getAllByTestId('live-tile').map((t) => t.querySelector('video')!);
+    await fireEvent.click(screen.getAllByRole('button', { name: 'Turn sound on' })[0]!);
+    expect(va!.muted).toBe(false);
+    await a.rerender({ offline: true });
+    await flush();
+    await tick();
+    await fireEvent.click(screen.getByRole('button', { name: 'Turn sound on' }));
+    expect(vb!.muted).toBe(false);
+    expect(va!.muted).toBe(true);
+  });
+
+  it('keeps one status element across connecting, reconnecting and live, with stable text', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T12:00:00Z'));
+    try {
+      const f = fakeTile();
+      render(LiveTile, { cameraId: 'front', name: 'Front', client: new FakeClient(), zone: ZONE, makeTile: f.make });
+      await f.emit({ state: 'connecting' });
+      const status = screen.getByRole('status');
+      await f.emit({ state: 'reconnecting', retryAt: Date.now() + 2000 });
+      expect(screen.getByRole('status')).toBe(status);
+      const text = status.textContent;
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(status.textContent).toBe(text);
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(status.textContent).toBe(text);
+      await f.emit({ state: 'live' });
+      expect(screen.getByRole('status')).toBe(status);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps Exit full screen and double-click exit when a fullscreen tile leaves live', async () => {
+    const f = fakeTile();
+    render(LiveTile, { cameraId: 'front', name: 'Front', client: new FakeClient(), zone: ZONE, makeTile: f.make });
+    const tile = screen.getByTestId('live-tile');
+    const exit = vi.fn(async () => {});
+    document.exitFullscreen = exit as unknown as Document['exitFullscreen'];
+    await f.emit({ state: 'live' });
+    setFullscreenElement(tile);
+    await flush();
+    await f.emit({ state: 'reconnecting', retryAt: null });
+    expect(screen.getByRole('button', { name: 'Exit full screen' })).toBeTruthy();
+    await fireEvent.dblClick(tile.querySelector('video')!);
+    expect(exit).toHaveBeenCalledTimes(1);
+  });
+
+  it('defines dark over-video colours on the tile root', () => {
+    const tile = renderTile();
+    expect(tile.getAttribute('style') ?? '').toMatch(/--z-ov-ground/);
+  });
 });
