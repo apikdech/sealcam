@@ -95,6 +95,45 @@ The demo is different from production in two ways:
   tests the S3 path with MinIO in Docker.
 - The demo uses only `127.0.0.1`. It does not use Tailscale or HTTPS.
 
+## Run the full stack on your Mac
+
+This section starts the production containers on your Mac with a local S3 server (RustFS) in
+place of the NAS. Use it to test all features with the real camera before you use the NAS.
+
+`make local-up` starts four services:
+
+- `rustfs`: the local S3 server. Its data stays in the Docker volume `zrelay_rustfs-data`.
+- `s3-init`: a setup job. It makes the `cctv` bucket, the two policies, and the `zrelay` and
+  `zview` users. It uses the secret keys in `deploy/secrets/`, so the keys always agree.
+- `zrelay` and `zview-server`: the same containers as in production.
+
+**Prerequisites:**
+
+- Docker with OrbStack, with the Local Network permission (runbook section 8).
+- Tailscale on the Mac. `deploy/deploy.sh` finds the CLI of the macOS app.
+- The production files in `deploy/` (see "Install the production system", steps 2 to 5).
+
+Do these steps:
+
+1. Write the production files in `deploy/`. In `deploy/.env`, set `S3_ENDPOINT=http://rustfs:9000`.
+2. In `deploy/zrelay.yaml`, set `relay.http_listen` to `"0.0.0.0:9464"`.
+3. Write a random secret key for the RustFS root user into `deploy/secrets/rustfs_root_secret`:
+   `(umask 077; openssl rand -hex 20 > deploy/secrets/rustfs_root_secret)`
+4. Start the stack: `make local-up`
+5. Open <http://127.0.0.1:8081> and import your master key.
+
+Use these commands to operate the stack:
+
+- `make local-logs` shows the logs of all services.
+- `make local-down` stops all services. The recordings stay in the RustFS volume.
+- The RustFS console is at <http://127.0.0.1:9001>. The user is `rustfsadmin`. The password is
+  in `deploy/secrets/rustfs_root_secret`.
+
+> **Warning:** `docker volume rm zrelay_rustfs-data` deletes all recordings in RustFS.
+
+To move to the NAS, change `S3_ENDPOINT` and the two S3 keys. Then start the stack with
+`deploy/deploy.sh`, without the local layer.
+
 ## Install the production system
 
 For the full procedure, see [`deploy/runbook.md`](deploy/runbook.md). These are the main steps:
@@ -136,6 +175,9 @@ You need Go 1.27 and Docker. For `web/`, you also need Node 26 and pnpm 12.
 | `make web` | Installs, lints, type-checks, and tests the web app in `web/`. |
 | `make web-e2e` | Runs the Playwright browser tests (Chromium and WebKit). |
 | `make demo` | Starts the local demo (see "Try it on your computer"). |
+| `make local-up` | Builds and starts the full stack with a local S3 server (see "Run the full stack on your Mac"). |
+| `make local-down` | Stops the full stack. The recordings stay. |
+| `make local-logs` | Shows the logs of the full stack. |
 
 The project runs `ffmpeg` and `ffprobe` only from a pinned Docker image. It never runs them on
 the host.
