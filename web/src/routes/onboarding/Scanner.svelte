@@ -30,14 +30,17 @@
       try {
         camera = await open();
         if (gone) return;
-        camera.video.className = 'w-full rounded';
+        camera.video.className = 'block w-full';
         video = camera.video;
         const text = await scanFrames({ grab: () => camera!.grab(), decode, wait, signal: ac.signal });
         onDecoded(text);
       } catch (e) {
         if ((e as Error).name !== 'AbortError') {
           // Only the error name: browsers' messages are not user-facing text.
-          error = (e as Error).name === 'NotAllowedError' ? 'Camera permission was denied.' : 'The camera could not be opened.';
+          error =
+            (e as Error).name === 'NotAllowedError'
+              ? "zview can't use the camera. Allow camera access in your browser settings, or use a photo of the QR code."
+              : "zview can't open the camera. Use a photo of the QR code instead.";
         }
       } finally {
         camera?.stop();
@@ -52,17 +55,22 @@
   });
 </script>
 
-<section aria-label="QR scanner" class="space-y-2">
+<section aria-label="QR scanner" class="space-y-3">
+  <p>Point the camera at the QR code.</p>
   {#if video}
-    <!-- The camera's own <video> element is placed here as-is. -->
-    <div
-      {@attach (host) => {
-        host.append(video!);
-      }}
-    ></div>
+    <div class="relative overflow-hidden rounded bg-plate">
+      <!-- The camera's own <video> element is placed here as-is. -->
+      <div
+        {@attach (host) => {
+          host.append(video!);
+        }}
+      ></div>
+      <span aria-hidden="true" class="pointer-events-none absolute top-1/2 left-1/2 aspect-square w-3/5 -translate-x-1/2 -translate-y-1/2 rounded border-2 border-ink"></span>
+    </div>
+    <p role="status" class="text-sm text-muted">Looking for a QR code…</p>
   {/if}
   {#if error}
-    <p role="alert" class="text-sm text-amber-400">{error} Paste the key instead.</p>
+    <p role="alert" class="text-amber">{error}</p>
   {/if}
-  <button type="button" class="rounded bg-neutral-800 px-3 py-1 text-sm" onclick={onClose}>Close scanner</button>
+  <button type="button" class="min-h-11 rounded border border-rule px-4 text-ink" onclick={onClose}>Close scanner</button>
 </section>

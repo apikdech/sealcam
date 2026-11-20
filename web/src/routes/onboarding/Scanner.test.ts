@@ -60,4 +60,20 @@ describe('Scanner', () => {
     screen.getByRole('button', { name: /close/i }).click();
     expect(onClose).toHaveBeenCalled();
   });
+
+  it('shows the instruction and the denial message', async () => {
+    render(Scanner, {
+      open: async () => {
+        throw Object.assign(new Error('denied'), { name: 'NotAllowedError' });
+      },
+      decode: async () => null,
+      wait: async () => {},
+      onDecoded: () => {},
+      onClose: () => {},
+    });
+    expect(screen.getByText('Point the camera at the QR code.')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "zview can't use the camera. Allow camera access in your browser settings, or use a photo of the QR code.",
+    );
+  });
 });

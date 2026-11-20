@@ -16,7 +16,7 @@ The viewer is private. It opens only on devices in the family Tailscale network.
 
 1. Open the address from the owner in Safari (iPhone) or Chrome (Android). The address looks
    like `https://mini.<name>.ts.net`.
-2. Make sure that the zview page shows "Import your key first".
+2. Make sure that the zview page shows "Add the family key".
 
 If the page does not open, make sure that Tailscale is on.
 
@@ -33,15 +33,18 @@ From now on, open zview from the new icon.
 
 ## 4. Add the key
 
-1. In zview, open the **Key** tab.
-2. Do one of these two steps:
-   - Paste the `zk1-...` text into **Master key**. Then tap **Import key**.
+1. In zview, find **Family key**. On a new device, this is the first screen.
+2. Do one of these three steps:
    - Tap **Scan QR code**. Let the app use the camera. Point the camera at the QR picture from
      the owner.
-3. A short fingerprint shows. Make sure that it is the same as the fingerprint from the owner.
+   - Tap **Use a photo of the QR code**. Choose the picture that the owner sent you.
+   - Paste the `zk1-...` text into **Family key**. Then tap **Add key**.
+3. The app shows **Key added** and a round fingerprint picture with a short fingerprint. Make
+   sure that it is the same as the fingerprint from the owner.
 4. If the app shows "typo in key", the text has an error. Copy the key again and try again.
-5. If the phone is your own phone, turn on **Remember this device**. On a shared phone, keep it
-   off.
+5. If the phone is your own phone, tap **Keep it on this phone**. On a shared phone, tap
+   **Only for now**.
+6. Tap **Open Home**.
 
 Now open **Timeline**. Select a day and tap a recording to watch it. **Live** shows the cameras
 now.
@@ -50,7 +53,7 @@ now.
 
 * The key never goes into a link, a message, or the address bar. Do not give the key to persons
   outside the family. A person with the key and Tailscale access can watch the cameras.
-* To remove the key from a device, open **Key** and tap **Forget** next to the key. If you lose a
+* To remove the key from a device, open **Keys** and tap **Forget** next to the key. Then tap **Forget key** to confirm. If you lose a
   phone, tell the owner immediately.
 * When an update is available, the app shows "New version available — reload". Tap reload when
   no video plays.
