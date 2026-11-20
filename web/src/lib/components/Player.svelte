@@ -8,6 +8,8 @@
   import ExportDialog from './ExportDialog.svelte';
   import Icon from './Icon.svelte';
   import { overVideo } from '../overVideo';
+  import { claimAudio } from '../live/audioFocus';
+  import { fullscreenMode, toggleFullscreen, watchFullscreen, type FullscreenMode } from '../live/fullscreen';
   import Seal from '../seal/Seal.svelte';
   import type { SealState } from '../seal/rosette';
   import { formatClock } from '../timeline/timezone';
@@ -53,6 +55,38 @@
   }: Props = $props();
 
   let video: HTMLVideoElement | undefined = $state();
+  let frame: HTMLDivElement | undefined = $state();
+  let fsMode: FullscreenMode = $state('none');
+  let fullscreen = $state(false);
+  let muted = $state(true);
+  let hasAudio = $state(false);
+  let pos = $state(0);
+  let duration = $state(0);
+  let releaseAudio: (() => void) | null = null;
+
+  type AudioProbe = HTMLVideoElement & { audioTracks?: { length: number }; mozHasAudio?: boolean; webkitAudioDecodedByteCount?: number };
+
+  /** Reads what the video element knows after a media event: duration, position, whether it has sound. */
+  function sync(v: HTMLVideoElement): void {
+    pos = v.currentTime;
+    duration = Number.isFinite(v.duration) ? v.duration : 0;
+    const a = v as AudioProbe;
+    hasAudio = (a.audioTracks?.length ?? 0) > 0 || a.mozHasAudio === true || (a.webkitAudioDecodedByteCount ?? 0) > 0;
+    muted = v.muted;
+    // Sound on takes the shared audio focus; sound off (or leaving) gives it back.
+    if (!v.muted && !releaseAudio) {
+      releaseAudio = claimAudio('player', () => {
+        v.muted = true;
+      });
+    } else if (v.muted && releaseAudio) {
+      releaseAudio();
+      releaseAudio = null;
+    }
+  }
+
+  function toggleSound(): void {
+    if (video) video.muted = !video.muted;
+  }
   let player: Player | undefined = $state();
   let snap: PlayerState = $state(initialState());
   let loadError = $state('');
@@ -67,7 +101,10 @@
 
   onMount(() => {
     if (!video) return;
-    const p = factory(video, client as WorkerClient, { profile: mp4Profile });
+    const v = video;
+    fsMode = fullscreenMode(v);
+    const unwatch = frame ? watchFullscreen(frame, v, (on) => (fullscreen = on)) : () => {};
+    const p = factory(v, client as WorkerClient, { profile: mp4Profile });
     const off = p.onState((s) => {
       snap = s;
       if (s.clipId !== null) current = s.clipId;
@@ -76,6 +113,8 @@
     player = p;
     return () => {
       clearTimeout(savedTimer);
+      unwatch();
+      releaseAudio?.();
       off();
       p.destroy();
     };
@@ -231,7 +270,8 @@
     </button>
   {/if}
   <div
-    class="relative overflow-hidden rounded-lg border border-rule md:mx-auto md:w-[min(100%,calc(56vh*16/9))] {snap.clipId === null
+    bind:this={frame}
+    class="relative overflow-hidden rounded-lg border border-rule md:w-[min(100%,calc(56vh*16/9))] [&:fullscreen]:w-full [&:fullscreen_video]:aspect-auto [&:fullscreen_video]:h-full {snap.clipId === null
       ? 'bg-plate'
       : 'bg-black'}"
   >
@@ -243,12 +283,51 @@
       playsinline
       onplay={() => (playing = true)}
       onpause={() => (playing = false)}
+      ontimeupdate={(e) => sync(e.currentTarget)}
+      onloadedmetadata={(e) => sync(e.currentTarget)}
+      ondurationchange={(e) => sync(e.currentTarget)}
+      onvolumechange={(e) => sync(e.currentTarget)}
       class="aspect-video w-full object-contain {snap.clipId === null ? '' : 'bg-black'}"
     ></video>
     {#if snap.clipId === null}
       <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-sm text-muted">
-        <span class="opacity-60"><Seal seed="zview" state="unknown-key" size={40} decorative /></span>
+        <span class="opacity-60"><Seal seed="zview" state="unchecked" size={40} decorative /></span>
         <span>Select a recording</span>
+      </div>
+    {/if}
+    {#if snap.clipId !== null}
+      <div class="scrim absolute inset-x-0 bottom-0 flex items-center gap-2 px-3 py-2 text-(--z-ov-ink)" style={overVideo}>
+        <input
+          type="range"
+          aria-label="Position"
+          class="min-w-0 flex-1"
+          min="0"
+          max={duration}
+          step="any"
+          value={pos}
+          disabled={duration === 0}
+          oninput={(e) => {
+            pos = Number(e.currentTarget.value);
+            void player?.seek(pos * 1000);
+          }}
+        />
+        {#if hasAudio}
+          <button
+            type="button"
+            class="ov-btn inline-flex size-11 shrink-0 items-center justify-center"
+            aria-label={muted ? 'Turn sound on' : 'Turn sound off'}
+            onclick={toggleSound}><Icon name={muted ? 'sound-off' : 'sound-on'} /></button
+          >
+        {/if}
+        {#if fsMode !== 'none'}
+          <button
+            type="button"
+            class="ov-btn inline-flex size-11 shrink-0 items-center justify-center"
+            aria-label={fullscreen ? 'Exit full screen' : 'Full screen'}
+            onclick={() => frame && video && toggleFullscreen(frame, video)}
+            ><Icon name={fullscreen ? 'fullscreen-exit' : 'fullscreen'} /></button
+          >
+        {/if}
       </div>
     {/if}
     {#if view.spinner}
@@ -340,3 +419,19 @@
     }}
   />
 {/if}
+
+<style>
+  /* The one gradient allowed: it keeps the bottom bar legible over any picture. */
+  .scrim {
+    background: linear-gradient(transparent, color-mix(in srgb, var(--z-ov-ground) 85%, transparent));
+  }
+  .ov-btn {
+    border: 1px solid var(--z-ov-rule);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--z-ov-ground) 70%, transparent);
+    color: var(--z-ov-ink);
+  }
+  input[type='range'] {
+    accent-color: var(--z-ov-line);
+  }
+</style>

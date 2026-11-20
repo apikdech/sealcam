@@ -141,7 +141,8 @@ describe('Player', () => {
     expect(frame).not.toHaveClass('bg-black');
     expect(video).not.toHaveClass('bg-black');
     expect(within(frame).getByText('Select a recording')).toBeInTheDocument();
-    expect(frame.querySelector('[data-seal-state]')).not.toBeNull();
+    // A neutral mark: it claims nothing was checked.
+    expect(frame.querySelector('[data-seal-state]')).toHaveAttribute('data-seal-state', 'unchecked');
     expect(frame.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
   });
 
@@ -155,7 +156,78 @@ describe('Player', () => {
 
   it('caps its height on desktop, keeping 16:9 by width', () => {
     render(Player, props());
-    expect(screen.getByTestId('player').parentElement!.className).toContain('md:w-[min(100%,calc(56vh*16/9))]');
+    const cls = screen.getByTestId('player').parentElement!.className;
+    expect(cls).toContain('md:w-[min(100%,calc(56vh*16/9))]');
+    // Left-aligned with the rest of the page.
+    expect(cls).not.toContain('mx-auto');
+  });
+
+  describe('clip controls', () => {
+    const stub = (v: HTMLElement, key: string, value: unknown) => Object.defineProperty(v, key, { value, configurable: true });
+
+    it('has an accessible Position range that shows the clip time and seeks on input', async () => {
+      render(Player, props());
+      const v = screen.getByTestId('player') as HTMLVideoElement;
+      const range = (await screen.findByRole('slider', { name: 'Position' })) as HTMLInputElement;
+      expect(range).toBeDisabled();
+      stub(v, 'duration', 120);
+      stub(v, 'currentTime', 12);
+      await fireEvent(v, new Event('loadedmetadata'));
+      expect(range).toBeEnabled();
+      expect(range.max).toBe('120');
+      expect(range.value).toBe('12');
+      await fireEvent.input(range, { target: { value: '30' } });
+      expect(FakePlayer.instances[0]!.seeks).toContain(30_000);
+      stub(v, 'currentTime', 31);
+      await fireEvent(v, new Event('timeupdate'));
+      expect(range.value).toBe('31');
+    });
+
+    it('offers sound only when the clip has audio, and toggles it', async () => {
+      render(Player, props());
+      const v = screen.getByTestId('player') as HTMLVideoElement;
+      await screen.findByRole('slider', { name: 'Position' });
+      expect(screen.queryByRole('button', { name: /turn sound/i })).toBeNull();
+      stub(v, 'webkitAudioDecodedByteCount', 100);
+      await fireEvent(v, new Event('timeupdate'));
+      await fireEvent.click(screen.getByRole('button', { name: 'Turn sound on' }));
+      expect(v.muted).toBe(false);
+      await fireEvent(v, new Event('volumechange'));
+      expect(screen.getByRole('button', { name: 'Turn sound off' })).toBeInTheDocument();
+    });
+
+    it('sound follows the shared audio focus: another claimant mutes the clip', async () => {
+      const { claimAudio } = await import('../live/audioFocus');
+      render(Player, props());
+      const v = screen.getByTestId('player') as HTMLVideoElement;
+      await screen.findByRole('slider', { name: 'Position' });
+      stub(v, 'webkitAudioDecodedByteCount', 100);
+      v.muted = false;
+      await fireEvent(v, new Event('volumechange'));
+      claimAudio('live-x', () => {})();
+      expect(v.muted).toBe(true);
+    });
+
+    it('has Full screen only where the browser supports it, and requests it on the frame', async () => {
+      const spy = vi.fn(() => Promise.resolve());
+      const descriptor = Object.getOwnPropertyDescriptor(document, 'fullscreenEnabled');
+      Object.defineProperty(document, 'fullscreenEnabled', { value: false, configurable: true });
+      const { unmount } = render(Player, props());
+      await screen.findByRole('slider', { name: 'Position' });
+      expect(screen.queryByRole('button', { name: 'Full screen' })).toBeNull();
+      unmount();
+      Object.defineProperty(document, 'fullscreenEnabled', { value: true, configurable: true });
+      try {
+        render(Player, props());
+        const v = screen.getByTestId('player');
+        v.parentElement!.requestFullscreen = spy;
+        await fireEvent.click(await screen.findByRole('button', { name: 'Full screen' }));
+        expect(spy).toHaveBeenCalled();
+      } finally {
+        if (descriptor) Object.defineProperty(document, 'fullscreenEnabled', descriptor);
+        else delete (document as unknown as Record<string, unknown>).fullscreenEnabled;
+      }
+    });
   });
 
   it('seeks to the offset after loading', async () => {
