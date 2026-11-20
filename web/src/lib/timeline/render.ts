@@ -131,12 +131,20 @@ export interface DrawOptions {
   hoverY?: number;
 }
 
-const FONT = '11px system-ui, sans-serif';
+const FACE = '"Atkinson Hyperlegible Next", system-ui, sans-serif';
+const FONT = `11px ${FACE}`;
+const FONT_BOLD = `bold 11px ${FACE}`;
 
-let hatchCache: { color: string; pattern: CanvasPattern } | null = null;
+/** Tabular figures for the ruler times where the canvas supports it; otherwise proportional. */
+function tabular(ctx: CanvasRenderingContext2D): void {
+  if ('fontVariantNumeric' in ctx) (ctx as unknown as { fontVariantNumeric: string }).fontVariantNumeric = 'tabular-nums';
+}
+
+const hatchCache = new Map<string, CanvasPattern>();
 
 function hatchPattern(ctx: CanvasRenderingContext2D, color: string): CanvasPattern | string {
-  if (hatchCache?.color === color) return hatchCache.pattern;
+  const cached = hatchCache.get(color);
+  if (cached) return cached;
   const tile = document.createElement('canvas');
   tile.width = tile.height = 8;
   const t = tile.getContext('2d');
@@ -154,7 +162,7 @@ function hatchPattern(ctx: CanvasRenderingContext2D, color: string): CanvasPatte
     return ctx.createPattern(tile, 'repeat');
   })() : null;
   if (!pattern) return color;
-  hatchCache = { color, pattern };
+  hatchCache.set(color, pattern);
   return pattern;
 }
 
@@ -179,6 +187,7 @@ export function drawTimeline(ctx: CanvasRenderingContext2D, layout: Layout, o: D
 
   // Ruler and vertical grid in the display zone.
   ctx.font = FONT;
+  tabular(ctx);
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
   ctx.strokeStyle = p.grid;
@@ -220,7 +229,7 @@ export function drawTimeline(ctx: CanvasRenderingContext2D, layout: Layout, o: D
 
   // Glyphs where they fit, so meaning never rests on color alone.
   ctx.fillStyle = p.onTrigger;
-  ctx.font = 'bold 11px system-ui, sans-serif';
+  ctx.font = FONT_BOLD;
   ctx.textAlign = 'center';
   for (const lane of layout.lanes) {
     for (const c of lane.clips) {
@@ -233,7 +242,19 @@ export function drawTimeline(ctx: CanvasRenderingContext2D, layout: Layout, o: D
   }
   ctx.textAlign = 'left';
 
+  // Camera names after the bars, on a plate backing so they stay legible.
+  ctx.font = FONT;
+  for (const lane of layout.lanes) {
+    const w = ctx.measureText(lane.name).width + 8;
+    ctx.fillStyle = p.lane;
+    ctx.fillRect(0, lane.y, w, 16);
+    ctx.fillStyle = p.textDim;
+    ctx.fillText(lane.name, 4, lane.y + 8);
+  }
+
   // Integrity markers (ui-spec §4.4): colour plus shape, never colour alone.
+  // Drawn after the lane names so no label plate can cover a marker.
+  const tamperedHatch = hatchPattern(ctx, p.tampered);
   for (const lane of layout.lanes) {
     for (const c of lane.clips) {
       const state = o.integrity[c.clipId];
@@ -244,7 +265,7 @@ export function drawTimeline(ctx: CanvasRenderingContext2D, layout: Layout, o: D
         ctx.beginPath();
         ctx.rect(c.x0, c.y, w, c.h);
         ctx.clip();
-        ctx.fillStyle = hatchPattern(ctx, p.tampered);
+        ctx.fillStyle = tamperedHatch;
         ctx.fillRect(c.x0, c.y, w, c.h);
         ctx.restore();
       }
@@ -261,16 +282,6 @@ export function drawTimeline(ctx: CanvasRenderingContext2D, layout: Layout, o: D
         ctx.fill();
       }
     }
-  }
-
-  // Camera names last, on a plate backing so they stay legible over the bars.
-  ctx.font = FONT;
-  for (const lane of layout.lanes) {
-    const w = ctx.measureText(lane.name).width + 8;
-    ctx.fillStyle = p.lane;
-    ctx.fillRect(0, lane.y, w, 16);
-    ctx.fillStyle = p.textDim;
-    ctx.fillText(lane.name, 4, lane.y + 8);
   }
 
   if (o.selectedClipId) {

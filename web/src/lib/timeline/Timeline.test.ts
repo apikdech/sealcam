@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { untrack } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Timeline from './Timeline.svelte';
+import Harness from './TimelineHarness.test.svelte';
 import { drawTimeline } from './render';
 import { localDayRange } from './timezone';
 
@@ -136,6 +137,17 @@ describe('Timeline.stepZoom anchoring', () => {
     api.stepZoom('in');
     const w = view();
     expect((NOW - w.startMs) / w.spanMs).toBeCloseTo((NOW - v.startMs) / v.spanMs, 6);
+  });
+});
+
+describe('Timeline integrity tracking', () => {
+  it('repaints when a key of a $state record is mutated in place', () => {
+    const r = render(Harness, props());
+    vi.mocked(drawTimeline).mockClear();
+    (r.component as unknown as { mark(id: string, s: string): void }).mark('a', 'tampered');
+    return Promise.resolve().then(() => {
+      expect(vi.mocked(drawTimeline).mock.calls.at(-1)![2].integrity).toEqual({ a: 'tampered' });
+    });
   });
 });
 

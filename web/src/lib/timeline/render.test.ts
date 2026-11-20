@@ -104,7 +104,11 @@ function spyCtx() {
   const ctx = new Proxy(state, {
     get(_t, key: string) {
       if (key === 'measureText') return () => ({ width: 50 });
-      if (key === 'createPattern') return () => ({ pattern: true });
+      if (key === 'createPattern')
+        return () => {
+          ops.push({ op: 'createPattern', args: [], fill: null, stroke: null });
+          return { pattern: true };
+        };
       if (key in state) return state[key];
       return (...args: unknown[]) => {
         ops.push({ op: key, args, fill: state.fillStyle, stroke: state.strokeStyle });
@@ -165,6 +169,39 @@ describe('readPalette', () => {
 });
 
 describe('drawTimeline integrity markers', () => {
+  it('tampered hatch pattern is built once, not on every frame', () => {
+    const tile = spyCtx();
+    const orig = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = (() => tile.ctx) as never;
+    const pal = { ...DARK, tampered: '#123456', hatch: '#654321' };
+    const draw = () => {
+      const { ctx, ops } = spyCtx();
+      const layout = frame({}).layout;
+      drawTimeline(ctx, layout, { zone: 'UTC', palette: pal, integrity: { c1: 'tampered' } });
+      return ops.filter((o) => o.op === 'createPattern').length;
+    };
+    try {
+      expect(draw()).toBe(2); // hatch + tampered, first draw only
+      expect(draw()).toBe(0);
+    } finally {
+      HTMLCanvasElement.prototype.getContext = orig;
+    }
+  });
+
+  it('integrity markers are drawn after the lane names', () => {
+    const { ops } = frame({ c1: 'mismatch' });
+    const name = ops.findIndex((o) => o.op === 'fillText' && o.args[0] === 'Front Door');
+    const marker = ops.findIndex((o) => o.op === 'strokeRect' && o.stroke === DARK.mismatch);
+    expect(marker).toBeGreaterThan(name);
+  });
+
+  it('canvas text uses the app face', () => {
+    const { ctx } = spyCtx();
+    const { layout } = frame({});
+    drawTimeline(ctx, layout, { zone: 'UTC', integrity: {} });
+    expect((ctx as unknown as { font: string }).font).toContain('Atkinson Hyperlegible Next');
+  });
+
   it('tampered bar is stroked with the tampered colour', () => {
     const { ops } = frame({ c1: 'tampered' });
     expect(ops.some((o) => o.op === 'strokeRect' && o.stroke === DARK.tampered)).toBe(true);

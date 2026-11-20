@@ -58,6 +58,7 @@
     cameras: $state.snapshot(cameras),
     clips: $state.snapshot(clips),
     coverage: $state.snapshot(coverage),
+    integrity: $state.snapshot(integrity),
   });
   const cssHeight = $derived(RULER_HEIGHT + Math.max(cameras.length, 1) * (laneHeight + LANE_GAP));
 
@@ -90,7 +91,7 @@
     drawTimeline(ctx, layout, {
       zone,
       palette,
-      integrity: $state.snapshot(integrity),
+      integrity: data.integrity,
       nowMs: currentNow(),
       selectedClipId: selectedId,
       hoverGap,
@@ -116,7 +117,7 @@
   });
 
   $effect(() => {
-    void [laneHeight, integrity];
+    void laneHeight;
     sched?.invalidate();
   });
 
@@ -129,7 +130,7 @@
 
   // Any change of data repaints.
   $effect(() => {
-    void [data, nowMs, zone, integrity, laneHeight];
+    void [data, nowMs, zone];
     sched?.invalidate();
   });
 
