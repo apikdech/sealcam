@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,7 +7,7 @@ import type { AddressInfo } from 'node:net';
 import { createServer, type ViteDevServer } from 'vite';
 
 // The timeline page in a real browser engine: layout (desktop and phone),
-// the virtualized list, keyboard shortcuts and the relay status dot.
+// the paged list, keyboard shortcuts and the recorder status pill.
 const webRoot = fileURLToPath(new URL('..', import.meta.url));
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 
@@ -35,25 +35,35 @@ test.afterAll(async () => {
 });
 
 const url = () => `${origin}/e2e/page/dashboard.html`;
+// The whole app over the same canned API, at the fixed "now" (2026-11-06 15:00 UTC) and zone.
+const NOW = Date.UTC(2026, 10, 6, 15, 0, 0);
+async function openShell(page: Page) {
+  await page.clock.install({ time: NOW });
+  await page.addInitScript(() => localStorage.setItem('zview.zone', 'Asia/Jakarta'));
+  await page.goto(`${origin}/e2e/page/dashboard.html?shell#/timeline`);
+}
 
 test.describe('desktop', () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
-  test('shows a short window of a long list, newest first, beside the player', async ({ page }) => {
+  test('shows a bounded page of a long list, newest first, in the side column', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto(url());
     const list = page.getByRole('listbox', { name: /recordings/i });
     await expect(list.getByRole('option').first()).toBeVisible();
-    expect(await list.getByRole('option').count()).toBeLessThan(40);
+    // 400 recordings, 50 rows in the DOM; "Show 50 more" adds one page.
+    expect(await list.getByRole('option').count()).toBe(50);
     // Newest first: the last clip of the day (index 399) leads.
     await expect(list.getByRole('option').first()).toHaveAttribute('data-clip', /399$/);
-    const [p, l] = await Promise.all([page.getByTestId('player').boundingBox(), list.boundingBox()]);
-    expect(l!.x).toBeGreaterThan(p!.x + p!.width - 1); // the sidebar sits to the right of the player
+    await page.getByRole('button', { name: 'Show 50 more' }).click();
+    expect(await list.getByRole('option').count()).toBe(100);
+    const [t, l] = await Promise.all([page.locator('canvas').first().boundingBox(), list.boundingBox()]);
+    expect(l!.x).toBeGreaterThan(t!.x + t!.width - 1); // the day's list sits to the right of the timeline
     expect(errors).toEqual([]);
   });
 
-  test('J and K walk the clips and the status dot is red for a 4-minute-old status', async ({ page }) => {
+  test('J and K walk the clips', async ({ page }) => {
     await page.goto(url());
     const list = page.getByRole('listbox', { name: /recordings/i });
     await expect(list.getByRole('option').first()).toBeVisible();
@@ -62,7 +72,11 @@ test.describe('desktop', () => {
     await expect(sel).toHaveAttribute('data-clip', /399$/);
     await page.keyboard.press('j');
     await expect(sel).toHaveAttribute('data-clip', /398$/);
-    await expect(page.getByTestId('relay-dot')).toHaveAttribute('data-level', 'bad');
+  });
+
+  test('the recorder status pill is red for a 4-minute-old status', async ({ page }) => {
+    await openShell(page);
+    await expect(page.getByTestId('relay-status')).toHaveAttribute('data-level', 'bad');
   });
 
   test('a selection far down the list scrolls into view', async ({ page }) => {
@@ -78,47 +92,45 @@ test.describe('desktop', () => {
 test.describe('phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
-  test('pins the player, folds the header into a menu and opens the events as a sheet', async ({ page }) => {
-    await page.goto(url());
-    const list = page.getByRole('listbox', { name: /recordings/i });
-    await expect(list).toBeHidden();
-    await expect(page.getByLabel('Camera')).toBeHidden();
-    await page.getByRole('button', { name: 'Menu' }).click();
+  test('the bottom tab bar is visible and the list is in page flow', async ({ page }) => {
+    await openShell(page);
+    const bar = page.locator('nav.fixed');
+    await expect(bar).toBeVisible();
+    await expect(bar.getByRole('link')).toHaveText(['Home', 'Timeline', 'Keys']);
+    await expect(bar.getByRole('link', { name: 'Timeline' })).toHaveAttribute('aria-current', 'page');
+    const b = (await bar.boundingBox())!;
+    expect(b.height).toBeGreaterThanOrEqual(64);
+    expect(b.y + b.height).toBeCloseTo(844, 0);
+    // The top-bar tab links are for desktop only.
+    await expect(page.locator('header nav')).toBeHidden();
+
+    // Filters are always visible: no Menu button.
     await expect(page.getByLabel('Camera')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Menu' })).toHaveCount(0);
 
-    await page.getByRole('button', { name: /^Events/ }).click();
-    await expect(list.getByRole('option').first()).toBeVisible();
-    const box = (await list.boundingBox())!;
-    expect(box.y + box.height).toBeLessThanOrEqual(844 + 1);
-
-    // The player's block is pinned to the top of the viewport while the page scrolls.
-    const pin = await page.getByTestId('player').evaluate((el) => {
-      const cs = getComputedStyle(el.closest('.sticky')!);
-      return { position: cs.position, top: cs.top };
-    });
-    expect(pin).toEqual({ position: 'sticky', top: '0px' });
-    // No horizontal page scroll.
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  });
-
-  test('the open sheet stays a short, virtualized panel with its toggle on screen', async ({ page }) => {
-    await page.goto(url());
-    const toggle = page.getByRole('button', { name: /^Events/ });
-    await toggle.click();
+    // The list is part of the page: no sheet, no scroll container of its own.
     const list = page.getByRole('listbox', { name: /recordings/i });
     await expect(list.getByRole('option').first()).toBeVisible();
-
-    // The toggle must stay reachable to close the sheet again.
-    const t = (await toggle.boundingBox())!;
-    expect(t.y).toBeGreaterThanOrEqual(0);
-    // The sheet covers at most the bottom half of the screen, so the player stays visible.
-    const box = (await list.boundingBox())!;
-    expect(box.y).toBeGreaterThanOrEqual(844 / 2);
-    expect(box.height).toBeLessThanOrEqual(844 / 2);
-    // Only a short window of the 400 recordings is rendered.
-    expect(await list.getByRole('option').count()).toBeLessThan(40);
-    // Newest first: the last clip of the day leads.
-    await expect(list.getByRole('option').first()).toHaveAttribute('data-clip', /399$/);
-    await expect(list.getByRole('option').first()).toBeInViewport();
+    const holders = await list.evaluate((el) => {
+      const out: { position: string; overflowY: string }[] = [];
+      for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) {
+        const cs = getComputedStyle(n);
+        out.push({ position: cs.position, overflowY: cs.overflowY });
+      }
+      return out;
+    });
+    for (const h of holders) {
+      expect(['fixed', 'absolute']).not.toContain(h.position);
+      expect(['auto', 'scroll']).not.toContain(h.overflowY);
+    }
+    // The page itself scrolls to reach the rest, and the last row is not hidden behind the tab bar.
+    const more = page.getByRole('button', { name: 'Show 50 more' });
+    await more.scrollIntoViewIfNeeded();
+    await expect(more).toBeInViewport();
+    const m = (await more.boundingBox())!;
+    expect(m.y + m.height).toBeLessThanOrEqual(b.y + 1);
+    // Bounded DOM, no horizontal page scroll.
+    expect(await list.getByRole('option').count()).toBe(50);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 });

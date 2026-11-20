@@ -7,7 +7,7 @@ import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 
-// Live view end to end (design §7.2): the SPA built by Vite, served by the real
+// Live on Home end to end (design §7.2): the SPA built by Vite, served by the real
 // zview-server, whose live upstream is the real internal/relay/live server fed
 // by the in-process RTSP fixture (helper binary internal/testutil/cmd/livefixture).
 // Every port is ephemeral and every process is private to this spec.
@@ -101,11 +101,11 @@ test('a live tile reaches the live state and plays 640 px wide video', async ({ 
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
 
-  // Import the throwaway key through the real onboarding form, then open Live.
+  // Import the throwaway key through the real Keys form; Home starts the live view by itself.
   await page.goto(`${origin}/#/key`);
-  await page.getByLabel('Master key').fill(fixture.key);
-  await page.getByRole('button', { name: 'Import key' }).click();
-  await page.getByRole('link', { name: 'Live' }).click();
+  await page.getByLabel('Family key').fill(fixture.key);
+  await page.getByRole('button', { name: 'Add key' }).click();
+  await page.getByRole('link', { name: 'Home' }).click();
 
   const tile = page.getByTestId('live-tile');
   await expect(tile).toHaveAttribute('data-camera', 'front');
@@ -115,9 +115,9 @@ test('a live tile reaches the live state and plays 640 px wide video', async ({ 
   expect(await video.evaluate((v: HTMLVideoElement) => v.muted)).toBe(true);
 
   // Fullscreen takes the whole tile and keeps the session.
-  await tile.getByRole('button', { name: 'Fullscreen' }).click();
+  await tile.getByRole('button', { name: 'Full screen' }).click();
   await expect.poll(() => page.evaluate(() => document.fullscreenElement?.getAttribute('data-testid'))).toBe('live-tile');
-  await tile.getByRole('button', { name: 'Exit fullscreen' }).click();
+  await tile.getByRole('button', { name: 'Exit full screen' }).click();
   await expect.poll(() => page.evaluate(() => document.fullscreenElement)).toBeNull();
   await expect(tile).toHaveAttribute('data-state', 'live');
   expect(errors).toEqual([]);

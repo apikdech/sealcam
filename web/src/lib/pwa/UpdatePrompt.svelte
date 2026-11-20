@@ -31,16 +31,16 @@
 </script>
 
 {#if available}
-  <div role="status" class="fixed inset-x-3 top-3 z-50 mx-auto flex max-w-md flex-wrap items-center gap-3 rounded-lg border border-sky-700 bg-neutral-900 px-4 py-3 text-sm shadow-xl">
+  <div role="status" class="fixed inset-x-3 top-3 z-50 mx-auto flex max-w-md flex-wrap items-center gap-3 rounded-lg border border-line bg-plate text-ink px-4 py-3 text-sm shadow-xl">
     <span>New version available — reload</span>
     <button
       type="button"
-      class="ml-auto rounded bg-sky-600 px-3 py-1.5 text-white disabled:cursor-not-allowed disabled:opacity-50"
+      class="ml-auto inline-flex min-h-11 items-center rounded border border-line bg-ground px-4 text-ink disabled:cursor-not-allowed disabled:opacity-50"
       disabled={playing}
       onclick={() => updater?.apply()}>Reload</button
     >
     {#if playing}
-      <span class="w-full text-xs text-neutral-400">Pause the video to update.</span>
+      <span class="w-full text-xs text-muted">Pause the video to update.</span>
     {/if}
   </div>
 {/if}

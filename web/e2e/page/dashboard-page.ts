@@ -1,8 +1,9 @@
-// Test page for e2e/dashboard.spec.ts: the real timeline page with a canned
+// Test page for e2e/dashboard.spec.ts: the real timeline page (or, with ?shell, the app) with a canned
 // API and a scripted player, so layout and keyboard handling run in a real
 // browser engine. The clock is fixed at 2026-11-06 15:00 UTC (22:00 in Jakarta).
 import { mount } from 'svelte';
 import '../../src/app.css';
+import App from '../../src/App.svelte';
 import Page from '../../src/routes/+page.svelte';
 import { DashClient, fakePlayerFactory, sidecar } from '../../test-support/dashboard-fakes';
 
@@ -23,7 +24,12 @@ client.clips = Array.from({ length: 400 }, (_, i) => {
   return sidecar(id, start);
 });
 
-mount(Page, {
-  target: document.getElementById('app')!,
-  props: { client, factory: fakePlayerFactory, zone: 'Asia/Jakarta', nowMs: NOW, profile: 'desktop' },
-});
+// `?shell` mounts the whole app (top bar, tab bar) over the same canned API; the spec fixes the clock.
+if (location.search.includes('shell')) {
+  mount(App, { target: document.getElementById('app')!, props: { client } });
+} else {
+  mount(Page, {
+    target: document.getElementById('app')!,
+    props: { client, factory: fakePlayerFactory, zone: 'Asia/Jakarta', nowMs: NOW, profile: 'desktop' },
+  });
+}

@@ -99,6 +99,7 @@ export class DashClient {
           return this.status as T;
       }
     }
+    if (msg.type === 'key.list') return { keys: [{ keyId: '0123456789abcdef', remembered: true }] } as T;
     if (msg.type === 'key.lock') return { keys: [] } as T;
     return {} as T;
   }

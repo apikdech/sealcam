@@ -9,7 +9,7 @@ import { build } from 'vite';
 
 // First run, end to end (Task 41), on Chromium and WebKit: a fresh profile
 // pastes the Contract §4.5 vector master key, the day view lists the fixture
-// clip, which plays, seeks and exports, and the Live tab shows a live tile.
+// clip, which plays, seeks and exports, and Home shows a live tile.
 // The SPA is the production build (with its service worker) served by the real
 // zview-server over testdata/clips/complete, and the live upstream is the real
 // live server fed by the in-process RTSP fixture, sealed under the same key.
@@ -233,20 +233,23 @@ async function instrument(page: Page, stubPicker: boolean, rawKey: number[]) {
 
 const probeOf = (page: Page) => page.evaluate(() => (window as unknown as { __probe: Probe }).__probe);
 
-/** The fresh-profile start: paste the vector key into the onboarding form, then open the day view. */
+/** The fresh-profile start: Home asks for the family key, the paste adds it, then open the day view. */
 async function importKeyAndOpenDay(page: Page) {
   await page.goto(origin);
-  // No key yet: the timeline says so and points to the key page.
-  await expect(page.getByRole('alert')).toContainText('Import your key first');
-  await page.getByRole('link', { name: 'Open keys' }).click();
-  await page.getByLabel('Master key').fill(manifest.master_key);
-  await page.getByRole('button', { name: 'Import key' }).click();
-  await expect(page.getByLabel('Master key')).toHaveValue(''); // cleared once the worker holds it
+  // No key yet: Home is the first-run page.
+  await expect(page.getByRole('heading', { name: 'Add the family key' })).toBeVisible();
+  await page.getByLabel('Family key').fill(manifest.master_key);
+  await page.getByRole('button', { name: 'Add key' }).click();
+  await expect(page.getByLabel('Family key')).toHaveValue(''); // cleared once the worker holds it
+  await page.getByRole('link', { name: 'Open Home' }).click();
   await page.getByRole('link', { name: 'Timeline' }).click();
-  await page.getByLabel('Date').fill(CLIP_DAY);
+  // Home's own day row is still on screen for a tick: wait for the Timeline page before picking the day.
+  await expect(page.getByTestId('timeline-page')).toBeVisible();
+  await page.getByLabel('Choose a date').fill(CLIP_DAY);
 }
 
 const rawKey = Array.from({ length: 32 }, (_, i) => i);
+const verifiedSeal = (page: Page) => page.getByTestId('integrity').locator('[data-seal-state="verified"]');
 const currentTime = (page: Page) => page.getByTestId('player').evaluate((v: HTMLVideoElement) => v.currentTime);
 
 async function playFirstClip(page: Page) {
@@ -255,7 +258,7 @@ async function playFirstClip(page: Page) {
   await expect(option).toHaveCount(1);
   await expect(option.first()).toHaveAttribute('data-clip', manifest.complete.clip_id);
   await option.first().click();
-  await expect(page.getByTestId('integrity')).toHaveAttribute('data-kind', 'verified', { timeout: 30_000 });
+  await expect(verifiedSeal(page)).toBeVisible({ timeout: 30_000 });
   await expect.poll(() => currentTime(page), { timeout: 20_000 }).toBeGreaterThan(1);
 }
 
@@ -275,9 +278,9 @@ test('a fresh profile imports the key, plays, seeks, exports and sees live video
   await expect.poll(() => currentTime(page), { timeout: 5000, intervals: [50] }).toBeGreaterThanOrEqual(20);
   const at = await currentTime(page);
   await expect.poll(() => currentTime(page), { timeout: 8000 }).toBeGreaterThan(at + 0.5);
-  await page.getByRole('button', { name: '-10 s' }).click();
+  await page.getByRole('button', { name: 'Back 10 seconds' }).click();
   await expect.poll(() => currentTime(page), { timeout: 5000 }).toBeLessThan(at);
-  await expect(page.getByTestId('integrity')).toHaveAttribute('data-kind', 'verified');
+  await expect(verifiedSeal(page)).toBeVisible();
 
   // Export: the confirmation says the copy is unencrypted; the file is the whole plaintext clip.
   await page.getByRole('button', { name: 'Export' }).click();
@@ -298,8 +301,8 @@ test('a fresh profile imports the key, plays, seeks, exports and sees live video
     expect((await download).suggestedFilename()).toBe(EXPORT_NAME);
   }
 
-  // Live: the tab's tile reaches the live state and plays video.
-  await page.getByRole('link', { name: 'Live' }).click();
+  // Live: Home's tile reaches the live state and plays video.
+  await page.getByRole('link', { name: 'Home' }).click();
   const tile = page.getByTestId('live-tile');
   await expect(tile).toHaveAttribute('data-camera', manifest.camera);
   if (browserName === 'chromium') {

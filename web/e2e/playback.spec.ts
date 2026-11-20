@@ -107,10 +107,10 @@ test.afterAll(() => {
 async function openDemo(page: Page, variant: keyof typeof origins, clip: string) {
   const origin = origins[variant];
   await page.goto(`${origin}/#/key`);
-  await page.getByLabel('Master key').fill(manifest.master_key);
-  await page.getByRole('button', { name: 'Import key' }).click();
+  await page.getByLabel('Family key').fill(manifest.master_key);
+  await page.getByRole('button', { name: 'Add key' }).click();
   // The form clears itself once the worker holds the key; opening a clip earlier would race the import.
-  await expect(page.getByLabel('Master key')).toHaveValue('');
+  await expect(page.getByLabel('Family key')).toHaveValue('');
   await page.evaluate((c) => {
     location.hash = `#/demo?clip=${c}`;
   }, clip);

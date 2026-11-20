@@ -1,79 +1,190 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Request } from './worker/protocol';
 
-// The pages need the worker and the browser APIs; only the routing is under test.
+// The pages need the worker and the browser APIs; only the shell is under test.
 vi.mock('./routes/+page.svelte', () => import('../test-support/routes/Timeline.svelte'));
-vi.mock('./routes/live/+page.svelte', () => import('../test-support/routes/Live.svelte'));
+vi.mock('./routes/home/Home.svelte', () => import('../test-support/routes/Home.svelte'));
 vi.mock('./routes/demo/+page.svelte', () => import('../test-support/routes/Demo.svelte'));
 vi.mock('./routes/onboarding/Onboarding.svelte', () => import('../test-support/routes/Key.svelte'));
+vi.mock('./routes/onboarding/FirstRun.svelte', () => import('../test-support/routes/FirstRun.svelte'));
 
 import App from './App.svelte';
 
-afterEach(() => {
+afterEach(async () => {
   cleanup();
   location.hash = '';
+  // jsdom delivers the hashchange for that reset asynchronously; let it pass before the next test renders.
+  await new Promise((r) => setTimeout(r, 0));
 });
 
+type Keys = { keyId: string; remembered: boolean }[];
+const KEY = { keyId: '0123456789abcdef', remembered: true };
+
+/** A worker double: `keys` is what key.list answers; key.lock answers `afterLock`. */
+function fake(keys: Keys = [KEY], afterLock: Keys = keys) {
+  const calls: Request[] = [];
+  return {
+    calls,
+    async call<T>(msg: Request): Promise<T> {
+      calls.push(msg);
+      if (msg.type === 'key.list') return { keys } as T;
+      if (msg.type === 'key.lock') return { keys: afterLock } as T;
+      if (msg.type === 'api.get') throw new Error('no status');
+      return undefined as T;
+    },
+  };
+}
+
 const shown = () =>
-  ['timeline', 'live', 'demo', 'key'].filter((r) => screen.queryByTestId(`route-${r}`) !== null);
+  ['home', 'timeline', 'demo', 'key', 'firstrun'].filter((r) => screen.queryByTestId(`route-${r}`) !== null);
+const settled = async (route: string) => {
+  await screen.findByTestId(`route-${route}`);
+  return shown();
+};
 
 describe('App routing', () => {
-  it('shows the timeline for an empty hash', () => {
+  it('default route renders Home', async () => {
     location.hash = '';
-    render(App);
-    expect(shown()).toEqual(['timeline']);
+    render(App, { client: fake() });
+    expect(await settled('home')).toEqual(['home']);
   });
 
-  it('shows the timeline for an unknown hash', () => {
-    location.hash = '#/nowhere';
-    render(App);
-    expect(shown()).toEqual(['timeline']);
-  });
+  for (const h of ['#/', '#/live', '#/nowhere']) {
+    it(`${h} renders Home`, async () => {
+      location.hash = h;
+      render(App, { client: fake() });
+      expect(await settled('home')).toEqual(['home']);
+    });
+  }
 
-  it('shows the timeline for #/timeline', () => {
+  it('shows the timeline for #/timeline', async () => {
     location.hash = '#/timeline';
-    render(App);
-    expect(shown()).toEqual(['timeline']);
-    expect(screen.getByRole('link', { name: 'Timeline' })).toHaveAttribute('aria-current', 'page');
+    render(App, { client: fake() });
+    expect(await settled('timeline')).toEqual(['timeline']);
   });
 
-  it('shows the onboarding page for #/key', () => {
+  it('shows the keys page for #/key', async () => {
     location.hash = '#/key';
-    render(App);
-    expect(shown()).toEqual(['key']);
-    expect(screen.getByRole('link', { name: 'Key' })).toHaveAttribute('aria-current', 'page');
+    render(App, { client: fake() });
+    expect(await settled('key')).toEqual(['key']);
   });
 
-  it('shows live and demo for their routes, passing the demo clip', () => {
-    location.hash = '#/live';
-    const { unmount } = render(App);
-    expect(shown()).toEqual(['live']);
-    unmount();
+  it('shows the demo page, passing the clip', async () => {
     location.hash = '#/demo?clip=01M6RXRJAQRJY105FSDF0QRBH1';
-    render(App);
-    expect(shown()).toEqual(['demo']);
+    render(App, { client: fake() });
+    expect(await settled('demo')).toEqual(['demo']);
     expect(screen.getByTestId('route-demo')).toHaveAttribute('data-clip', '01M6RXRJAQRJY105FSDF0QRBH1');
   });
 
-  it('keeps the demo page out of the nav', () => {
+  it('the active tab has aria-current, in the top bar and the bottom bar', async () => {
+    location.hash = '#/timeline';
+    render(App, { client: fake() });
+    await settled('timeline');
+    const navs = screen.getAllByRole('navigation', { name: 'Views' });
+    expect(navs).toHaveLength(2);
+    for (const nav of navs) {
+      expect(within(nav).getByRole('link', { name: 'Timeline' })).toHaveAttribute('aria-current', 'page');
+      expect(within(nav).getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current');
+    }
+  });
+
+  it('Home, Timeline and Keys are the tabs; the demo page stays out', async () => {
     location.hash = '#/demo';
-    render(App);
-    const nav = screen.getByRole('navigation', { name: 'Views' });
-    expect([...nav.querySelectorAll('a')].map((a) => a.textContent)).toEqual(['Timeline', 'Live', 'Key']);
+    render(App, { client: fake() });
+    for (const nav of screen.getAllByRole('navigation', { name: 'Views' })) {
+      expect([...nav.querySelectorAll('a')].map((a) => a.textContent?.trim())).toEqual(['Home', 'Timeline', 'Keys']);
+    }
   });
 
   it('follows hash changes', async () => {
     location.hash = '';
-    render(App);
-    expect(shown()).toEqual(['timeline']);
+    render(App, { client: fake() });
+    expect(await settled('home')).toEqual(['home']);
     location.hash = '#/key';
     await fireEvent(window, new HashChangeEvent('hashchange'));
     await waitFor(() => expect(shown()).toEqual(['key']));
     location.hash = '#/bogus';
     await fireEvent(window, new HashChangeEvent('hashchange'));
+    await waitFor(() => expect(shown()).toEqual(['home']));
+  });
+});
+
+describe('App first run and Lock', () => {
+  it('no keys renders FirstRun on Home, while Timeline stays reachable', async () => {
+    location.hash = '';
+    render(App, { client: fake([]) });
+    expect(await settled('firstrun')).toEqual(['firstrun']);
+    location.hash = '#/timeline';
+    await fireEvent(window, new HashChangeEvent('hashchange'));
     await waitFor(() => expect(shown()).toEqual(['timeline']));
+  });
+
+  it('importing on FirstRun shows Home once the user leaves it; the remember choice stays reachable until then', async () => {
+    location.hash = '';
+    let keys: Keys = [];
+    const client = {
+      async call<T>(msg: Request): Promise<T> {
+        if (msg.type === 'key.list') return { keys } as T;
+        throw new Error('no status');
+      },
+    };
+    render(App, { client });
+    await settled('firstrun');
+    keys = [KEY];
+    await fireEvent.click(screen.getByRole('button', { name: 'Add key' }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(shown()).toEqual(['firstrun']);
+    expect(screen.getByText(/Keep it on this phone/)).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole('link', { name: 'Open Home' }));
+    await waitFor(() => expect(shown()).toEqual(['home']));
+  });
+
+  it('Lock shows the result text for a remembered key', async () => {
+    render(App, { client: fake([KEY], [KEY]) });
+    await settled('home');
+    await fireEvent.click(screen.getByRole('button', { name: 'Lock' }));
+    expect(await screen.findByText('Locked. Opening a recording unlocks it again on this device.')).toBeInTheDocument();
+  });
+
+  it('Lock shows the session-only text when no key is kept', async () => {
+    render(App, { client: fake([{ keyId: 'a', remembered: false }], []) });
+    await settled('home');
+    await fireEvent.click(screen.getByRole('button', { name: 'Lock' }));
+    expect(await screen.findByText('Locked. Add the key again to watch.')).toBeInTheDocument();
+  });
+
+  it('Lock is disabled with no key', async () => {
+    render(App, { client: fake([]) });
+    await settled('firstrun');
+    expect(screen.getByRole('button', { name: 'Lock' })).toBeDisabled();
+  });
+});
+
+describe('App recorder status', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('polls /api/v1/status every 60 s and passes it to Home', async () => {
+    vi.useFakeTimers();
+    const status = { schema: 'zrec.status/1', relay_id: 'r', version: 'v', updated_at: '2026-11-20T10:00:00Z', key_id: 'k', cameras: [] };
+    const calls: Request[] = [];
+    const client = {
+      async call<T>(msg: Request): Promise<T> {
+        calls.push(msg);
+        if (msg.type === 'key.list') return { keys: [KEY] } as T;
+        if (msg.type === 'api.get') return status as T;
+        return undefined as T;
+      },
+    };
+    render(App, { client });
+    await vi.advanceTimersByTimeAsync(0);
+    const polls = () => calls.filter((c) => c.type === 'api.get' && c.path === '/api/v1/status').length;
+    expect(polls()).toBe(1);
+    expect(screen.getByTestId('route-home')).toHaveAttribute('data-status', '2026-11-20T10:00:00Z');
+    expect(screen.getByTestId('relay-status')).toBeInTheDocument();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(polls()).toBe(2);
   });
 });
 
@@ -88,35 +199,28 @@ describe('App-level idle auto-lock', () => {
     vi.useRealTimers();
   });
 
-  for (const route of ['#/timeline', '#/live', '#/demo']) {
+  for (const route of ['#/timeline', '#/', '#/demo']) {
     it(`locks the worker from ${route} when the saved idle time passes with the tab hidden`, async () => {
       vi.useFakeTimers();
       localStorage.setItem('zview.idleLockMinutes', '5');
-      const calls: Request[] = [];
-      const client = {
-        async call<T>(msg: Request): Promise<T> {
-          calls.push(msg);
-          return { keys: [] } as T;
-        },
-      };
+      const client = fake();
       location.hash = route;
       render(App, { client });
       setHidden(true);
       await vi.advanceTimersByTimeAsync(4 * 60_000);
-      expect(calls.some((c) => c.type === 'key.lock')).toBe(false);
+      expect(client.calls.some((c) => c.type === 'key.lock')).toBe(false);
       await vi.advanceTimersByTimeAsync(60_000);
-      expect(calls.filter((c) => c.type === 'key.lock')).toHaveLength(1);
+      expect(client.calls.filter((c) => c.type === 'key.lock')).toHaveLength(1);
     });
   }
 
   it('does not lock when the setting is off', async () => {
     vi.useFakeTimers();
-    const calls: Request[] = [];
-    const client = { async call<T>(msg: Request): Promise<T> { calls.push(msg); return { keys: [] } as T; } };
+    const client = fake();
     location.hash = '#/timeline';
     render(App, { client });
     setHidden(true);
     await vi.advanceTimersByTimeAsync(3_600_000);
-    expect(calls).toEqual([]);
+    expect(client.calls.filter((c) => c.type === 'key.lock')).toEqual([]);
   });
 });

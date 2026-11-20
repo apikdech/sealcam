@@ -7,13 +7,11 @@
   import { acquireIdleLock, IDLE_CHOICES, savedIdleMinutes, type IdleHandle } from './idleService';
   import { fingerprint } from './keyInput';
   import KeyImport from './KeyImport.svelte';
+  import { lockedNotice } from './lockNotice';
 
   type Props = Pick<ComponentProps<typeof KeyImport>, 'client' | 'now' | 'scanner'>;
 
   let { client = workerClient, now = Date.now, scanner = {} }: Props = $props();
-
-  const LOCKED_REMEMBERED = 'Locked. Opening a recording unlocks it again on this device.';
-  const LOCKED_SESSION = 'Locked. Add the key again to watch.';
 
   let keys: KeyListResult['keys'] = $state([]);
   let notice = $state('');
@@ -28,17 +26,13 @@
     keys = (result ?? (await client.call<KeyListResult>({ type: 'key.list' }))).keys;
   }
 
-  function lockedNotice(result: KeyListResult) {
-    notice = result.keys.some((k) => k.remembered) ? LOCKED_REMEMBERED : LOCKED_SESSION;
-  }
-
   async function doLock() {
     actionError = '';
     try {
       const result = await client.call<KeyListResult>({ type: 'key.lock' });
       epoch++;
       await refresh(result);
-      lockedNotice(result);
+      notice = lockedNotice(result);
     } catch {
       actionError = 'Could not lock. Try again.';
     }
@@ -69,7 +63,7 @@
         actionError = '';
         epoch++;
         void refresh(result);
-        lockedNotice(result);
+        notice = lockedNotice(result);
       },
       onError: () => {
         actionError = 'Could not lock. Try again.';
