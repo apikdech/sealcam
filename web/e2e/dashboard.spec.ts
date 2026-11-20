@@ -100,4 +100,25 @@ test.describe('phone', () => {
     // No horizontal page scroll.
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
+
+  test('the open sheet stays a short, virtualized panel with its toggle on screen', async ({ page }) => {
+    await page.goto(url());
+    const toggle = page.getByRole('button', { name: /^Events/ });
+    await toggle.click();
+    const list = page.getByRole('listbox', { name: /recordings/i });
+    await expect(list.getByRole('option').first()).toBeVisible();
+
+    // The toggle must stay reachable to close the sheet again.
+    const t = (await toggle.boundingBox())!;
+    expect(t.y).toBeGreaterThanOrEqual(0);
+    // The sheet covers at most the bottom half of the screen, so the player stays visible.
+    const box = (await list.boundingBox())!;
+    expect(box.y).toBeGreaterThanOrEqual(844 / 2);
+    expect(box.height).toBeLessThanOrEqual(844 / 2);
+    // Only a short window of the 400 recordings is rendered.
+    expect(await list.getByRole('option').count()).toBeLessThan(40);
+    // Newest first: the last clip of the day leads.
+    await expect(list.getByRole('option').first()).toHaveAttribute('data-clip', /399$/);
+    await expect(list.getByRole('option').first()).toBeInViewport();
+  });
 });

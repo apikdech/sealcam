@@ -281,7 +281,7 @@
         aria-expanded={sheetOpen}
         onclick={() => (sheetOpen = !sheetOpen)}>Events ({rows.length}) {sheetOpen ? '▾' : '▴'}</button
       >
-      <div class="min-h-0 flex-1 max-md:h-[45dvh] {sheetOpen ? '' : 'max-md:hidden'}">
+      <div class="min-h-0 flex-1 max-md:h-[45dvh] max-md:flex-none {sheetOpen ? '' : 'max-md:hidden'}">
         <EventList clips={rows} {selectedId} {zone} {integrity} onSelect={(id) => select(id)} />
       </div>
     </aside>
