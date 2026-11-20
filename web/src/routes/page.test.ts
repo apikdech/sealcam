@@ -80,10 +80,82 @@ const getsFor = (c: DashClient, path: string) =>
   c.calls.filter((m): m is Extract<Request, { type: 'api.get' }> => m.type === 'api.get' && m.path === path);
 
 describe('timeline dashboard', () => {
-  it('the list wrapper is the scroll container', async () => {
+  it('no bottom sheet: the list is in page flow on phones', async () => {
     mountPage(client());
-    const box = (await screen.findByRole('listbox', { name: /recordings/i })).parentElement!;
-    expect(box).toHaveClass('overflow-y-auto', 'overscroll-contain');
+    const box = await screen.findByRole('listbox', { name: /recordings/i });
+    expect(screen.queryByRole('button', { name: /^Events/ })).toBeNull();
+    for (let el: HTMLElement | null = box; el; el = el.parentElement) {
+      expect(el).not.toHaveClass('fixed');
+      expect(el.className).not.toMatch(/max-md:h-|max-md:hidden/);
+    }
+  });
+
+  it('filters are visible without a menu', async () => {
+    mountPage(client());
+    await listRows();
+    for (const name of ['Camera', 'Trigger', 'Time zone']) expect(screen.getByRole('combobox', { name })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /menu/i })).toBeNull();
+  });
+
+  it('does not poll the relay status any more', async () => {
+    const c = client();
+    mountPage(c);
+    await listRows();
+    expect(getsFor(c, '/api/v1/status')).toHaveLength(0);
+    expect(screen.queryByRole('img', { name: /relay/i })).toBeNull();
+  });
+
+  it('the legend names every trigger and not monitored', async () => {
+    mountPage(client());
+    await listRows();
+    const legend = within(screen.getByRole('list', { name: 'Legend' }));
+    for (const word of ['Person', 'Vehicle', 'Pet', 'Motion', 'Other', 'not monitored', 'Failed verification', 'Metadata mismatch']) {
+      expect(legend.getByText(word)).toBeInTheDocument();
+    }
+  });
+
+  it('the shortcuts disclosure lists Space, J, K, [, ] and T', async () => {
+    mountPage(client());
+    await listRows();
+    const toggle = screen.getByRole('button', { name: 'Keyboard shortcuts' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Space')).toBeNull();
+    await fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    for (const key of ['Space', 'J', 'K', '[', ']', 'T']) expect(screen.getByText(key)).toBeInTheDocument();
+  });
+
+  it('the zone select shows city names', async () => {
+    mountPage(client());
+    await listRows();
+    expect(within(screen.getByLabelText('Time zone')).getByRole('option', { name: 'Jakarta' })).toHaveValue('Asia/Jakarta');
+  });
+
+  it('the span readout updates after zoom', async () => {
+    mountPage(client());
+    await listRows();
+    const readout = screen.getByText('24 h');
+    expect(readout).toHaveAttribute('aria-live', 'polite');
+    await fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+    expect(readout).toHaveTextContent('6 h');
+    await fireEvent.keyDown(window, { key: ']' });
+    expect(readout).toHaveTextContent('1 h');
+  });
+
+  it('a failed load shows Try again, and it loads again', async () => {
+    const c = client();
+    const ok = c.call.bind(c);
+    let fail = true;
+    c.call = (async (m: Request) => {
+      if (fail && m.type === 'api.get' && m.path === '/api/v1/clips') throw new Error('down');
+      return ok(m);
+    }) as never;
+    mountPage(c);
+    const retry = await screen.findByRole('button', { name: 'Try again' });
+    expect(screen.queryByRole('listbox', { name: /recordings/i })).toBeNull();
+    fail = false;
+    await fireEvent.click(retry);
+    expect(await listRows()).toHaveLength(3);
   });
 
   it('lists the day newest first, in local time', async () => {
@@ -124,7 +196,7 @@ describe('timeline dashboard', () => {
   it('ignores the shortcuts while typing in a field', async () => {
     mountPage(client());
     await listRows();
-    const date = screen.getByLabelText('Date');
+    const date = screen.getByLabelText('Choose a date');
     await fireEvent.keyDown(date, { key: 'k' });
     expect(selected()).toBeNull();
   });
@@ -135,26 +207,6 @@ describe('timeline dashboard', () => {
     await fireEvent.click(rows[1]!);
     expect(selected()).toBe(ids.b);
     await waitFor(() => expect(FakePlayer.instances[0]?.loads).toEqual([ids.b]));
-  });
-
-  it('shows a red relay dot when updated_at is 4 minutes old', async () => {
-    const c = client();
-    c.status = status(4 * 60_000);
-    mountPage(c);
-    await waitFor(() => expect(screen.getByRole('img', { name: /relay/i }).dataset.level).toBe('bad'));
-  });
-
-  it('shows a green relay dot for a fresh status', async () => {
-    mountPage(client());
-    await waitFor(() => expect(screen.getByRole('img', { name: /relay/i }).dataset.level).toBe('ok'));
-  });
-
-  it('shows an unknown dot, not a green one, when the status cannot be read', async () => {
-    const c = client();
-    c.failStatus = true;
-    mountPage(c);
-    await listRows();
-    await waitFor(() => expect(screen.getByRole('img', { name: /relay/i }).dataset.level).toBe('unknown'));
   });
 
   it('re-queries with the camera and trigger filters', async () => {
@@ -177,7 +229,7 @@ describe('timeline dashboard', () => {
     const c = client();
     mountPage(c);
     await listRows();
-    await fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-05' } });
+    await fireEvent.change(screen.getByLabelText('Choose a date'), { target: { value: '2026-11-05' } });
     await waitFor(() => {
       expect(getsFor(c, '/api/v1/clips').at(-1)!.query).toMatchObject({
         from: '2026-11-04T17:00:00.000Z',
@@ -192,7 +244,8 @@ describe('timeline dashboard', () => {
       throw Object.assign(new Error('no key loaded'), { name: 'ErrNoKey' });
     };
     mountPage(c);
-    expect(await screen.findByText(/import your key/i)).toBeInTheDocument();
+    expect(await screen.findByText(/your key is locked/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Unlock' })).toHaveAttribute('href', '#/key');
   });
 
   it('says how many recordings could not be read', async () => {
@@ -216,14 +269,6 @@ describe('timeline dashboard', () => {
     const rows = await listRows();
     await fireEvent.click(rows[0]!);
     await waitFor(() => expect(rows[0]!.querySelector('[data-seal-state="tampered"]')).not.toBeNull());
-  });
-
-  it('locks the key from the menu', async () => {
-    const c = client();
-    mountPage(c);
-    await listRows();
-    await fireEvent.click(screen.getByRole('button', { name: 'Lock' }));
-    expect(c.calls.some((m) => m.type === 'key.lock')).toBe(true);
   });
 });
 
@@ -320,12 +365,12 @@ describe('shortcuts and transport', () => {
 
     it('T on another day switches to today, reloads it and shows it', async () => {
       const c = await ready();
-      await fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-05' } });
+      await fireEvent.change(screen.getByLabelText('Choose a date'), { target: { value: '2026-11-05' } });
       await waitFor(() => expect(view().startMs).toBe(FROM - 24 * HOUR));
       keys(']');
       expect(view().spanMs).toBe(6 * HOUR);
       keys('T');
-      await waitFor(() => expect(screen.getByLabelText('Date')).toHaveValue('2026-11-06'));
+      await waitFor(() => expect(screen.getByLabelText('Choose a date')).toHaveValue('2026-11-06'));
       await waitFor(() => expect(view().startMs).toBe(FROM));
       expect(getsFor(c, '/api/v1/clips').at(-1)!.query).toMatchObject({
         from: '2026-11-05T17:00:00.000Z',
@@ -392,10 +437,10 @@ describe('shortcuts and transport', () => {
 
     it('Now on another day returns to today', async () => {
       await ready();
-      await fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-04' } });
+      await fireEvent.change(screen.getByLabelText('Choose a date'), { target: { value: '2026-11-04' } });
       await waitFor(() => expect(view().startMs).toBe(FROM - 2 * 24 * HOUR));
       await press('Now');
-      await waitFor(() => expect(screen.getByLabelText('Date')).toHaveValue('2026-11-06'));
+      await waitFor(() => expect(screen.getByLabelText('Choose a date')).toHaveValue('2026-11-06'));
       await waitFor(() => expect(view().startMs).toBe(FROM));
     });
   });
@@ -477,9 +522,9 @@ describe('forced display zone', () => {
     await fireEvent.change(screen.getByLabelText('Time zone'), { target: { value: 'Asia/Jakarta' } });
     // "Today" is now Jakarta's today (the 7th) and the range is that Jakarta day.
     await waitFor(() => expect(lastRange(c)).toMatchObject(dayRange('2026-11-07', 'Asia/Jakarta')));
-    expect(screen.getByLabelText('Date')).toHaveValue('2026-11-07');
+    expect(screen.getByLabelText('Choose a date')).toHaveValue('2026-11-07');
     // The evening of the 6th at home reads 19:00 for a 12:00Z clip, not 13:00 as in Berlin.
-    await fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-06' } });
+    await fireEvent.change(screen.getByLabelText('Choose a date'), { target: { value: '2026-11-06' } });
     await waitFor(() => expect(lastRange(c)).toMatchObject(dayRange('2026-11-06', 'Asia/Jakarta')));
     const rows = await listRows();
     expect(rows[0]).toHaveTextContent('19:00');

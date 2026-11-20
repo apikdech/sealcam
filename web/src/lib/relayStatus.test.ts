@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/svelte';
+import { cleanup } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Status } from '../worker/schemas';
-import StatusDot from './components/StatusDot.svelte';
 import { recorderWords, relayHealth } from './relayStatus';
 
 const NOW = Date.UTC(2026, 10, 6, 15, 0, 0);
@@ -75,21 +74,6 @@ describe('relayHealth', () => {
 
   it('is unknown when no status could be read', () => {
     expect(relayHealth(null, NOW).level).toBe('unknown');
-  });
-});
-
-describe('StatusDot', () => {
-  it('renders red with an accessible name when updated_at is 4 minutes old', () => {
-    render(StatusDot, { status: status({ ageMs: 4 * 60_000 }), nowMs: NOW });
-    const dot = screen.getByRole('img');
-    expect(dot.dataset.level).toBe('bad');
-    expect(dot).toHaveAccessibleName(/stale/i);
-    expect(dot.getAttribute('title')).toContain(iso(NOW - 4 * 60_000));
-  });
-
-  it('renders green when healthy', () => {
-    render(StatusDot, { status: status(), nowMs: NOW });
-    expect(screen.getByRole('img').dataset.level).toBe('ok');
   });
 });
 
