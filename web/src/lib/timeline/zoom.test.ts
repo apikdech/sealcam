@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fullView, MIN_SPAN_MS, panBy, stepPreset, ZOOM_PRESETS_MS, zoomAround } from './zoom';
+import { fullView, MIN_SPAN_MS, panBy, spanLabel, stepPreset, ZOOM_PRESETS_MS, zoomAround } from './zoom';
 
 const H = 3_600_000;
 const M = 60_000;
@@ -93,5 +93,17 @@ describe('panBy', () => {
     const v = { startMs: range[0] + H, spanMs: H };
     expect(panBy(v, -100 * H, range).startMs).toBe(range[0]);
     expect(panBy(v, 100 * H, range).startMs).toBe(range[1] - H);
+  });
+});
+
+describe('spanLabel', () => {
+  it('names the presets', () => {
+    expect([24 * H, 6 * H, H, 10 * M, M].map(spanLabel)).toEqual(['24 h', '6 h', '1 h', '10 min', '1 min']);
+  });
+  it('rounds in-between spans', () => {
+    expect(spanLabel(3.2 * H)).toBe('3 h');
+    expect(spanLabel(25 * M + 10_000)).toBe('25 min');
+    expect(spanLabel(90_000)).toBe('90 s');
+    expect(spanLabel(59.6 * M)).toBe('1 h');
   });
 });

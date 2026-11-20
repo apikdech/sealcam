@@ -112,6 +112,57 @@ describe('Timeline.stepZoom', () => {
   });
 });
 
+describe('Timeline.stepZoom anchoring', () => {
+  it('keeps the selected clip in view when it is inside the current view', () => {
+    const { api, view } = mount({ selectedClipId: 'a' });
+    const start = NOW - 3 * HOUR;
+    for (let i = 0; i < 4; i++) {
+      api.stepZoom('in');
+      expect(view().startMs).toBeLessThanOrEqual(start);
+      expect(view().startMs + view().spanMs).toBeGreaterThanOrEqual(start);
+    }
+    // The clip keeps its relative place on screen (anchor fixed).
+    expect((start - view().startMs) / view().spanMs).toBeCloseTo((start - FROM) / (TO - FROM), 6);
+  });
+
+  it('falls back to now when the selected clip is outside the view', () => {
+    const early = { id: 'early', cameraId: 'front-door', startMs: FROM + HOUR, endMs: FROM + HOUR + MIN, triggers: [] };
+    const { api, view } = mount({ selectedClipId: 'early', clips: [early] });
+    api.stepZoom('in'); // 6 h around the selected clip
+    for (let i = 0; i < 30; i++) fireEvent.keyDown(screen.getByRole('application'), { key: 'ArrowRight' });
+    const v = view();
+    expect(FROM + HOUR).toBeLessThan(v.startMs); // selected clip scrolled out
+    expect(NOW).toBeLessThan(v.startMs + v.spanMs); // now still on screen
+    api.stepZoom('in');
+    const w = view();
+    expect((NOW - w.startMs) / w.spanMs).toBeCloseTo((NOW - v.startMs) / v.spanMs, 6);
+  });
+});
+
+describe('Timeline props', () => {
+  it('onSpan reports the new span', () => {
+    const spans: number[] = [];
+    const { api } = mount({ onSpan: (s: number) => spans.push(s) });
+    expect(spans.at(-1)).toBe(TO - FROM);
+    api.stepZoom('in');
+    expect(spans.at(-1)).toBe(6 * HOUR);
+  });
+
+  it('passes integrity to the renderer and laneHeight to the layout', () => {
+    const { api } = mount({ integrity: { a: 'tampered' }, laneHeight: 56 });
+    expect(vi.mocked(drawTimeline).mock.calls.at(-1)![2].integrity).toEqual({ a: 'tampered' });
+    expect((api.getLayout() as unknown as { lanes: { height: number }[] }).lanes[0]!.height).toBe(56);
+  });
+
+  it('the canvas label lists both zoom key pairs', () => {
+    mount();
+    const label = screen.getByRole('application').getAttribute('aria-label')!;
+    expect(label).toContain('+');
+    expect(label).toContain('[');
+    expect(label).toContain(']');
+  });
+});
+
 describe('Timeline.jumpToNow', () => {
   const panAway = (canvas: HTMLElement, key: 'ArrowLeft' | 'ArrowRight', times: number) => {
     for (let i = 0; i < times; i++) fireEvent.keyDown(canvas, { key });

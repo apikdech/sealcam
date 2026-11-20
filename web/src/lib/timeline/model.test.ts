@@ -266,3 +266,25 @@ describe('rulerTicks', () => {
     expect(ticks[0]!.label).toBe('00:00');
   });
 });
+
+describe('layoutLanes laneHeight', () => {
+  const base = {
+    cameras: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }],
+    clips: [],
+    coverage: [],
+    range: [0, 1000] as [number, number],
+    view: { startMs: 0, spanMs: 1000 },
+    width: 100,
+  };
+
+  it('defaults to 44', () => {
+    expect(layoutLanes(base).lanes[0]!.height).toBe(44);
+  });
+
+  it('changes the layout height and lane spacing', () => {
+    const l = layoutLanes({ ...base, laneHeight: 56 });
+    expect(l.lanes[0]!.height).toBe(56);
+    expect(l.lanes[1]!.y).toBe(28 + 56 + 6);
+    expect(l.height).toBe(28 + 2 * (56 + 6));
+  });
+});

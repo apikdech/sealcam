@@ -1,5 +1,6 @@
 // Canvas 2D drawing for the timeline. Nothing here owns state: Timeline.svelte
 // owns the view and calls drawTimeline from a dirty-flag rAF scheduler.
+import type { IntegrityState } from '../player/engine';
 import { glyphFits, RULER_HEIGHT, rulerTicks, timeToX, triggerStyle, type GapRect, type Layout } from './model';
 
 export interface Scheduler {
@@ -51,26 +52,76 @@ export interface Palette {
   bar: string;
   barEdge: string;
   hatch: string;
-  now: string;
-  selected: string;
+  foil: string;
+  /** Integrity mismatch (amber). */
+  mismatch: string;
+  /** Integrity tampered (void). */
+  tampered: string;
+  /** Text on a trigger colour. */
+  onTrigger: string;
 }
 
 export const DARK: Palette = {
-  bg: '#0b0d10',
-  lane: '#12161b',
-  grid: '#232a33',
-  text: '#e6e8eb',
-  textDim: '#8b94a0',
-  bar: '#5b6573',
-  barEdge: '#8b94a0',
-  hatch: '#3a424d',
-  now: '#ef4444',
-  selected: '#ffffff',
+  bg: '#0E1A1F',
+  lane: '#132429',
+  grid: '#22393F',
+  text: '#E6E2D6',
+  textDim: '#93A6A4',
+  bar: '#5FA8A0',
+  barEdge: '#5FA8A0',
+  hatch: '#93A6A4',
+  foil: '#C9A44C',
+  mismatch: '#D9A441',
+  tampered: '#D2554A',
+  onTrigger: '#071014',
 };
+
+export const LIGHT: Palette = {
+  bg: '#EDE9DF',
+  lane: '#E3DED1',
+  grid: '#C9C2B1',
+  text: '#1B2A2E',
+  textDim: '#56656A',
+  bar: '#2F6F73',
+  barEdge: '#2F6F73',
+  hatch: '#56656A',
+  foil: '#8A6A1F',
+  mismatch: '#9A6A12',
+  tampered: '#A8322A',
+  onTrigger: '#071014',
+};
+
+const TOKENS: Record<keyof Palette, string> = {
+  bg: '--z-ground',
+  lane: '--z-plate',
+  grid: '--z-rule',
+  text: '--z-ink',
+  textDim: '--z-muted',
+  bar: '--z-line',
+  barEdge: '--z-line',
+  hatch: '--z-muted',
+  foil: '--z-foil',
+  mismatch: '--z-amber',
+  tampered: '--z-void',
+  onTrigger: '--z-on-trigger',
+};
+
+/** The palette from the `--z-*` custom properties in force on `el`; DARK fills any gap. */
+export function readPalette(el: Element): Palette {
+  const cs = getComputedStyle(el);
+  const p = { ...DARK };
+  for (const key of Object.keys(TOKENS) as (keyof Palette)[]) {
+    const v = cs.getPropertyValue(TOKENS[key]).trim();
+    if (v) p[key] = v;
+  }
+  return p;
+}
 
 export interface DrawOptions {
   zone: string;
   palette?: Palette;
+  /** Per clip id; tampered and mismatch clips are marked on the bar (ui-spec §4.4). */
+  integrity: Readonly<Record<string, IntegrityState | undefined>>;
   /** Draws the now line when it falls inside the view. */
   nowMs?: number;
   selectedClipId?: string | null;
@@ -120,9 +171,11 @@ export function drawTimeline(ctx: CanvasRenderingContext2D, layout: Layout, o: D
   for (const lane of layout.lanes) ctx.fillRect(0, lane.y, width, lane.height);
 
   ctx.fillStyle = hatchPattern(ctx, p.hatch);
+  ctx.globalAlpha = 0.45;
   for (const lane of layout.lanes) {
     for (const g of lane.gaps) ctx.fillRect(g.x0, lane.y, g.x1 - g.x0, lane.height);
   }
+  ctx.globalAlpha = 1;
 
   // Ruler and vertical grid in the display zone.
   ctx.font = FONT;
@@ -139,10 +192,6 @@ export function drawTimeline(ctx: CanvasRenderingContext2D, layout: Layout, o: D
     ctx.fillText(t.label, x + 3, RULER_HEIGHT / 2 - 2);
   }
   ctx.stroke();
-
-  // Camera names.
-  ctx.fillStyle = p.textDim;
-  for (const lane of layout.lanes) ctx.fillText(lane.name, 6, lane.y + 9);
 
   // Clip bars in one path.
   ctx.fillStyle = p.bar;
@@ -170,7 +219,7 @@ export function drawTimeline(ctx: CanvasRenderingContext2D, layout: Layout, o: D
   }
 
   // Glyphs where they fit, so meaning never rests on color alone.
-  ctx.fillStyle = '#0b0d10';
+  ctx.fillStyle = p.onTrigger;
   ctx.font = 'bold 11px system-ui, sans-serif';
   ctx.textAlign = 'center';
   for (const lane of layout.lanes) {
@@ -184,8 +233,48 @@ export function drawTimeline(ctx: CanvasRenderingContext2D, layout: Layout, o: D
   }
   ctx.textAlign = 'left';
 
+  // Integrity markers (ui-spec §4.4): colour plus shape, never colour alone.
+  for (const lane of layout.lanes) {
+    for (const c of lane.clips) {
+      const state = o.integrity[c.clipId];
+      if (state !== 'tampered' && state !== 'mismatch') continue;
+      const w = c.x1 - c.x0;
+      if (state === 'tampered') {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(c.x0, c.y, w, c.h);
+        ctx.clip();
+        ctx.fillStyle = hatchPattern(ctx, p.tampered);
+        ctx.fillRect(c.x0, c.y, w, c.h);
+        ctx.restore();
+      }
+      ctx.strokeStyle = state === 'tampered' ? p.tampered : p.mismatch;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(c.x0, c.y, w, c.h);
+      if (state === 'mismatch') {
+        ctx.fillStyle = p.mismatch;
+        ctx.beginPath();
+        ctx.moveTo(c.x0, c.y);
+        ctx.lineTo(c.x0 + 8, c.y);
+        ctx.lineTo(c.x0, c.y + 8);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  }
+
+  // Camera names last, on a plate backing so they stay legible over the bars.
+  ctx.font = FONT;
+  for (const lane of layout.lanes) {
+    const w = ctx.measureText(lane.name).width + 8;
+    ctx.fillStyle = p.lane;
+    ctx.fillRect(0, lane.y, w, 16);
+    ctx.fillStyle = p.textDim;
+    ctx.fillText(lane.name, 4, lane.y + 8);
+  }
+
   if (o.selectedClipId) {
-    ctx.strokeStyle = p.selected;
+    ctx.strokeStyle = p.foil;
     ctx.lineWidth = 2;
     for (const lane of layout.lanes) {
       for (const c of lane.clips) {
@@ -197,7 +286,7 @@ export function drawTimeline(ctx: CanvasRenderingContext2D, layout: Layout, o: D
   if (o.nowMs !== undefined) {
     const x = timeToX(view, width, o.nowMs);
     if (x >= 0 && x <= width) {
-      ctx.strokeStyle = p.now;
+      ctx.strokeStyle = p.foil;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.moveTo(x, RULER_HEIGHT - 8);
@@ -212,8 +301,10 @@ export function drawTimeline(ctx: CanvasRenderingContext2D, layout: Layout, o: D
     const w = ctx.measureText(label).width + 12;
     const x = Math.min(Math.max(0, o.hoverX + 10), Math.max(0, width - w));
     const y = Math.max(0, o.hoverY - 24);
-    ctx.fillStyle = '#000000cc';
+    ctx.fillStyle = p.bg;
+    ctx.globalAlpha = 0.9;
     ctx.fillRect(x, y, w, 20);
+    ctx.globalAlpha = 1;
     ctx.fillStyle = p.text;
     ctx.fillText(label, x + 6, y + 10);
   }

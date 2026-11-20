@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
+  import type { IntegrityState } from '../player/engine';
   import {
     gapAt,
     hitTest,
@@ -14,7 +15,7 @@
     type TimelineCamera,
     type TimelineClip,
   } from './model';
-  import { backingSize, createScheduler, drawTimeline, type Scheduler } from './render';
+  import { backingSize, createScheduler, drawTimeline, readPalette, DARK, type Palette, type Scheduler } from './render';
   import { browserZone, localDayRange } from './timezone';
   import { fullView, panBy, stepPreset, zoomAround, type View } from './zoom';
 
@@ -32,12 +33,24 @@
     nowMs?: number;
     /** A clip selected from outside (list, keyboard): drawn highlighted. */
     selectedClipId?: string | null;
+    /** Integrity state per clip id; tampered and mismatch clips are marked on the bar. */
+    integrity?: Readonly<Record<string, IntegrityState | undefined>>;
+    /** Lane height in CSS px; phones pass 56. */
+    laneHeight?: number;
+    /** Called with the view span (ms) whenever it changes, for a span readout. */
+    onSpan?: (spanMs: number) => void;
     onSelect: (clipId: string, offsetMs: number) => void;
     /** Reports the CPU cost (ms) of each drawn frame. */
     onFrame?: (ms: number) => void;
   }
 
-  let { cameras, clips, coverage, day, zone = browserZone(), nowMs, selectedClipId, onSelect, onFrame }: Props = $props();
+  let { cameras, clips, coverage, day, zone = browserZone(), nowMs, selectedClipId,
+    integrity = {},
+    laneHeight = LANE_HEIGHT,
+    onSpan,
+    onSelect,
+    onFrame,
+  }: Props = $props();
 
   const range = $derived(localDayRange(day, zone));
   // Plain copies: reading a deep reactive proxy for every clip on every frame is slow.
@@ -46,7 +59,7 @@
     clips: $state.snapshot(clips),
     coverage: $state.snapshot(coverage),
   });
-  const cssHeight = $derived(RULER_HEIGHT + Math.max(cameras.length, 1) * (LANE_HEIGHT + LANE_GAP));
+  const cssHeight = $derived(RULER_HEIGHT + Math.max(cameras.length, 1) * (laneHeight + LANE_GAP));
 
   let canvas: HTMLCanvasElement;
   let cssWidth = 0;
@@ -59,6 +72,7 @@
   let hoverX = 0;
   let hoverY = 0;
   let sched: Scheduler | undefined;
+  let palette: Palette = DARK;
 
   export function getLayout(): Layout {
     return layout;
@@ -72,9 +86,11 @@
     const ctx = canvas.getContext('2d');
     if (!ctx || cssWidth <= 0) return;
     const t0 = performance.now();
-    layout = layoutLanes({ ...data, range, view, width: cssWidth, nowMs: currentNow() });
+    layout = layoutLanes({ ...data, range, view, width: cssWidth, nowMs: currentNow(), laneHeight });
     drawTimeline(ctx, layout, {
       zone,
+      palette,
+      integrity: $state.snapshot(integrity),
       nowMs: currentNow(),
       selectedClipId: selectedId,
       hoverGap,
@@ -95,7 +111,12 @@
 
   // A new day or zone shows the whole day again.
   $effect(() => {
-    view = fullView(range);
+    const r = range;
+    untrack(() => setView(fullView(r)));
+  });
+
+  $effect(() => {
+    void [laneHeight, integrity];
     sched?.invalidate();
   });
 
@@ -108,7 +129,7 @@
 
   // Any change of data repaints.
   $effect(() => {
-    void [data, nowMs, zone];
+    void [data, nowMs, zone, integrity, laneHeight];
     sched?.invalidate();
   });
 
@@ -119,6 +140,13 @@
 
   onMount(() => {
     sched = createScheduler(draw);
+    palette = readPalette(canvas);
+    const scheme = window.matchMedia?.('(prefers-color-scheme: dark)');
+    const onScheme = () => {
+      palette = readPalette(canvas);
+      sched?.invalidate();
+    };
+    scheme?.addEventListener?.('change', onScheme);
     const ro = new ResizeObserver(([entry]) => {
       cssWidth = entry?.contentRect.width ?? canvas.clientWidth;
       resize();
@@ -133,21 +161,27 @@
     }, 30_000);
     return () => {
       clearInterval(tick);
+      scheme?.removeEventListener?.('change', onScheme);
       ro.disconnect();
       sched?.dispose();
     };
   });
 
   function setView(v: View): void {
+    const spanChanged = v.spanMs !== view.spanMs;
     view = v;
+    if (spanChanged) onSpan?.(v.spanMs);
     sched?.invalidate();
   }
 
-  /** Zooms to the next preset span in or out, around the current time if it is on screen, else the view's centre. */
+  /** Zooms to the next preset span, anchored on the selected clip's start if on screen, else the current time, else the view's centre. */
   export function stepZoom(dir: 'in' | 'out'): void {
+    const inView = (ms: number) => ms >= view.startMs && ms <= view.startMs + view.spanMs;
+    const selectedStart = data.clips.find((c) => c.id === selectedId)?.startMs;
     const now = currentNow();
-    const onScreen = now >= view.startMs && now <= view.startMs + view.spanMs;
-    setView(stepPreset(view, dir, onScreen ? now : view.startMs + view.spanMs / 2, range));
+    const anchor =
+      selectedStart !== undefined && inView(selectedStart) ? selectedStart : inView(now) ? now : view.startMs + view.spanMs / 2;
+    setView(stepPreset(view, dir, anchor, range));
   }
 
   /** Centres the view on the current time (clamped to the day). */
@@ -298,7 +332,7 @@
   style:height="{cssHeight}px"
   tabindex="0"
   role="application"
-  aria-label="Event timeline. Arrow keys pan, plus and minus zoom, Home shows the whole day."
+  aria-label="Event timeline. Arrow keys pan, + and - or [ and ] zoom, Home shows the whole day."
   {onpointerdown}
   {onpointermove}
   {onpointerup}

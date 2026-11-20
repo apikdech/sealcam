@@ -123,6 +123,8 @@ export interface LayoutInput {
   width: number;
   /** When set, time after it is the future, not a coverage gap. */
   nowMs?: number;
+  /** Lane height in CSS px; defaults to LANE_HEIGHT (phones pass 56). */
+  laneHeight?: number;
 }
 
 export function timeToX(view: View, width: number, ms: number): number {
@@ -167,11 +169,12 @@ export function layoutLanes(input: LayoutInput): Layout {
   }
   const gapEnd = input.nowMs === undefined ? input.range[1] : Math.min(input.range[1], input.nowMs);
   const viewEnd = view.startMs + view.spanMs;
+  const laneHeight = input.laneHeight ?? LANE_HEIGHT;
 
   const lanes = input.cameras.map((cam, i): Lane => {
-    const y = RULER_HEIGHT + i * (LANE_HEIGHT + LANE_GAP);
+    const y = RULER_HEIGHT + i * (laneHeight + LANE_GAP);
     const barY = y + BAR_INSET;
-    const barH = LANE_HEIGHT - 2 * BAR_INSET;
+    const barH = laneHeight - 2 * BAR_INSET;
 
     const clips: ClipRect[] = [];
     for (const c of byCamera.get(cam.id) ?? []) {
@@ -213,10 +216,10 @@ export function layoutLanes(input: LayoutInput): Layout {
         });
       }
     }
-    return { cameraId: cam.id, name: cam.name, y, height: LANE_HEIGHT, clips, gaps };
+    return { cameraId: cam.id, name: cam.name, y, height: laneHeight, clips, gaps };
   });
 
-  const height = RULER_HEIGHT + Math.max(input.cameras.length, 1) * (LANE_HEIGHT + LANE_GAP);
+  const height = RULER_HEIGHT + Math.max(input.cameras.length, 1) * (laneHeight + LANE_GAP);
   return { width, height, view, lanes };
 }
 

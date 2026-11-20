@@ -50,3 +50,12 @@ export function stepPreset(v: View, dir: 'in' | 'out', anchorMs: number, range: 
 export function panBy(v: View, deltaMs: number, range: Range): View {
   return clampView({ startMs: v.startMs + deltaMs, spanMs: v.spanMs }, range);
 }
+
+/** Span readout: "24 h", "10 min", "90 s"; in-between values are rounded. */
+export function spanLabel(spanMs: number): string {
+  const seconds = Math.round(spanMs / 1000);
+  if (seconds < 120 && seconds % 60 !== 0) return `${seconds} s`;
+  const minutes = Math.round(spanMs / MIN);
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.round(spanMs / HOUR)} h`;
+}
