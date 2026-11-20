@@ -1,0 +1,86 @@
+<script lang="ts">
+  import { rosetteParams, rosettePath, sealLabel, type SealState } from './rosette';
+
+  interface Props {
+    seed: string;
+    state: SealState;
+    size?: number;
+    showLabel?: boolean;
+  }
+
+  let { seed, state, size = 32, showLabel = false }: Props = $props();
+
+  const uid = $props.id();
+  const clipId = `seal-clip-${uid}`;
+  const c = $derived(size / 2);
+  const ringR = $derived(size / 2 - 0.5);
+  const path = $derived(state === 'unchecked' || state === 'tampered' ? '' : rosettePath(rosetteParams(seed), size));
+  const label = $derived(sealLabel(state));
+  const voidRows = $derived(Array.from({ length: Math.ceil(size / 6) + 2 }, (_, i) => i * 6 - 6));
+</script>
+
+<span class="seal" data-seal-state={state}>
+  <svg
+    class="shrink-0"
+    role="img"
+    aria-label={label}
+    width={size}
+    height={size}
+    viewBox="0 0 {size} {size}"
+    fill="none"
+    stroke-width="0.8"
+  >
+    {#if state === 'unchecked'}
+      <circle cx={c} cy={c} r={ringR} stroke="var(--z-muted)" stroke-dasharray="2 2.5" />
+    {:else if state === 'tampered'}
+      <defs>
+        <clipPath id={clipId}><circle cx={c} cy={c} r={ringR - 1} /></clipPath>
+      </defs>
+      <circle cx={c} cy={c} r={ringR} stroke="var(--z-void)" />
+      <g clip-path="url(#{clipId})" transform="rotate(-35 {c} {c})" fill="var(--z-void)" stroke="none">
+        {#each voidRows as y (y)}
+          <text x={-size / 2} {y} font-size="5" font-weight="600" letter-spacing="0.5">VOID VOID VOID VOID VOID VOID VOID</text>
+        {/each}
+      </g>
+    {:else if state === 'unknown-key'}
+      <circle cx={c} cy={c} r={ringR} stroke="var(--z-muted)" pathLength="100" stroke-dasharray="40 6 20 6 20 8" />
+      <path data-rosette d={path} stroke="var(--z-muted)" />
+    {:else if state === 'incomplete'}
+      <circle cx={c} cy={c} r={ringR} stroke="var(--z-amber)" />
+      <path data-rosette d={path} stroke="var(--z-amber)" pathLength="360" stroke-dasharray="240 120" />
+    {:else if state === 'mismatch'}
+      <circle cx={c} cy={c} r={ringR} stroke="var(--z-amber)" />
+      <path data-rosette d={path} stroke="var(--z-amber)" />
+    {:else if state === 'verifying'}
+      <circle cx={c} cy={c} r={ringR} stroke="var(--z-line)" opacity="0.4" />
+      <path data-rosette class="spin" d={path} stroke="var(--z-line)" opacity="0.4" />
+    {:else}
+      <circle cx={c} cy={c} r={ringR} stroke="var(--z-line)" />
+      <path data-rosette d={path} stroke="var(--z-line)" />
+    {/if}
+  </svg>
+  {#if showLabel}<span class="text-sm">{label}</span>{/if}
+</span>
+
+<style>
+  .seal {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .spin {
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: seal-spin 12s linear infinite;
+  }
+  @keyframes seal-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spin {
+      animation: none;
+    }
+  }
+</style>
