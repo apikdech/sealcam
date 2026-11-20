@@ -8,15 +8,7 @@ import ExportDialog from './ExportDialog.svelte';
 import IntegrityBadge from './IntegrityBadge.svelte';
 import Player from './Player.svelte';
 
-// jsdom has no ResizeObserver; `bind:clientHeight` needs one.
-class FakeResizeObserver {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
-}
-
 beforeEach(() => {
-  globalThis.ResizeObserver = FakeResizeObserver as unknown as typeof ResizeObserver;
   FakePlayer.instances = [];
   FakePlayer.nextIntegrity = 'verified';
   HTMLMediaElement.prototype.play = () => Promise.resolve();

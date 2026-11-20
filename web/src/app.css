@@ -29,6 +29,8 @@
   --z-pet: #a855f7;
   --z-motion: #3b82f6;
   --z-other: #9ca3af;
+  /* Letter on a trigger chip: fixed dark so it holds 4.5:1 on all five colours in both themes. */
+  --z-on-trigger: #0e1a1f;
 }
 
 @media (prefers-color-scheme: light) {
@@ -55,6 +57,7 @@
   --color-foil: var(--z-foil);
   --color-amber: var(--z-amber);
   --color-void: var(--z-void);
+  --color-on-trigger: var(--z-on-trigger);
   --font-sans: 'Atkinson Hyperlegible Next', ui-sans-serif, system-ui, sans-serif;
 }
 

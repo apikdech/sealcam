@@ -109,7 +109,7 @@
               aria-label={st.label}
               title={st.label}
               style:background={st.color}
-              class="inline-block min-w-5 rounded px-1 text-center text-xs font-bold text-ground">{st.glyph}</span
+              class="inline-block min-w-5 rounded px-1 text-center text-xs font-bold text-on-trigger">{st.glyph}</span
             >
           {/each}
           <span class="truncate"><b class="font-semibold text-ink">{c.cameraName}</b> · <span class="num">{formatDuration(c.durationMs)}</span></span>

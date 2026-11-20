@@ -80,6 +80,12 @@ const getsFor = (c: DashClient, path: string) =>
   c.calls.filter((m): m is Extract<Request, { type: 'api.get' }> => m.type === 'api.get' && m.path === path);
 
 describe('timeline dashboard', () => {
+  it('the list wrapper is the scroll container', async () => {
+    mountPage(client());
+    const box = (await screen.findByRole('listbox', { name: /recordings/i })).parentElement!;
+    expect(box).toHaveClass('overflow-y-auto', 'overscroll-contain');
+  });
+
   it('lists the day newest first, in local time', async () => {
     mountPage(client());
     const rows = await listRows();
