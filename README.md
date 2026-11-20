@@ -131,8 +131,12 @@ Use these commands to operate the stack:
 
 > **Warning:** `docker volume rm zrelay_rustfs-data` deletes all recordings in RustFS.
 
-To move to the NAS, change `S3_ENDPOINT` and the two S3 keys. Then start the stack with
-`deploy/deploy.sh`, without the local layer.
+> **Note:** The local stack and the production stack use the same containers. `make local-up`
+> replaces the production containers, and zview-server moves from port 8080 to port 8081.
+
+To move to the NAS, stop the local stack with `make local-down`. Then change `S3_ENDPOINT` in
+`deploy/.env` and the S3 secret keys in `deploy/secrets/`. Then start the stack with
+`deploy/deploy.sh`.
 
 ## Install the production system
 

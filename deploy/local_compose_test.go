@@ -217,3 +217,21 @@ func TestMakeLocalDownKeepsVolumes(t *testing.T) {
 		t.Errorf("local-down deletes volumes (the recordings); recipe:\n%s", down)
 	}
 }
+
+// Both stacks share the compose project "zrelay", so moving to the NAS with
+// the local stack still up leaves RustFS running as an orphan.
+func TestReadmeStopsLocalStackBeforeNAS(t *testing.T) {
+	readme := readFile(t, "../README.md")
+	i := strings.Index(readme, "To move to the NAS")
+	if i < 0 {
+		t.Fatal(`README has no "To move to the NAS" paragraph`)
+	}
+	para := readme[i:]
+	if j := strings.Index(para, "\n\n"); j >= 0 {
+		para = para[:j]
+	}
+	stop, deploy := strings.Index(para, "make local-down"), strings.Index(para, "deploy/deploy.sh")
+	if stop < 0 || deploy < 0 || stop > deploy {
+		t.Errorf("the NAS paragraph must say to run `make local-down` before deploy/deploy.sh:\n%s", para)
+	}
+}
