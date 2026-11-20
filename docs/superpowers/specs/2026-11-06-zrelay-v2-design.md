@@ -298,11 +298,17 @@ ui-spec §4–5 unchanged, except:
 
 * The data origin **is** the app origin. The worker calls relative `/api/v1/*` paths.
 * **New worker message:** `live.offer {cameraId, sdp} → {sdp, sessionPath}` and `live.close {sessionPath}`. The worker performs the WHEP `POST`/`DELETE` with `K_api`. `RTCPeerConnection` runs on the main thread (it is unavailable in workers), so the main thread sees only SDP and media, never `K_api`.
-* **New Live view:** a responsive grid of camera tiles, each a `<video muted playsinline>` attached to a WHEP session.
-  * Sessions close when the tab is hidden (`visibilitychange`) and reopen when it is visible.
-  * Each tile shows a live badge, a reconnecting state with backoff, a tap-to-unmute control (audio only when the track exists), and a "viewer limit reached" state on `503`.
+* **Live tiles:** camera tiles, each a `<video muted playsinline>` attached to a WHEP session. The tiles live on **Home** (below).
+  * Sessions close when the tab is hidden (`visibilitychange`) and reopen when it is visible. While Home is open and visible, each tile holds one viewer slot of `live.max_viewers`.
+  * Each tile shows a live badge (only after the video plays), a reconnecting state with backoff and a "Try now" action, a tap-to-unmute control (audio only when the track exists, one tile unmuted at a time), and a "viewer limit reached" state on `503`.
+  * A tile does not retry when the retry cannot succeed. With no key (`ErrNoKey`) it shows "key locked" with a link to Keys. When `/api/v1/status` reports the camera `down`, it shows "camera offline".
+  * The grid follows the camera count: 1 camera fills the width, 2 sit side by side, 3–4 form a 2×2 grid.
   * The CSP needs no change for WebRTC.
-* **Navigation:** two top-level views, **Timeline** (ui-spec §4.6–4.7) and **Live**.
+* **Navigation:** three top-level views:
+  * **Home** (`#/`, the default): the live tiles above the selected day's events, newest first. Selecting an event plays it in place of the live tiles, with a "Back to live" control. With no key, Home shows the key import instead (first run, ui-spec §4.1).
+  * **Timeline** (`#/timeline`): ui-spec §4.6–4.7.
+  * **Keys** (`#/key`): ui-spec §4.1.
+  * `#/live` is kept as an alias of Home.
 * The service worker MUST NOT intercept `/api` or `/live`.
 
 ---
@@ -527,7 +533,7 @@ Ordered so the camera core and live view come first. They exercise the real C220
 * §3.4: the `video-link` endpoint is removed. `/api/v1/status` adds `storage`. Add the `/live/*` proxy (§7.1 here).
 * §3.6: replaced by §8.2 here.
 * §4.2: add the `live.offer` and `live.close` messages. All requests are same-origin.
-* §4.7: add the Live view.
+* §4.7: add Home (the live tiles and the day's events) as the default view, and the three-view navigation (§7.2 here).
 * §7: replaced by §10 here.
 
 ---
