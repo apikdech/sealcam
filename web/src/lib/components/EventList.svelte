@@ -10,12 +10,6 @@
     status: 'complete' | 'incomplete';
   }
 
-  /** Row pitch in CSS px; the list positions rows by it. */
-  export const ROW_HEIGHT = 56;
-  const OVERSCAN = 6;
-  /** Viewport height assumed until the element reports its own. */
-  const FALLBACK_VIEW = 480;
-
   export function formatDuration(ms: number | null): string {
     if (ms === null) return '—';
     const total = Math.round(ms / 1000);
@@ -31,95 +25,107 @@
   import { formatClock } from '../timeline/timezone';
   import { triggerStyle } from '../timeline/model';
   import type { IntegrityState } from '../player/engine';
-  import IntegrityBadge from './IntegrityBadge.svelte';
+  import Seal from '../seal/Seal.svelte';
+  import type { SealState } from '../seal/rosette';
 
   interface Props {
     /** Newest first. */
     clips: readonly EventRow[];
     selectedId: string | null;
     zone: string;
-    /** What is known about each clip's integrity; absent means not known yet. */
+    /** What is known about each clip's integrity; absent means not checked yet. */
     integrity: Readonly<Record<string, IntegrityState | undefined>>;
     onSelect: (clipId: string) => void;
+    pageSize?: number;
   }
 
-  let { clips, selectedId, zone, integrity, onSelect }: Props = $props();
+  let { clips, selectedId, zone, integrity, onSelect, pageSize = 50 }: Props = $props();
 
-  let scroller: HTMLDivElement;
-  let scrollTop = $state(0);
-  let viewHeight = $state(0);
+  let extra = $state(0);
+  let list: HTMLDivElement;
 
-  const view = $derived(viewHeight || FALLBACK_VIEW);
-  const first = $derived(Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN));
-  const last = $derived(Math.min(clips.length, Math.ceil((scrollTop + view) / ROW_HEIGHT) + OVERSCAN));
-  const visible = $derived(clips.slice(first, last));
+  const selectedIndex = $derived(selectedId === null ? -1 : clips.findIndex((c) => c.id === selectedId));
+  // A selection made elsewhere (J/K, the timeline) is always rendered.
+  const shown = $derived(Math.min(clips.length, Math.max(pageSize + extra, selectedIndex + 1)));
+  const visible = $derived(clips.slice(0, shown));
+  const stop = $derived(selectedIndex >= 0 && selectedIndex < shown ? selectedIndex : 0);
 
-  // Bring a selection made elsewhere (J/K, the timeline) into view.
+  function sealState(c: EventRow): SealState {
+    return integrity[c.id] ?? (c.status === 'incomplete' ? 'incomplete' : 'unchecked');
+  }
+
+  function focusRow(i: number) {
+    list.querySelectorAll<HTMLElement>('[role="option"]')[i]?.focus();
+  }
+
+  function onKey(e: KeyboardEvent, i: number, id: string) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onSelect(id);
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      focusRow(Math.min(shown - 1, Math.max(0, i + (e.key === 'ArrowDown' ? 1 : -1))));
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      focusRow(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      focusRow(shown - 1);
+    }
+  }
+
+  // Bring a selection made elsewhere into view.
   $effect(() => {
-    if (selectedId === null || !scroller) return;
-    const i = clips.findIndex((c) => c.id === selectedId);
-    if (i < 0) return;
-    const top = i * ROW_HEIGHT;
-    const st = scroller.scrollTop;
-    if (top >= st && top + ROW_HEIGHT <= st + view) return;
-    const target = Math.max(0, top - (view - ROW_HEIGHT) / 2);
-    scroller.scrollTop = target;
-    scrollTop = target;
+    if (selectedId === null || !list) return;
+    list.querySelectorAll<HTMLElement>('[role="option"]')[selectedIndex]?.scrollIntoView?.({ block: 'nearest' });
   });
 </script>
 
-<div
-  bind:this={scroller}
-  bind:clientHeight={viewHeight}
-  role="listbox"
-  aria-label="Recordings, newest first"
-  tabindex="-1"
-  onscroll={() => (scrollTop = scroller.scrollTop)}
-  class="relative h-full overflow-y-auto overscroll-contain"
->
+<div bind:this={list} role="listbox" aria-label="Recordings" tabindex="-1">
   {#if clips.length === 0}
-    <p class="p-4 text-sm text-neutral-400">No recordings in this view.</p>
+    <p class="px-4 py-6 text-sm text-muted">No recordings on this day.</p>
   {:else}
-    <div style:height="{clips.length * ROW_HEIGHT}px" class="relative">
-      {#each visible as c, k (c.id)}
-        {@const i = first + k}
-        {@const sel = c.id === selectedId}
-        <div
-          role="option"
-          aria-selected={sel}
-          aria-posinset={i + 1}
-          aria-setsize={clips.length}
-          data-clip={c.id}
-          tabindex={sel ? 0 : -1}
-          style:top="{i * ROW_HEIGHT}px"
-          style:height="{ROW_HEIGHT}px"
-          onclick={() => onSelect(c.id)}
-          onkeydown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              onSelect(c.id);
-            }
-          }}
-          class="absolute inset-x-0 flex cursor-pointer items-center gap-3 border-b border-neutral-800 px-3 text-sm hover:bg-neutral-800/60 {sel
-            ? 'bg-sky-900/40'
-            : ''}"
+    {#each visible as c, i (c.id)}
+      {@const sel = c.id === selectedId}
+      <div
+        role="option"
+        aria-selected={sel}
+        aria-posinset={i + 1}
+        aria-setsize={clips.length}
+        data-clip={c.id}
+        tabindex={i === stop ? 0 : -1}
+        onclick={() => onSelect(c.id)}
+        onkeydown={(e) => onKey(e, i, c.id)}
+        class="grid min-h-16 cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-3 border-t border-rule px-4 outline-offset-[-1px] outline-foil first:border-t-0 focus-visible:outline-2 {sel
+          ? 'bg-plate outline outline-1'
+          : 'hover:bg-plate'}"
+      >
+        <span class="num text-[20px] font-semibold text-ink">{formatClock(c.startMs, zone)}</span>
+        <span class="flex min-w-0 items-center gap-1.5 text-sm text-muted">
+          {#each c.triggers as t (t)}
+            {@const st = triggerStyle(t)}
+            <span
+              role="img"
+              aria-label={st.label}
+              title={st.label}
+              style:background={st.color}
+              class="inline-block min-w-5 rounded px-1 text-center text-xs font-bold text-ground">{st.glyph}</span
+            >
+          {/each}
+          <span class="truncate"><b class="font-semibold text-ink">{c.cameraName}</b> · <span class="num">{formatDuration(c.durationMs)}</span></span>
+        </span>
+        <Seal seed={c.id} state={sealState(c)} size={38} />
+      </div>
+    {/each}
+    <div class="flex items-center justify-between gap-3 border-t border-rule px-4 py-3 text-sm text-muted">
+      <span class="num">Showing {shown} of {clips.length}</span>
+      {#if shown < clips.length}
+        <button
+          type="button"
+          onclick={() => (extra += pageSize)}
+          class="min-h-11 rounded px-3 font-semibold text-ink outline-foil hover:bg-plate focus-visible:outline-2">Show {pageSize} more</button
         >
-          <div class="min-w-0 flex-1">
-            <div class="flex items-baseline gap-2">
-              <span class="font-mono tabular-nums">{formatClock(c.startMs, zone, true)}</span>
-              <span class="text-xs text-neutral-400">{formatDuration(c.durationMs)}</span>
-            </div>
-            <div class="truncate text-xs text-neutral-400">{c.cameraName}</div>
-          </div>
-          <div class="flex items-center gap-1">
-            {#each c.triggers as t (t)}
-              {@const st = triggerStyle(t)}
-              <span role="img" aria-label={st.label} title={st.label} style:color={st.color} class="w-4 text-center text-xs font-bold">{st.glyph}</span>
-            {/each}
-          </div>
-          <IntegrityBadge state={integrity[c.id] ?? (c.status === 'incomplete' ? 'incomplete' : undefined)} />
-        </div>
-      {/each}
+      {/if}
     </div>
   {/if}
 </div>

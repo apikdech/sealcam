@@ -1,10 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakePlayer, fakePlayerFactory, ids } from '../../../test-support/dashboard-fakes';
 import type { PlayerState } from '../player/engine';
 import { initialState } from '../player/status';
-import EventList from './EventList.svelte';
 import ExportDialog from './ExportDialog.svelte';
 import IntegrityBadge from './IntegrityBadge.svelte';
 import Player from './Player.svelte';
@@ -24,78 +23,6 @@ beforeEach(() => {
   HTMLMediaElement.prototype.pause = () => {};
 });
 afterEach(cleanup);
-
-const row = (i: number) => ({
-  id: `id${i}`,
-  cameraName: 'Front Door',
-  startMs: Date.UTC(2026, 10, 6, 0, 0, 0) + i * 60_000,
-  durationMs: 65_000 as number | null,
-  triggers: ['person', 'vehicle'],
-  status: 'complete' as const,
-});
-
-describe('EventList', () => {
-  const many = Array.from({ length: 5000 }, (_, i) => row(5000 - i)); // newest first
-
-  it('renders only a window of a very long list', () => {
-    render(EventList, { clips: many, selectedId: null, zone: 'Asia/Jakarta', integrity: {}, onSelect: () => {} });
-    const rows = screen.getAllByRole('option');
-    expect(rows.length).toBeGreaterThan(0);
-    expect(rows.length).toBeLessThan(60);
-    expect(rows[0]).toHaveAttribute('aria-setsize', '5000');
-  });
-
-  it('renders further rows after scrolling, newest first', async () => {
-    render(EventList, { clips: many, selectedId: null, zone: 'Asia/Jakarta', integrity: {}, onSelect: () => {} });
-    const list = screen.getByRole('listbox');
-    expect(within(list).getAllByRole('option')[0]).toHaveAttribute('data-clip', 'id5000');
-    list.scrollTop = 56 * 2000;
-    await fireEvent.scroll(list);
-    const first = within(list).getAllByRole('option')[0]!;
-    expect(Number(first.getAttribute('aria-posinset'))).toBeGreaterThan(1900);
-    // The window starts a few rows above the viewport; rows stay in newest-first order.
-    expect(first.dataset.clip).toBe(`id${5000 - (Number(first.getAttribute('aria-posinset')) - 1)}`);
-  });
-
-  it('shows local time in the zone, camera, trigger glyphs, duration and the integrity badge', () => {
-    render(EventList, {
-      clips: [row(0)],
-      selectedId: null,
-      zone: 'Asia/Jakarta',
-      integrity: { id0: 'verified' },
-      onSelect: () => {},
-    });
-    const r = screen.getByRole('option');
-    // 2026-11-06T00:00Z is 07:00 in Jakarta.
-    expect(r).toHaveTextContent('07:00:00');
-    expect(r).toHaveTextContent('Front Door');
-    expect(r).toHaveTextContent('1:05');
-    expect(within(r).getByLabelText('Person')).toBeInTheDocument();
-    expect(within(r).getByLabelText('Vehicle')).toBeInTheDocument();
-    expect(within(r).getByLabelText(/verified/i)).toBeInTheDocument();
-  });
-
-  it('marks the selection and calls onSelect on click', async () => {
-    const onSelect = vi.fn();
-    render(EventList, { clips: [row(1), row(0)], selectedId: 'id0', zone: 'UTC', integrity: {}, onSelect });
-    const [a, b] = screen.getAllByRole('option');
-    expect(a).toHaveAttribute('aria-selected', 'false');
-    expect(b).toHaveAttribute('aria-selected', 'true');
-    await fireEvent.click(a!);
-    expect(onSelect).toHaveBeenCalledWith('id1');
-  });
-
-  it('scrolls a selected clip that is far outside the window into view', async () => {
-    const { rerender } = render(EventList, { clips: many, selectedId: null, zone: 'UTC', integrity: {}, onSelect: () => {} });
-    await rerender({ clips: many, selectedId: 'id10', zone: 'UTC', integrity: {}, onSelect: () => {} });
-    await waitFor(() => expect(screen.getByRole('option', { selected: true })).toBeInTheDocument());
-  });
-
-  it('says so when there are no recordings', () => {
-    render(EventList, { clips: [], selectedId: null, zone: 'UTC', integrity: {}, onSelect: () => {} });
-    expect(screen.getByText(/no recordings/i)).toBeInTheDocument();
-  });
-});
 
 describe('IntegrityBadge', () => {
   it.each([

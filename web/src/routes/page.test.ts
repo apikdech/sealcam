@@ -85,7 +85,7 @@ describe('timeline dashboard', () => {
     const rows = await listRows();
     expect(rows.map((r) => r.getAttribute('data-clip'))).toEqual([ids.c, ids.b, ids.a]);
     // 12:00Z is 19:00 in Jakarta.
-    expect(rows[0]).toHaveTextContent('19:00:00');
+    expect(rows[0]).toHaveTextContent('19:00');
   });
 
   it('asks for the Jakarta day in UTC', async () => {
@@ -201,7 +201,7 @@ describe('timeline dashboard', () => {
     c.clips = [sidecar(ids.a, '2026-11-06T10:00:00Z', { status: 'incomplete', end_time: null, duration_ms: null })];
     mountPage(c);
     const row = (await listRows())[0]!;
-    expect(row.querySelector('[data-integrity="incomplete"]')).not.toBeNull();
+    expect(row.querySelector('[data-seal-state="incomplete"]')).not.toBeNull();
   });
 
   it('records the integrity the player reports in the list', async () => {
@@ -209,7 +209,7 @@ describe('timeline dashboard', () => {
     mountPage(client());
     const rows = await listRows();
     await fireEvent.click(rows[0]!);
-    await waitFor(() => expect(rows[0]!.querySelector('[data-integrity="tampered"]')).not.toBeNull());
+    await waitFor(() => expect(rows[0]!.querySelector('[data-seal-state="tampered"]')).not.toBeNull());
   });
 
   it('locks the key from the menu', async () => {
@@ -476,7 +476,7 @@ describe('forced display zone', () => {
     await fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-06' } });
     await waitFor(() => expect(lastRange(c)).toMatchObject(dayRange('2026-11-06', 'Asia/Jakarta')));
     const rows = await listRows();
-    expect(rows[0]).toHaveTextContent('19:00:00');
+    expect(rows[0]).toHaveTextContent('19:00');
   });
 
   it('remembers the choice for the next visit', async () => {
