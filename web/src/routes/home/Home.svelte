@@ -119,7 +119,7 @@
         {data.invalid} {data.invalid === 1 ? 'recording' : 'recordings'} could not be read and {data.invalid === 1 ? 'is' : 'are'} not shown.
       </p>
     {/if}
-    <div class="grid min-w-0 flex-1 md:grid-cols-[minmax(0,1fr)_22rem] md:gap-4 md:px-4">
+    <div class="grid min-w-0 flex-1 content-start md:grid-cols-[minmax(0,1fr)_22rem] md:gap-4 md:px-4">
       <div class="min-w-0 max-md:px-4">
         <!-- The grid unmounts while the player shows, which frees the viewer slots. -->
         {#if selectedId === null}

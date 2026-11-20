@@ -45,8 +45,24 @@ describe('FilterBar', () => {
     expect(p.onZone.mock.calls).toEqual([['Asia/Jakarta'], [null]]);
   });
 
-  it('scrolls sideways in one row', () => {
+  it('wraps into a grid on phones: no sideways scroll, selects may shrink', () => {
     const { container } = render(FilterBar, props());
-    expect(container.firstElementChild).toHaveClass('overflow-x-auto');
+    const bar = container.firstElementChild!;
+    expect(bar).toHaveClass('grid', 'grid-cols-2');
+    expect(bar).not.toHaveClass('overflow-x-auto');
+    for (const name of ['Camera', 'Trigger', 'Time zone']) {
+      const select = screen.getByRole('combobox', { name });
+      expect(select).toHaveClass('min-w-0', 'w-full', 'appearance-none');
+      expect(select.closest('label')).toHaveClass('min-w-0');
+    }
+    expect(screen.getByRole('combobox', { name: 'Time zone' }).closest('label')).toHaveClass('col-span-2');
+  });
+
+  it('draws its own chevron in the palette', () => {
+    render(FilterBar, props());
+    for (const name of ['Camera', 'Trigger', 'Time zone']) {
+      const wrap = screen.getByRole('combobox', { name }).parentElement!;
+      expect(wrap.querySelector('.text-muted svg')).not.toBeNull();
+    }
   });
 });

@@ -52,6 +52,33 @@ describe('rosette', () => {
     }
   });
 
+  it('list-size seals (< 44 px) draw N rotated ellipses, not the concentric bands', () => {
+    const p = rosetteParams('clip-1');
+    expect(p.ellipses).toBeGreaterThanOrEqual(8);
+    expect(p.ellipses).toBeLessThanOrEqual(14);
+    for (const size of [20, 38, 43]) {
+      const d = rosettePath(p, size);
+      expect(d.match(/M/g)!.length).toBe(p.ellipses);
+      expect(d.endsWith('Z')).toBe(true);
+      expect(d).not.toContain('NaN');
+      for (const n of d.match(/-?\d+(\.\d+)?/g)!.map(Number)) {
+        expect(n).toBeGreaterThanOrEqual(0);
+        expect(n).toBeLessThanOrEqual(size);
+      }
+    }
+    expect(rosettePath(p, 64).match(/M/g)!.length).toBe(p.strands * 3);
+  });
+
+  it('list-size rosettes are deterministic and distinct per seed', () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 100; i++) {
+      const d = rosettePath(rosetteParams(`clip-${i}`), 38);
+      expect(rosettePath(rosetteParams(`clip-${i}`), 38)).toBe(d);
+      seen.add(d);
+    }
+    expect(seen.size).toBeGreaterThanOrEqual(95);
+  });
+
   it('sealLabel returns the exact copy for all seven states', () => {
     const want: Record<SealState, string> = {
       unchecked: 'Not checked yet. Play it to verify.',

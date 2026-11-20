@@ -12,7 +12,7 @@
 
   let { cameras, client, zone, status }: Props = $props();
 
-  const columns = $derived(cameras.length <= 1 ? '' : cameras.length === 2 ? 'md:grid-cols-2' : 'sm:grid-cols-2');
+  const columns = $derived(cameras.length <= 1 ? 'md:mx-auto md:w-[min(100%,calc(56vh*16/9))]' : cameras.length === 2 ? 'md:grid-cols-2' : 'sm:grid-cols-2');
   const down = $derived(new Set((status?.cameras ?? []).filter((c) => c.rtsp === 'down').map((c) => c.id)));
 </script>
 

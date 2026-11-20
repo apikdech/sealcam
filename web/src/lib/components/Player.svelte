@@ -230,18 +230,27 @@
       <span>Back to live</span>
     </button>
   {/if}
-  <div class="relative overflow-hidden rounded-lg border border-rule bg-black">
+  <div
+    class="relative overflow-hidden rounded-lg border border-rule md:mx-auto md:w-[min(100%,calc(56vh*16/9))] {snap.clipId === null
+      ? 'bg-plate'
+      : 'bg-black'}"
+  >
     <video
       bind:this={video}
       data-testid="player"
       data-clip-player
-      controls
       muted
       playsinline
       onplay={() => (playing = true)}
       onpause={() => (playing = false)}
-      class="aspect-video w-full bg-black object-contain"
+      class="aspect-video w-full object-contain {snap.clipId === null ? '' : 'bg-black'}"
     ></video>
+    {#if snap.clipId === null}
+      <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-sm text-muted">
+        <span class="opacity-60"><Seal seed="zview" state="unknown-key" size={40} decorative /></span>
+        <span>Select a recording</span>
+      </div>
+    {/if}
     {#if view.spinner}
       <div
         class="absolute inset-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--z-ov-ground)_70%,transparent)] text-sm"
@@ -256,9 +265,7 @@
 
   <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
     <span data-testid="integrity" data-kind={view.kind} class="flex items-center gap-2" title={view.title}>
-      {#if snap.clipId === null}
-        <span class="text-muted">Select a recording</span>
-      {:else}
+      {#if snap.clipId !== null}
         <Seal seed={snap.clipId} state={sealState} showLabel />
       {/if}
     </span>

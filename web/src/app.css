@@ -82,6 +82,10 @@ body {
   outline-offset: 2px;
 }
 
+html {
+  accent-color: var(--z-line);
+}
+
 a {
   text-underline-offset: 3px;
 }

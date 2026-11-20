@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import { layoutLanes } from './model';
+import { layoutLanes, NAME_BAND } from './model';
 import { backingSize, createScheduler, DARK, drawTimeline, LIGHT, readPalette } from './render';
 
 function fakeRaf() {
@@ -235,5 +235,27 @@ describe('drawTimeline integrity markers', () => {
     const backing = ops.findIndex((o, i) => i > barFill && o.op === 'fillRect' && o.fill === DARK.lane);
     expect(backing).toBeGreaterThan(-1);
     expect(backing).toBeLessThan(name);
+  });
+
+  it('bars start below the lane name band, so a name is never under a bar', () => {
+    const { layout } = frame({});
+    const lane = layout.lanes[0]!;
+    expect(lane.clips.length).toBeGreaterThan(0);
+    for (const c of lane.clips) expect(c.y).toBeGreaterThanOrEqual(lane.y + NAME_BAND);
+  });
+
+  it('the now line steps over a lane name instead of crossing it', () => {
+    const { layout } = frame({});
+    const lane = layout.lanes[0]!;
+    const spy = spyCtx();
+    drawTimeline(spy.ctx, layout, { zone: 'UTC', integrity: {}, selectedClipId: null, nowMs: T0 + H / 4 });
+    const x = 1000 / 96;
+    const ys = spy.ops.filter((o) => (o.op === 'moveTo' || o.op === 'lineTo') && Math.abs((o.args[0] as number) - x) < 0.01);
+    expect(ys.length).toBeGreaterThan(0);
+    for (const o of ys) {
+      const y = o.args[1] as number;
+      expect(y > lane.y && y < lane.y + NAME_BAND).toBe(false);
+    }
+    expect(ys.some((o) => o.op === 'moveTo' && o.args[1] === lane.y + NAME_BAND)).toBe(true);
   });
 });

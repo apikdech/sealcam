@@ -137,8 +137,11 @@ describe('KeyImport scanning and photos', () => {
 describe('KeyImport success panel', () => {
   it('takes focus and shows the fingerprint, clearing the field', async () => {
     const { client } = fakeClient({ clips: clipsAt(KEY_ID) });
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus');
     const heading = await importTyped(client);
     await waitFor(() => expect(heading).toHaveFocus());
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    focus.mockRestore();
     expect(screen.getByRole('status')).toHaveTextContent(`Fingerprint ${FP}`);
     expect(document.body.textContent).not.toContain('zk1-');
     await waitFor(() => expect(screen.getByText('Matches recent recordings.')).toBeInTheDocument());

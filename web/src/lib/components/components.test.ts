@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakePlayer, fakePlayerFactory, ids } from '../../../test-support/dashboard-fakes';
 import type { PlayerState } from '../player/engine';
@@ -126,6 +126,36 @@ describe('Player', () => {
   it('marks its video as clip playback so the update prompt can tell it from live tiles', () => {
     render(Player, props());
     expect(screen.getByTestId('player')).toHaveAttribute('data-clip-player');
+  });
+
+  it('has no native controls: the custom transport covers them', () => {
+    render(Player, props());
+    expect(screen.getByTestId('player')).not.toHaveAttribute('controls');
+  });
+
+  it('shows the empty state on the plate, not a black slab, until a clip is loaded', async () => {
+    render(Player, props({ cue: null }));
+    const video = screen.getByTestId('player');
+    const frame = video.parentElement!;
+    expect(frame).toHaveClass('bg-plate');
+    expect(frame).not.toHaveClass('bg-black');
+    expect(video).not.toHaveClass('bg-black');
+    expect(within(frame).getByText('Select a recording')).toBeInTheDocument();
+    expect(frame.querySelector('[data-seal-state]')).not.toBeNull();
+    expect(frame.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  it('goes dark over video only while a clip is loaded', async () => {
+    render(Player, props());
+    const video = screen.getByTestId('player');
+    await waitFor(() => expect(video.parentElement).toHaveClass('bg-black'));
+    expect(video).toHaveClass('bg-black');
+    expect(within(video.parentElement!).queryByText('Select a recording')).toBeNull();
+  });
+
+  it('caps its height on desktop, keeping 16:9 by width', () => {
+    render(Player, props());
+    expect(screen.getByTestId('player').parentElement!.className).toContain('md:w-[min(100%,calc(56vh*16/9))]');
   });
 
   it('seeks to the offset after loading', async () => {

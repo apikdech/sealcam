@@ -1,7 +1,7 @@
 // Canvas 2D drawing for the timeline. Nothing here owns state: Timeline.svelte
 // owns the view and calls drawTimeline from a dirty-flag rAF scheduler.
 import type { IntegrityState } from '../player/engine';
-import { glyphFits, RULER_HEIGHT, rulerTicks, timeToX, triggerStyle, type GapRect, type Layout } from './model';
+import { glyphFits, NAME_BAND, RULER_HEIGHT, rulerTicks, timeToX, triggerStyle, type GapRect, type Layout } from './model';
 
 export interface Scheduler {
   /** Marks the canvas dirty; draws once on the next animation frame. */
@@ -242,14 +242,16 @@ export function drawTimeline(ctx: CanvasRenderingContext2D, layout: Layout, o: D
   }
   ctx.textAlign = 'left';
 
-  // Camera names after the bars, on a plate backing so they stay legible.
+  // Camera names in the name band above each lane's bars (bars never enter it), on a plate backing.
   ctx.font = FONT;
+  const nameWidths: number[] = [];
   for (const lane of layout.lanes) {
     const w = ctx.measureText(lane.name).width + 8;
+    nameWidths.push(w);
     ctx.fillStyle = p.lane;
-    ctx.fillRect(0, lane.y, w, 16);
+    ctx.fillRect(0, lane.y, w, NAME_BAND);
     ctx.fillStyle = p.textDim;
-    ctx.fillText(lane.name, 4, lane.y + 8);
+    ctx.fillText(lane.name, 4, lane.y + NAME_BAND / 2);
   }
 
   // Integrity markers (ui-spec §4.4): colour plus shape, never colour alone.
@@ -300,7 +302,15 @@ export function drawTimeline(ctx: CanvasRenderingContext2D, layout: Layout, o: D
       ctx.strokeStyle = p.foil;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(x, RULER_HEIGHT - 8);
+      // The line steps over any name it would cross.
+      let from = RULER_HEIGHT - 8;
+      layout.lanes.forEach((lane, i) => {
+        if (x > nameWidths[i]! + 2) return;
+        ctx.moveTo(x, from);
+        ctx.lineTo(x, lane.y);
+        from = lane.y + NAME_BAND;
+      });
+      ctx.moveTo(x, from);
       ctx.lineTo(x, height);
       ctx.stroke();
     }

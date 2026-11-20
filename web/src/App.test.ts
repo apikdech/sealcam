@@ -13,6 +13,9 @@ vi.mock('./routes/onboarding/FirstRun.svelte', () => import('../test-support/rou
 import App from './App.svelte';
 import { saveZonePref } from './lib/timeline/zonePref';
 
+const scrollTo = vi.fn();
+window.scrollTo = scrollTo as unknown as typeof window.scrollTo;
+
 afterEach(async () => {
   cleanup();
   location.hash = '';
@@ -46,6 +49,17 @@ const settled = async (route: string) => {
 };
 
 describe('App routing', () => {
+  it('a route change scrolls to the top', async () => {
+    location.hash = '';
+    render(App, { client: fake() });
+    await settled('home');
+    scrollTo.mockClear();
+    location.hash = '#/timeline';
+    await fireEvent(window, new HashChangeEvent('hashchange'));
+    await waitFor(() => expect(shown()).toEqual(['timeline']));
+    expect(scrollTo).toHaveBeenCalledWith(0, 0);
+  });
+
   it('default route renders Home', async () => {
     location.hash = '';
     render(App, { client: fake() });
@@ -140,6 +154,35 @@ describe('App first run and Lock', () => {
     expect(screen.getByText(/Keep it on this phone/)).toBeInTheDocument();
     await fireEvent.click(screen.getByRole('link', { name: 'Open Home' }));
     await waitFor(() => expect(shown()).toEqual(['home']));
+  });
+
+  it('marks no tab current during first run, in either bar', async () => {
+    location.hash = '';
+    render(App, { client: fake([]) });
+    await settled('firstrun');
+    for (const nav of screen.getAllByRole('navigation', { name: 'Views' })) {
+      expect(nav.querySelector('[aria-current]')).toBeNull();
+    }
+  });
+
+  it('Open Home lands at the top of the page', async () => {
+    location.hash = '';
+    let keys: Keys = [];
+    const client = {
+      async call<T>(msg: Request): Promise<T> {
+        if (msg.type === 'key.list') return { keys } as T;
+        throw new Error('no status');
+      },
+    };
+    render(App, { client });
+    await settled('firstrun');
+    keys = [KEY];
+    await fireEvent.click(screen.getByRole('button', { name: 'Add key' }));
+    await new Promise((r) => setTimeout(r, 20));
+    scrollTo.mockClear();
+    await fireEvent.click(screen.getByRole('link', { name: 'Open Home' }));
+    await waitFor(() => expect(shown()).toEqual(['home']));
+    expect(scrollTo).toHaveBeenCalledWith(0, 0);
   });
 
   it('Lock shows the result text for a remembered key', async () => {

@@ -93,6 +93,8 @@
   }
 
   async function leaveFirstRun() {
+    // Every route (and Open Home) starts at the top bar, status and day row.
+    window.scrollTo(0, 0);
     holdFirstRun = false;
     await refreshKeys();
     if (hasKey) void pollStatus();
@@ -133,6 +135,9 @@
     };
   });
 
+  /** FirstRun is not the Home view: no tab is current while it shows. */
+  const current = (h: string): boolean => hash === h && !(h === '#/' && showFirstRun);
+
   const tabBase = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line';
 </script>
 
@@ -155,8 +160,8 @@
     {#each tabs as t (t.hash)}
       <a
         href={t.hash}
-        aria-current={hash === t.hash ? 'page' : undefined}
-        class="{tabBase} inline-flex min-h-11 items-center px-3 text-sm {hash === t.hash ? 'text-line underline underline-offset-8' : 'text-muted'}">{t.label}</a
+        aria-current={current(t.hash) ? 'page' : undefined}
+        class="{tabBase} inline-flex min-h-11 items-center px-3 text-sm {current(t.hash) ? 'text-line underline underline-offset-8' : 'text-muted'}">{t.label}</a
       >
     {/each}
   </nav>
@@ -228,8 +233,8 @@
   {#each tabs as t (t.hash)}
     <a
       href={t.hash}
-      aria-current={hash === t.hash ? 'page' : undefined}
-      class="{tabBase} flex flex-col items-center justify-center gap-1 text-xs {hash === t.hash ? 'text-line' : 'text-muted'}"
+      aria-current={current(t.hash) ? 'page' : undefined}
+      class="{tabBase} flex flex-col items-center justify-center gap-1 text-xs {current(t.hash) ? 'text-line' : 'text-muted'}"
     >
       <Icon name={t.icon} size={22} />
       <span>{t.label}</span>

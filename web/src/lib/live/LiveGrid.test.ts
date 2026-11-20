@@ -51,6 +51,14 @@ describe('LiveGrid', () => {
     expect(grid().className).toContain('md:grid-cols-2');
   });
 
+  it('a single camera is capped in height on desktop, keeping 16:9 by width', () => {
+    render(LiveGrid, props(cams('a')));
+    expect(grid().className).toContain('md:w-[min(100%,calc(56vh*16/9))]');
+    cleanup();
+    render(LiveGrid, props(cams('a', 'b')));
+    expect(grid().className).not.toContain('56vh');
+  });
+
   it('four cameras get two columns from sm', () => {
     render(LiveGrid, props(cams('a', 'b', 'c', 'd')));
     expect(grid().className).toContain('sm:grid-cols-2');

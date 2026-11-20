@@ -101,7 +101,7 @@
       onImported?.(res.keyId);
       void checkRecordings(res.keyId);
       await tick();
-      heading?.focus();
+      heading?.focus({ preventScroll: true });
     } catch {
       importError = 'Could not import the key. Try again.'; // fixed text: never the key or the raw error
     }
@@ -204,7 +204,7 @@
     <input
       id="family-key"
       type={show ? 'text' : 'password'}
-      class="w-full rounded border border-rule bg-plate p-3 font-mono text-base text-ink focus-visible:outline-2 focus-visible:outline-line"
+      class="w-full rounded border border-rule bg-plate p-3 font-mono text-base text-ink placeholder:text-muted focus-visible:outline-2 focus-visible:outline-line"
       autocomplete="off"
       autocapitalize="off"
       spellcheck="false"

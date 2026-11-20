@@ -38,6 +38,8 @@ export const RULER_HEIGHT = 28;
 export const LANE_HEIGHT = 44;
 export const LANE_GAP = 6;
 export const BAR_INSET = 6;
+/** Top of each lane, reserved for the camera name: bars start below it, so nothing crosses the text. */
+export const NAME_BAND = 14;
 /** Bars and trigger spans never get thinner than this, so 20 s clips stay visible at 24 h zoom. */
 export const MIN_CLIP_PX = 3;
 /** Click-to-nearest-clip snap distance (ui-spec §4.6). */
@@ -173,8 +175,8 @@ export function layoutLanes(input: LayoutInput): Layout {
 
   const lanes = input.cameras.map((cam, i): Lane => {
     const y = RULER_HEIGHT + i * (laneHeight + LANE_GAP);
-    const barY = y + BAR_INSET;
-    const barH = laneHeight - 2 * BAR_INSET;
+    const barY = y + NAME_BAND;
+    const barH = laneHeight - NAME_BAND - BAR_INSET;
 
     const clips: ClipRect[] = [];
     for (const c of byCamera.get(cam.id) ?? []) {
