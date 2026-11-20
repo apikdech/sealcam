@@ -3,7 +3,7 @@ import { cleanup, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Status } from '../worker/schemas';
 import StatusDot from './components/StatusDot.svelte';
-import { relayHealth } from './relayStatus';
+import { recorderWords, relayHealth } from './relayStatus';
 
 const NOW = Date.UTC(2026, 10, 6, 15, 0, 0);
 const iso = (ms: number) => new Date(ms).toISOString().replace('.000Z', 'Z');
@@ -90,5 +90,89 @@ describe('StatusDot', () => {
   it('renders green when healthy', () => {
     render(StatusDot, { status: status(), nowMs: NOW });
     expect(screen.getByRole('img').dataset.level).toBe('ok');
+  });
+});
+
+describe('recorderWords', () => {
+  const Z = 'Asia/Jakarta';
+  const cam = (name: string, over: Partial<Status['cameras'][number]> = {}): Status['cameras'][number] => ({
+    id: name,
+    name,
+    rtsp: 'up',
+    events: 'up',
+    since: iso(NOW - 3_600_000),
+    last_clip_at: null,
+    ...over,
+  });
+
+  it('says status unavailable for null', () => {
+    expect(recorderWords(null, NOW, Z)).toMatchObject({ level: 'unknown', short: 'Status unavailable' });
+  });
+
+  it('counts whole minutes when stale', () => {
+    const w = recorderWords(status({ ageMs: 4 * 60_000 + 30_000 }), NOW, Z);
+    expect(w.level).toBe('bad');
+    expect(w.short).toBe('Recorder quiet 4 min');
+    expect(w.details[0]).toMatch(/^The recorder last checked in at \d\d:\d\d\.$/);
+  });
+
+  it('switches to hours from 120 minutes', () => {
+    expect(recorderWords(status({ ageMs: 119 * 60_000 }), NOW, Z).short).toBe('Recorder quiet 119 min');
+    expect(recorderWords(status({ ageMs: 150 * 60_000 }), NOW, Z).short).toBe('Recorder quiet 2 h');
+  });
+
+  it('names one offline camera', () => {
+    const w = recorderWords(status({ cameras: [cam('Front Door', { rtsp: 'down' })] }), NOW, Z);
+    expect(w.short).toBe('Front Door offline');
+    expect(w.level).toBe('bad');
+  });
+
+  it('counts two or more offline cameras', () => {
+    const w = recorderWords(
+      status({ cameras: [cam('A', { rtsp: 'down' }), cam('B', { rtsp: 'down' }), cam('C')] }),
+      NOW,
+      Z,
+    );
+    expect(w.short).toBe('2 cameras offline');
+    expect(w.details.length).toBe(2);
+  });
+
+  it('names a degraded camera', () => {
+    expect(recorderWords(status({ cameras: [cam('Garage', { rtsp: 'degraded' })] }), NOW, Z).short).toBe(
+      'Garage degraded',
+    );
+  });
+
+  it('names a camera whose events are not up', () => {
+    const w = recorderWords(status({ cameras: [cam('Garage', { events: 'down' })] }), NOW, Z);
+    expect(w.short).toBe('Garage degraded');
+    expect(w.level).toBe('warn');
+  });
+
+  it('says storage delayed when the breaker is not closed', () => {
+    const w = recorderWords(status({ storage: { state: 'open', since: iso(NOW - 600_000) } }), NOW, Z);
+    expect(w.short).toBe('Storage delayed');
+    expect(w.details[0]).toMatch(/^Saving to storage is delayed since \d\d:\d\d\.$/);
+  });
+
+  it('says Recorder OK otherwise', () => {
+    expect(recorderWords(status({ storage: { state: 'closed' } }), NOW, Z)).toMatchObject({
+      level: 'ok',
+      short: 'Recorder OK',
+    });
+  });
+
+  it('details use the display zone', () => {
+    const now = Date.parse('2026-11-20T14:30:00Z');
+    const s = status({ cameras: [cam('Front Door', { rtsp: 'down', since: '2026-11-20T14:04:00Z' })] });
+    s.updated_at = '2026-11-20T14:29:30Z';
+    expect(recorderWords(s, now, Z).details).toEqual(['Front Door has been offline since 21:04.']);
+  });
+
+  it('ok details', () => {
+    const now = Date.parse('2026-11-20T14:47:00Z');
+    const s = status();
+    s.updated_at = '2026-11-20T14:46:00Z';
+    expect(recorderWords(s, now, Z).details).toEqual(['The recorder checked in at 21:46.']);
   });
 });
