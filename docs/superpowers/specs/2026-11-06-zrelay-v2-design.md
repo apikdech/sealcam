@@ -139,6 +139,7 @@ Replaces the Tapo-specific parts of relay-spec §4.4 with behaviour proven in ip
 | Topic suffix | Item | Kind |
 |---|---|---|
 | `RuleEngine/CellMotionDetector/Motion` | `IsMotion` | motion |
+| `RuleEngine/PeopleDetector/People` | `IsPeople` | person |
 | `RuleEngine/TPSmartEventDetector/TPSmartEvent` | `IsPeople` | person |
 | `RuleEngine/TPSmartEventDetector/TPSmartEvent` | `IsPet` | pet |
 | `RuleEngine/TPSmartEventDetector/TPSmartEvent` | `IsVehicle` | vehicle |
@@ -506,6 +507,7 @@ Ordered so the camera core and live view come first. They exercise the real C220
 * §3.2: the budget formula in §8.1 here (`part_buffer = part_size_mib`, plus queue and live terms). Update the worked example.
 * §4.2: gortsplib **v5**.
 * §4.4: the Tapo endpoint, pull cadence, Renew-as-health and built-in rules in §4.3 here.
+* §4.4 message handling: an inactive `PropertyOperation="Initialized"` message deactivates its kind like a `Changed` one; it is **not** ignored. The C220 marks every notification `Initialized`, including the one that ends an event, so ignoring it left every event to end only at `trigger_timeout_seconds`.
 * §4.6: the muxer library is mediacommon `fmp4` (D19).
 * §4.8: add the circuit breaker and retry classification (§6.3 here).
 * §4.9: the drivers are `local` (tests) and `s3`. Remove `smb` and `sftp` rows. The S3 driver semantics are in §6.2 here.

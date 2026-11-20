@@ -59,6 +59,7 @@ func CompileRules(rcs []config.RuleConfig) ([]Rule, error) {
 var (
 	tapoMotion = regexp.MustCompile(`(^|[:/])RuleEngine/CellMotionDetector/Motion$`)
 	tapoSmart  = regexp.MustCompile(`(^|[:/])RuleEngine/TPSmartEventDetector/TPSmartEvent$`)
+	tapoPeople = regexp.MustCompile(`(^|[:/])RuleEngine/PeopleDetector/People$`)
 )
 
 // TapoRules returns the built-in Tapo rules (design §4.3). The catch-all
@@ -66,6 +67,7 @@ var (
 func TapoRules() []Rule {
 	return []Rule{
 		{Kind: KindMotion, Topic: tapoMotion, Item: "IsMotion", ActiveValue: "true"},
+		{Kind: KindPerson, Topic: tapoPeople, Item: "IsPeople", ActiveValue: "true"},
 		{Kind: KindPerson, Topic: tapoSmart, Item: "IsPeople", ActiveValue: "true"},
 		{Kind: KindPet, Topic: tapoSmart, Item: "IsPet", ActiveValue: "true"},
 		{Kind: KindVehicle, Topic: tapoSmart, Item: "IsVehicle", ActiveValue: "true"},

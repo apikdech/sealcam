@@ -32,8 +32,8 @@ func NewTracker(timeout time.Duration, clk clock.Clock) *Tracker {
 }
 
 // Apply records s. An active signal activates its kind, or refreshes its
-// timeout if already active. An inactive signal deactivates its kind,
-// except an Initialized one, which is ignored.
+// timeout if already active. An inactive signal deactivates its kind, also
+// an Initialized one: the Tapo C220 marks every notification Initialized.
 func (t *Tracker) Apply(s Signal) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -45,7 +45,6 @@ func (t *Tracker) Apply(s Signal) {
 			t.activated[s.Kind] = struct{}{}
 			t.notify()
 		}
-	case s.Initialized:
 	case was:
 		delete(t.lastActive, s.Kind)
 		t.notify()

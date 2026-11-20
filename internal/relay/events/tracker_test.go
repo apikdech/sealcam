@@ -97,13 +97,15 @@ func TestInitializedActiveSetsStateWithoutNewChange(t *testing.T) {
 	}
 }
 
-func TestInitializedInactiveIgnored(t *testing.T) {
+// The Tapo C220 marks every notification Initialized, including the one
+// that ends an event, so an Initialized inactive must end the kind.
+func TestInitializedInactiveEndsKind(t *testing.T) {
 	tr := events.NewTracker(60*time.Second, clock.NewFake(t0))
-	tr.Apply(signal(events.KindMotion, true, false, t0))
+	tr.Apply(signal(events.KindMotion, true, true, t0))
 	changed(tr)
 	tr.Apply(signal(events.KindMotion, false, true, t0))
-	if !tr.Triggered() || changed(tr) {
-		t.Fatal("Initialized inactive changed the state")
+	if tr.Triggered() || !changed(tr) {
+		t.Fatal("Initialized inactive did not end the kind")
 	}
 }
 

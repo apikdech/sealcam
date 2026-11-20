@@ -11,6 +11,7 @@ import (
 const (
 	motionTopic = "tns1:RuleEngine/CellMotionDetector/Motion"
 	smartTopic  = "tns1:RuleEngine/TPSmartEventDetector/TPSmartEvent"
+	peopleTopic = "tns1:RuleEngine/PeopleDetector/People"
 )
 
 func item(name, value string) events.Item { return events.Item{Name: name, Value: value} }
@@ -26,6 +27,8 @@ func TestTapoRules(t *testing.T) {
 		{"motion active", motionTopic, []events.Item{item("IsMotion", "true")}, []events.MatchResult{{Kind: events.KindMotion, Active: true}}},
 		{"motion inactive", motionTopic, []events.Item{item("IsMotion", "false")}, []events.MatchResult{{Kind: events.KindMotion, Active: false}}},
 		{"person", smartTopic, []events.Item{item("IsPeople", "true")}, []events.MatchResult{{Kind: events.KindPerson, Active: true}}},
+		{"people detector", peopleTopic, []events.Item{item("IsPeople", "true")}, []events.MatchResult{{Kind: events.KindPerson, Active: true}}},
+		{"people detector inactive", peopleTopic, []events.Item{item("IsPeople", "false")}, []events.MatchResult{{Kind: events.KindPerson, Active: false}}},
 		{"pet", smartTopic, []events.Item{item("IsPet", "true")}, []events.MatchResult{{Kind: events.KindPet, Active: true}}},
 		{"vehicle", smartTopic, []events.Item{item("IsVehicle", "true")}, []events.MatchResult{{Kind: events.KindVehicle, Active: true}}},
 		{"catch-all other", smartTopic, []events.Item{item("IsBabyCry", "true")}, []events.MatchResult{{Kind: events.KindOther, Active: true}}},
