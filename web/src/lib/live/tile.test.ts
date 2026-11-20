@@ -13,9 +13,11 @@ class FakeDoc extends EventTarget {
 let doc: FakeDoc;
 let client: FakeClient;
 
+const clock = 1_000_000;
 function make(video = fakeVideo()) {
-  return createTile({ video, cameraId: 'front', client, doc: doc as unknown as Document, onChange: () => {} });
+  return createTile({ video, cameraId: 'front', client, doc: doc as unknown as Document, now: () => clock, onChange: () => {} });
 }
+const playing = (v: HTMLVideoElement) => v.dispatchEvent(new Event('playing'));
 const flush = async () => {
   for (let i = 0; i < 30; i++) await Promise.resolve();
 };
@@ -44,18 +46,21 @@ describe('backoffDelay', () => {
 });
 
 describe('tile', () => {
-  it('goes connecting -> live when the peer connects', async () => {
-    const tile = make();
+  it('goes connecting -> live when the video plays', async () => {
+    const video = fakeVideo();
+    const tile = make(video);
     tile.start();
     await flush();
     expect(tile.snapshot().state).toBe('connecting');
     FakePeer.instances[0]!.setState('connected');
+    playing(video);
     expect(tile.snapshot().state).toBe('live');
     tile.destroy();
   });
 
   it('closes the session when the tab is hidden and reopens it when visible', async () => {
-    const tile = make();
+    const video = fakeVideo();
+    const tile = make(video);
     tile.start();
     await flush();
     FakePeer.instances[0]!.setState('connected');
@@ -71,6 +76,7 @@ describe('tile', () => {
     await flush();
     expect(FakePeer.instances).toHaveLength(2);
     FakePeer.instances[1]!.setState('connected');
+    playing(video);
     expect(tile.snapshot().state).toBe('live');
     tile.destroy();
   });
@@ -103,7 +109,8 @@ describe('tile', () => {
 
   it('503 from the offer shows limit and keeps retrying with backoff', async () => {
     client.offerFailures.push({ name: 'LiveBusy', status: 503 }, { name: 'LiveBusy', status: 503 });
-    const tile = make();
+    const video = fakeVideo();
+    const tile = make(video);
     tile.start();
     await flush();
     expect(tile.snapshot().state).toBe('limit');
@@ -118,6 +125,7 @@ describe('tile', () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(client.of('live.offer')).toHaveLength(3);
     FakePeer.instances.at(-1)!.setState('connected');
+    playing(video);
     expect(tile.snapshot().state).toBe('live');
     tile.destroy();
   });
@@ -188,5 +196,139 @@ describe('tile', () => {
     doc.set('visible');
     await vi.advanceTimersByTimeAsync(60_000);
     expect(FakePeer.instances).toHaveLength(1);
+  });
+});
+
+describe('tile truth', () => {
+  it('stays connecting after ICE connected until the video plays', async () => {
+    const tile = make();
+    tile.start();
+    await flush();
+    FakePeer.instances[0]!.setState('connected');
+    expect(tile.snapshot().state).toBe('connecting');
+    tile.destroy();
+  });
+
+  it('goes live on the playing event', async () => {
+    const video = fakeVideo();
+    const tile = make(video);
+    tile.start();
+    await flush();
+    playing(video);
+    expect(tile.snapshot().state).toBe('live');
+    tile.destroy();
+  });
+
+  it('ErrNoKey gives locked and schedules no retry', async () => {
+    client.offerFailures.push({ name: 'ErrNoKey' });
+    const tile = make();
+    tile.start();
+    await flush();
+    expect(tile.snapshot().state).toBe('locked');
+    expect(tile.snapshot().retryAt).toBeNull();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(client.of('live.offer')).toHaveLength(1);
+    tile.destroy();
+  });
+
+  it('401 gives locked', async () => {
+    client.offerFailures.push({ name: 'LiveError', status: 401 });
+    const tile = make();
+    tile.start();
+    await flush();
+    expect(tile.snapshot().state).toBe('locked');
+    tile.destroy();
+  });
+
+  it('tryNow from locked opens immediately', async () => {
+    client.offerFailures.push({ name: 'ErrNoKey' });
+    const tile = make();
+    tile.start();
+    await flush();
+    tile.tryNow();
+    await flush();
+    expect(client.of('live.offer')).toHaveLength(2);
+    expect(tile.snapshot().state).toBe('connecting');
+    tile.destroy();
+  });
+
+  it('tryNow during reconnecting cancels the timer and opens', async () => {
+    client.offerFailures.push({ name: 'LiveError', status: 502 });
+    const tile = make();
+    tile.start();
+    await flush();
+    expect(tile.snapshot().state).toBe('reconnecting');
+    tile.tryNow();
+    await flush();
+    expect(client.of('live.offer')).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(client.of('live.offer')).toHaveLength(2);
+    tile.destroy();
+  });
+
+  it('tryNow is a no-op while live', async () => {
+    const video = fakeVideo();
+    const tile = make(video);
+    tile.start();
+    await flush();
+    playing(video);
+    tile.tryNow();
+    await flush();
+    expect(client.of('live.offer')).toHaveLength(1);
+    tile.destroy();
+  });
+
+  it('retryAt is now + backoff while reconnecting and null when live', async () => {
+    client.offerFailures.push({ name: 'LiveError', status: 502 });
+    const video = fakeVideo();
+    const tile = make(video);
+    tile.start();
+    await flush();
+    expect(tile.snapshot().retryAt).toBe(clock + 1000);
+    await vi.advanceTimersByTimeAsync(1000);
+    playing(video);
+    expect(tile.snapshot().retryAt).toBeNull();
+    tile.destroy();
+  });
+
+  it('setOffline(true) closes the session and never retries', async () => {
+    const tile = make();
+    tile.start();
+    await flush();
+    tile.setOffline(true);
+    await flush();
+    expect(FakePeer.instances[0]!.closed).toBe(true);
+    expect(tile.snapshot().state).toBe('offline');
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(FakePeer.instances).toHaveLength(1);
+    tile.tryNow();
+    doc.set('hidden');
+    doc.set('visible');
+    await flush();
+    expect(FakePeer.instances).toHaveLength(1);
+    expect(tile.snapshot().state).toBe('offline');
+    tile.destroy();
+  });
+
+  it('setOffline(false) reconnects', async () => {
+    const tile = make();
+    tile.start();
+    await flush();
+    tile.setOffline(true);
+    tile.setOffline(false);
+    await flush();
+    expect(tile.snapshot().state).toBe('connecting');
+    expect(FakePeer.instances).toHaveLength(2);
+    tile.destroy();
+  });
+
+  it('destroy removes the playing listener', async () => {
+    const video = fakeVideo();
+    const tile = make(video);
+    tile.start();
+    await flush();
+    tile.destroy();
+    playing(video);
+    expect(tile.snapshot().state).toBe('connecting');
   });
 });

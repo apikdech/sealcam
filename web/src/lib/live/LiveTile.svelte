@@ -14,7 +14,7 @@
 
   let root: HTMLDivElement | undefined = $state();
   let video: HTMLVideoElement | undefined = $state();
-  let snap: TileSnapshot = $state({ state: 'connecting', canUnmute: false, muted: true });
+  let snap: TileSnapshot = $state({ state: 'connecting', canUnmute: false, muted: true, retryAt: null });
 
   let fsMode: FullscreenMode = $state('none');
   let fullscreen = $state(false);
@@ -45,7 +45,11 @@
         ? 'Connecting…'
         : snap.state === 'reconnecting'
           ? 'Reconnecting…'
-          : 'Viewer limit reached',
+          : snap.state === 'locked'
+            ? 'Key locked'
+            : snap.state === 'offline'
+              ? 'Camera offline'
+              : 'Viewer limit reached',
   );
 </script>
 

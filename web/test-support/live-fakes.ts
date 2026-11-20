@@ -93,6 +93,12 @@ export class FakeClient {
   }
 }
 
+class FakeVideo extends EventTarget {
+  srcObject: unknown = null;
+  muted = false;
+  playsInline = false;
+  play = async () => {};
+}
 export function fakeVideo() {
-  return { srcObject: null as unknown, muted: false, playsInline: false, play: async () => {} } as unknown as HTMLVideoElement;
+  return new FakeVideo() as unknown as HTMLVideoElement;
 }

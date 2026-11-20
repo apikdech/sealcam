@@ -36,6 +36,7 @@ describe('live page', () => {
     expect(tiles[0]!.querySelector('video')!.muted).toBe(true);
     await waitFor(() => expect(FakePeer.instances).toHaveLength(2));
     FakePeer.instances[0]!.setState('connected');
+    tiles[0]!.querySelector('video')!.dispatchEvent(new Event('playing'));
     await waitFor(() => expect(tiles[0]!.dataset.state).toBe('live'));
     expect(tiles[0]).toHaveTextContent('Live');
     expect(screen.queryByRole('button', { name: /unmute/i })).toBeNull();
