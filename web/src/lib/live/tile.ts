@@ -39,6 +39,8 @@ export interface Tile {
 
 const BASE_DELAY_MS = 1000;
 const MAX_DELAY_MS = 30_000;
+/** An accepted session that has not played by now is torn down and retried. */
+const PLAY_WATCHDOG_MS = 15_000;
 
 /** Reconnect delay before attempt `n` (0-based): 1 s doubling up to 30 s. */
 export function backoffDelay(n: number): number {
@@ -55,6 +57,7 @@ export function createTile(opts: TileOptions): Tile {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let attempt = 0;
   let retryAt: number | null = null;
+  let watchdog: ReturnType<typeof setTimeout> | null = null;
   // Bumped whenever the current attempt is superseded (hide, destroy, new attempt).
   let epoch = 0;
   let running = false;
@@ -69,6 +72,7 @@ export function createTile(opts: TileOptions): Tile {
   };
   const onPlaying = () => {
     if (session === null) return;
+    clearWatchdog();
     retryAt = null;
     setState('live');
   };
@@ -80,8 +84,14 @@ export function createTile(opts: TileOptions): Tile {
     timer = null;
   }
 
+  function clearWatchdog() {
+    if (watchdog !== null) clearTimeout(watchdog);
+    watchdog = null;
+  }
+
   function schedule(next: TileState) {
     clearTimer();
+    clearWatchdog();
     const mine = epoch;
     const delay = backoffDelay(attempt);
     retryAt = now() + delay;
@@ -100,7 +110,7 @@ export function createTile(opts: TileOptions): Tile {
     const mine = ++epoch;
     let s: WhepSession;
     try {
-      s = await startWhep(video, cameraId, client);
+      s = await startWhep(video, cameraId, client, () => mine === epoch);
     } catch (e) {
       if (mine !== epoch) return;
       const err = e as { name?: string; status?: number };
@@ -117,6 +127,13 @@ export function createTile(opts: TileOptions): Tile {
       return;
     }
     session = s;
+    watchdog = setTimeout(() => {
+      watchdog = null;
+      if (session !== s) return;
+      session = null;
+      void s.close();
+      schedule('reconnecting');
+    }, PLAY_WATCHDOG_MS);
     s.onaudio = () => {
       if (session !== s) return;
       canUnmute = true;
@@ -144,6 +161,7 @@ export function createTile(opts: TileOptions): Tile {
   function teardown() {
     epoch++;
     clearTimer();
+    clearWatchdog();
     retryAt = null;
     const s = session;
     session = null;

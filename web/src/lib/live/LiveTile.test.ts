@@ -55,6 +55,7 @@ beforeEach(() => {
   FakePeer.instances = [];
   FakePeer.stallGathering = false;
   FakePeer.failSetRemote = false;
+  FakePeer.tracksOnAnswer = [];
   vi.stubGlobal('RTCPeerConnection', FakePeer);
   vi.stubGlobal('MediaStream', FakeStream);
   Object.defineProperty(document, 'fullscreenEnabled', { configurable: true, value: true });

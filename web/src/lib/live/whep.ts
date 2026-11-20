@@ -46,7 +46,13 @@ function gatheringComplete(pc: RTCPeerConnection): Promise<void> {
  * require it). Resolves once the answer is applied; media may still be
  * connecting, which `session.state` and `onstate` report.
  */
-export async function startWhep(video: HTMLVideoElement, cameraId: string, client: WhepClient): Promise<WhepSession> {
+export async function startWhep(
+  video: HTMLVideoElement,
+  cameraId: string,
+  client: WhepClient,
+  /** Asked before each attach: a superseded attempt must never write `video.srcObject`. */
+  canAttach: () => boolean = () => true,
+): Promise<WhepSession> {
   const pc = new RTCPeerConnection();
   let sessionPath: string | null = null;
   let closed = false;
@@ -84,7 +90,7 @@ export async function startWhep(video: HTMLVideoElement, cameraId: string, clien
   video.playsInline = true;
   pc.ontrack = (e) => {
     stream.addTrack(e.track);
-    if (video.srcObject !== stream) {
+    if (video.srcObject !== stream && canAttach()) {
       video.srcObject = stream;
       void video.play?.()?.catch?.(() => {});
     }

@@ -6,6 +6,7 @@ beforeEach(() => {
   FakePeer.instances = [];
   FakePeer.stallGathering = false;
   FakePeer.failSetRemote = false;
+  FakePeer.tracksOnAnswer = [];
   vi.stubGlobal('RTCPeerConnection', FakePeer);
   vi.stubGlobal('MediaStream', FakeStream);
 });
@@ -96,5 +97,22 @@ describe('startWhep', () => {
     await expect(startWhep(fakeVideo(), 'front', client)).rejects.toThrow('bad answer');
     expect(FakePeer.instances[0]!.closed).toBe(true);
     expect(client.of('live.close')).toHaveLength(1);
+  });
+
+  it('a stale attempt never attaches its stream to the video', async () => {
+    const video = fakeVideo();
+    let current = 'A';
+    const a = await startWhep(video, 'front', new FakeClient(), () => current === 'A');
+    current = 'B';
+    const b = await startWhep(video, 'front', new FakeClient(), () => current === 'B');
+    const [pcA, pcB] = FakePeer.instances as [FakePeer, FakePeer];
+    pcB.addRemoteTrack('video');
+    const accepted = video.srcObject;
+    expect(accepted).not.toBeNull();
+    pcA.addRemoteTrack('video');
+    expect(video.srcObject).toBe(accepted);
+    await a.close();
+    expect(video.srcObject).toBe(accepted);
+    await b.close();
   });
 });

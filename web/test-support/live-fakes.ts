@@ -11,6 +11,8 @@ export class FakePeer {
   /** When true, gathering never completes unless the test calls finishGathering(). */
   static stallGathering = false;
   static failSetRemote = false;
+  /** Tracks the peer raises while the answer is applied, as a real browser does. */
+  static tracksOnAnswer: ('audio' | 'video')[] = [];
 
   iceGatheringState: 'new' | 'gathering' | 'complete' = 'new';
   connectionState: 'new' | 'connecting' | 'connected' | 'disconnected' | 'failed' | 'closed' = 'new';
@@ -45,6 +47,7 @@ export class FakePeer {
   async setRemoteDescription(d: { type: string; sdp: string }) {
     if (FakePeer.failSetRemote) throw new Error('bad answer');
     this.remoteDescription = d;
+    for (const k of FakePeer.tracksOnAnswer) this.addRemoteTrack(k);
   }
   setState(s: FakePeer['connectionState']) {
     this.connectionState = s;

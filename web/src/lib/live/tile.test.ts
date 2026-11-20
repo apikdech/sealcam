@@ -27,6 +27,7 @@ beforeEach(() => {
   FakePeer.instances = [];
   FakePeer.stallGathering = false;
   FakePeer.failSetRemote = false;
+  FakePeer.tracksOnAnswer = [];
   doc = new FakeDoc();
   client = new FakeClient();
   vi.stubGlobal('RTCPeerConnection', FakePeer);
@@ -279,7 +280,7 @@ describe('tile truth', () => {
     tile.tryNow();
     await flush();
     expect(client.of('live.offer')).toHaveLength(2);
-    await vi.advanceTimersByTimeAsync(60_000);
+    await vi.advanceTimersByTimeAsync(14_000);
     expect(client.of('live.offer')).toHaveLength(2);
     tile.destroy();
   });
@@ -351,5 +352,70 @@ describe('tile truth', () => {
     expect(remove).not.toHaveBeenCalledWith('playing', added);
     tile.destroy();
     expect(remove).toHaveBeenCalledWith('playing', added);
+  });
+
+  it('try now during an in-flight open: the late first attempt cannot hijack the video', async () => {
+    FakePeer.stallGathering = true;
+    const video = fakeVideo();
+    const tile = make(video);
+    tile.start();
+    await flush();
+    tile.tryNow();
+    await flush();
+    const [pcA, pcB] = FakePeer.instances as [FakePeer, FakePeer];
+    // B is accepted first and gets its media; A's late answer raises a track that must not replace it.
+    FakePeer.stallGathering = false;
+    FakePeer.tracksOnAnswer = ['video'];
+    pcB.finishGathering();
+    await flush();
+    const accepted = video.srcObject;
+    expect(accepted).not.toBeNull();
+    pcA.finishGathering();
+    await flush();
+    expect(video.srcObject).toBe(accepted);
+    pcB.setState('connected');
+    playing(video);
+    expect(tile.snapshot().state).toBe('live');
+    tile.destroy();
+  });
+
+  it('goes offline during an in-flight open: the late session is closed and stays offline', async () => {
+    FakePeer.stallGathering = true;
+    const tile = make();
+    tile.start();
+    await flush();
+    tile.setOffline(true);
+    FakePeer.instances[0]!.finishGathering();
+    await flush();
+    expect(FakePeer.instances[0]!.closed).toBe(true);
+    expect(tile.snapshot().state).toBe('offline');
+    tile.destroy();
+  });
+
+  it('watchdog: no playing within 15 s tears down and reconnects', async () => {
+    const tile = make();
+    tile.start();
+    await flush();
+    expect(FakePeer.instances).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(14_999);
+    expect(tile.snapshot().state).toBe('connecting');
+    await vi.advanceTimersByTimeAsync(1);
+    expect(FakePeer.instances[0]!.closed).toBe(true);
+    expect(tile.snapshot().state).toBe('reconnecting');
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(FakePeer.instances).toHaveLength(2);
+    tile.destroy();
+  });
+
+  it('watchdog: playing in time cancels it', async () => {
+    const video = fakeVideo();
+    const tile = make(video);
+    tile.start();
+    await flush();
+    playing(video);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(tile.snapshot().state).toBe('live');
+    expect(FakePeer.instances).toHaveLength(1);
+    tile.destroy();
   });
 });
