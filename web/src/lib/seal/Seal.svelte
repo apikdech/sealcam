@@ -14,7 +14,9 @@
   const clipId = `seal-clip-${uid}`;
   const c = $derived(size / 2);
   const ringR = $derived(size / 2 - 0.5);
-  const path = $derived(state === 'unchecked' || state === 'tampered' ? '' : rosettePath(rosetteParams(seed), size));
+  const path = $derived(state === 'unchecked' || state === 'tampered' ? '' : rosettePath(rosetteParams(seed), size, size <= 40 ? 120 : 180));
+  // 240 degree sector from 12 o'clock clockwise, for the interrupted recording.
+  const wedge = $derived(`M${c} ${c}L${c} 0A${c} ${c} 0 1 1 ${(c - c * Math.sin(Math.PI / 3)).toFixed(2)} ${(c + c / 2).toFixed(2)}Z`);
   const label = $derived(sealLabel(state));
   const voidRows = $derived(Array.from({ length: Math.ceil(size / 6) + 2 }, (_, i) => i * 6 - 6));
 </script>
@@ -47,7 +49,10 @@
       <path data-rosette d={path} stroke="var(--z-muted)" />
     {:else if state === 'incomplete'}
       <circle cx={c} cy={c} r={ringR} stroke="var(--z-amber)" />
-      <path data-rosette d={path} stroke="var(--z-amber)" pathLength="360" stroke-dasharray="240 120" />
+      <defs>
+        <clipPath id={clipId}><path d={wedge} /></clipPath>
+      </defs>
+      <path data-rosette d={path} stroke="var(--z-amber)" clip-path="url(#{clipId})" />
     {:else if state === 'mismatch'}
       <circle cx={c} cy={c} r={ringR} stroke="var(--z-amber)" />
       <path data-rosette d={path} stroke="var(--z-amber)" />
@@ -69,8 +74,8 @@
     gap: 0.5rem;
   }
   .spin {
-    transform-origin: center;
-    transform-box: fill-box;
+    transform-origin: 50% 50%;
+    transform-box: view-box;
     animation: seal-spin 12s linear infinite;
   }
   @keyframes seal-spin {

@@ -6,26 +6,29 @@ describe('rosette', () => {
     expect(rosetteParams('clip-1')).toEqual(rosetteParams('clip-1'));
   });
 
-  it('params stay in range for 500 random seeds', () => {
+  it('params stay in range for 500 seeds', () => {
     for (let i = 0; i < 500; i++) {
-      const p = rosetteParams(`seed-${i}-${Math.random()}`);
+      const p = rosetteParams(`seed-${i}`);
       expect(Number.isInteger(p.petals)).toBe(true);
       expect(p.petals).toBeGreaterThanOrEqual(5);
       expect(p.petals).toBeLessThanOrEqual(11);
+      expect(Number.isInteger(p.strands)).toBe(true);
+      expect(p.strands).toBeGreaterThanOrEqual(3);
+      expect(p.strands).toBeLessThanOrEqual(6);
       expect(p.inner).toBeGreaterThanOrEqual(0.25);
-      expect(p.inner).toBeLessThanOrEqual(0.6);
-      expect(p.offset).toBeGreaterThanOrEqual(0.3);
-      expect(p.offset).toBeLessThanOrEqual(0.9);
+      expect(p.inner).toBeLessThanOrEqual(0.4);
+      expect(p.amp).toBeGreaterThanOrEqual(0.05);
+      expect(p.amp).toBeLessThanOrEqual(0.1);
       expect(p.phase).toBeGreaterThanOrEqual(0);
       expect(p.phase).toBeLessThanOrEqual(Math.PI * 2);
     }
   });
 
-  it('different seeds differ (>= 95 % distinct triples over 200 clip ids)', () => {
+  it('different seeds differ (>= 95 % distinct tuples over 200 clip ids)', () => {
     const seen = new Set<string>();
     for (let i = 0; i < 200; i++) {
       const p = rosetteParams(`clip-${i}`);
-      seen.add(`${p.petals}|${p.inner}|${p.offset}`);
+      seen.add(`${p.petals}|${p.strands}|${p.inner}|${p.amp}`);
     }
     expect(seen.size).toBeGreaterThanOrEqual(190);
   });
@@ -39,6 +42,8 @@ describe('rosette', () => {
         expect(d).not.toContain('NaN');
         const nums = d.match(/-?\d+(\.\d+)?/g)!.map(Number);
         expect(nums.length).toBeGreaterThan(0);
+        expect(d.match(/M/g)!.length).toBeGreaterThanOrEqual(6);
+        expect(d.match(/Z/g)!.length).toBe(d.match(/M/g)!.length);
         for (const n of nums) {
           expect(n).toBeGreaterThanOrEqual(0);
           expect(n).toBeLessThanOrEqual(size);
