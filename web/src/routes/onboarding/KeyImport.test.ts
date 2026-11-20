@@ -90,9 +90,13 @@ describe('KeyImport field', () => {
     render(KeyImport, { client: fakeClient().client });
     expect(field().type).toBe('text');
     await fireEvent.click(screen.getByRole('button', { name: 'Hide' }));
-    expect(field().type).toBe('password');
+    // Never type=password: password managers would offer to save the key.
+    expect(field().type).toBe('text');
+    expect(field().className).toContain('text-security');
+    expect(screen.getByRole('button', { name: 'Show' })).not.toHaveAttribute('aria-pressed');
     await fireEvent.click(screen.getByRole('button', { name: 'Show' }));
     expect(field().type).toBe('text');
+    expect(field().className).not.toContain('text-security');
   });
 
   it('Add key is disabled until the key is valid', async () => {

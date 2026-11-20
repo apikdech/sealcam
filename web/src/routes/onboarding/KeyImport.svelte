@@ -197,14 +197,14 @@
   >
     <div class="flex items-end justify-between gap-3">
       <label class="font-semibold" for="family-key">Family key</label>
-      <button type="button" class="min-h-11 px-2 text-line underline" aria-pressed={!show} onclick={() => (show = !show)}
+      <button type="button" class="min-h-11 px-2 text-line underline" onclick={() => (show = !show)}
         >{show ? 'Hide' : 'Show'}</button
       >
     </div>
     <input
       id="family-key"
-      type={show ? 'text' : 'password'}
-      class="w-full rounded border border-rule bg-plate p-3 font-mono text-base text-ink placeholder:text-muted focus-visible:outline-2 focus-visible:outline-line"
+      type="text"
+      class="{show ? '' : 'text-security-disc '}w-full rounded border border-rule bg-plate p-3 font-mono text-base text-ink placeholder:text-muted focus-visible:outline-2 focus-visible:outline-line"
       autocomplete="off"
       autocapitalize="off"
       spellcheck="false"

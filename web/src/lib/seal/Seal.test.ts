@@ -50,4 +50,17 @@ describe('Seal', () => {
     const { container } = render(Seal, { seed: 'c1', state: 'verified' });
     expect(container.querySelector('[data-rosette]')).not.toBeNull();
   });
+
+  it('mismatch differs in shape from verified and from unknown-key, not by colour alone', () => {
+    const ring = (state: SealState) => {
+      const { container, unmount } = render(Seal, { seed: 'c1', state });
+      const dash = container.querySelector('circle')!.getAttribute('stroke-dasharray');
+      unmount();
+      return dash;
+    };
+    expect(ring('verified')).toBeNull();
+    expect(ring('mismatch')).not.toBeNull();
+    expect(ring('mismatch')).not.toBe(ring('unknown-key'));
+    expect(ring('mismatch')).not.toBe(ring('incomplete'));
+  });
 });

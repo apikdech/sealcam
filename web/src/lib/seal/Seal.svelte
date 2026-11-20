@@ -57,7 +57,8 @@
       </defs>
       <path data-rosette d={path} stroke="var(--z-amber)" clip-path="url(#{clipId})" />
     {:else if state === 'mismatch'}
-      <circle cx={c} cy={c} r={ringR} stroke="var(--z-amber)" />
+      <!-- One wide notch in the ring (unknown-key has three small gaps). -->
+      <circle cx={c} cy={c} r={ringR} stroke="var(--z-amber)" pathLength="100" stroke-dasharray="86 14" transform="rotate(-82 {c} {c})" />
       <path data-rosette d={path} stroke="var(--z-amber)" />
     {:else if state === 'verifying'}
       <circle cx={c} cy={c} r={ringR} stroke="var(--z-line)" opacity="0.4" />
