@@ -104,7 +104,8 @@
 
 <svelte:window {onkeydown} />
 
-<div data-testid="home" class="flex min-h-dvh flex-col">
+<main data-testid="home" class="flex min-h-dvh flex-col">
+  <h1 class="sr-only">Home</h1>
   <DayNav {day} {todayDay} {zone} onDay={setDay} />
 
   {#if data.error}
@@ -174,4 +175,4 @@
       {/if}
     </div>
   {/if}
-</div>
+</main>

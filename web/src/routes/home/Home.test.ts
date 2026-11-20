@@ -57,6 +57,12 @@ const mount = (c: DashClient) =>
 const rows = async () => within(await screen.findByRole('listbox', { name: /recordings/i })).findAllByRole('option');
 
 describe('Home', () => {
+  it('is the main landmark with a Home h1', async () => {
+    mount(client());
+    expect(screen.getByRole('main')).toBe(screen.getByTestId('home'));
+    expect(screen.getByRole('heading', { level: 1, name: 'Home' })).toBeInTheDocument();
+  });
+
   it("shows the live grid and today's events newest first", async () => {
     mount(client());
     const r = await rows();

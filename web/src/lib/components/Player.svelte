@@ -8,8 +8,7 @@
   import ExportDialog from './ExportDialog.svelte';
   import Icon from './Icon.svelte';
   import { overVideo } from '../overVideo';
-  import { claimAudio } from '../live/audioFocus';
-  import { fullscreenMode, toggleFullscreen, watchFullscreen, type FullscreenMode } from '../live/fullscreen';
+    import { fullscreenMode, toggleFullscreen, watchFullscreen, type FullscreenMode } from '../live/fullscreen';
   import Seal from '../seal/Seal.svelte';
   import type { SealState } from '../seal/rosette';
   import { formatClock } from '../timeline/timezone';
@@ -58,35 +57,15 @@
   let frame: HTMLDivElement | undefined = $state();
   let fsMode: FullscreenMode = $state('none');
   let fullscreen = $state(false);
-  let muted = $state(true);
-  let hasAudio = $state(false);
   let pos = $state(0);
   let duration = $state(0);
-  let releaseAudio: (() => void) | null = null;
 
-  type AudioProbe = HTMLVideoElement & { audioTracks?: { length: number }; mozHasAudio?: boolean; webkitAudioDecodedByteCount?: number };
-
-  /** Reads what the video element knows after a media event: duration, position, whether it has sound. */
+  /** Reads what the video element knows after a media event: duration and position. */
   function sync(v: HTMLVideoElement): void {
     pos = v.currentTime;
     duration = Number.isFinite(v.duration) ? v.duration : 0;
-    const a = v as AudioProbe;
-    hasAudio = (a.audioTracks?.length ?? 0) > 0 || a.mozHasAudio === true || (a.webkitAudioDecodedByteCount ?? 0) > 0;
-    muted = v.muted;
-    // Sound on takes the shared audio focus; sound off (or leaving) gives it back.
-    if (!v.muted && !releaseAudio) {
-      releaseAudio = claimAudio('player', () => {
-        v.muted = true;
-      });
-    } else if (v.muted && releaseAudio) {
-      releaseAudio();
-      releaseAudio = null;
-    }
   }
 
-  function toggleSound(): void {
-    if (video) video.muted = !video.muted;
-  }
   let player: Player | undefined = $state();
   let snap: PlayerState = $state(initialState());
   let loadError = $state('');
@@ -114,7 +93,6 @@
     return () => {
       clearTimeout(savedTimer);
       unwatch();
-      releaseAudio?.();
       off();
       p.destroy();
     };
@@ -262,7 +240,7 @@
   }
 </script>
 
-<section class="min-w-0" aria-label="Player">
+<section class="min-w-0 md:w-[min(100%,calc(56vh*16/9))]" aria-label="Player" data-testid="player-column">
   {#if onBack}
     <button type="button" class="{ghost} mb-2" onclick={onBack}>
       <Icon name="home" size={16} />
@@ -271,7 +249,7 @@
   {/if}
   <div
     bind:this={frame}
-    class="relative overflow-hidden rounded-lg border border-rule md:w-[min(100%,calc(56vh*16/9))] [&:fullscreen]:w-full [&:fullscreen_video]:aspect-auto [&:fullscreen_video]:h-full {snap.clipId === null
+    class="relative overflow-hidden rounded-lg border border-rule [&:fullscreen]:w-full [&:fullscreen_video]:aspect-auto [&:fullscreen_video]:h-full {snap.clipId === null
       ? 'bg-plate'
       : 'bg-black'}"
   >
@@ -286,7 +264,6 @@
       ontimeupdate={(e) => sync(e.currentTarget)}
       onloadedmetadata={(e) => sync(e.currentTarget)}
       ondurationchange={(e) => sync(e.currentTarget)}
-      onvolumechange={(e) => sync(e.currentTarget)}
       class="aspect-video w-full object-contain {snap.clipId === null ? '' : 'bg-black'}"
     ></video>
     {#if snap.clipId === null}
@@ -300,7 +277,7 @@
         <input
           type="range"
           aria-label="Position"
-          class="min-w-0 flex-1"
+          class="min-w-0 flex-1 max-md:h-11"
           min="0"
           max={duration}
           step="any"
@@ -311,14 +288,6 @@
             void player?.seek(pos * 1000);
           }}
         />
-        {#if hasAudio}
-          <button
-            type="button"
-            class="ov-btn inline-flex size-11 shrink-0 items-center justify-center"
-            aria-label={muted ? 'Turn sound on' : 'Turn sound off'}
-            onclick={toggleSound}><Icon name={muted ? 'sound-off' : 'sound-on'} /></button
-          >
-        {/if}
         {#if fsMode !== 'none'}
           <button
             type="button"
@@ -351,7 +320,7 @@
     {#if header}
       <span class="num text-muted">{cameraName(header.cameraId)}, {formatClock(header.startUnixMs, zone, true)}</span>
     {/if}
-    <label class="ml-auto flex items-center gap-1 text-muted">
+    <label class="ml-auto flex items-center gap-1 text-muted max-md:min-h-11">
       <input type="checkbox" bind:checked={autoAdvance} />
       <span>Autoplay next</span>
     </label>
@@ -387,11 +356,11 @@
       role={view.kind === 'incomplete' ? 'status' : 'alert'}
       class="mt-2 flex items-start gap-2 rounded border bg-plate px-3 py-2 text-sm text-ink {tone}"
     >
-      <Seal seed={snap.clipId} state={sealState} size={20} />
+      <Seal seed={snap.clipId} state={sealState} size={20} decorative />
       <p>
         {view.text}
         {#if view.next}
-          {#if view.nextHref}<a href={view.nextHref} class="underline">{view.next}</a>{:else}<span class="block text-muted">{view.next}</span>{/if}
+          {#if view.nextHref}<a href={view.nextHref} class="inline-flex items-center underline max-md:min-h-11">{view.next}</a>{:else}<span class="block text-muted">{view.next}</span>{/if}
         {/if}
       </p>
     </div>
@@ -433,5 +402,38 @@
   }
   input[type='range'] {
     accent-color: var(--z-ov-line);
+  }
+  /* Phones: a 44 px hit area around a thin drawn track. */
+  @media (max-width: 767px) {
+    input[type='range'] {
+      appearance: none;
+      background: transparent;
+    }
+    input[type='range']::-webkit-slider-runnable-track {
+      height: 4px;
+      border-radius: 2px;
+      background: color-mix(in srgb, var(--z-ov-ink) 40%, transparent);
+    }
+    input[type='range']::-moz-range-track {
+      height: 4px;
+      border-radius: 2px;
+      background: color-mix(in srgb, var(--z-ov-ink) 40%, transparent);
+    }
+    input[type='range']::-webkit-slider-thumb {
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      margin-top: -8px;
+      border-radius: 50%;
+      border: 0;
+      background: var(--z-ov-line);
+    }
+    input[type='range']::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 0;
+      background: var(--z-ov-line);
+    }
   }
 </style>

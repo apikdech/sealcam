@@ -80,6 +80,12 @@ const getsFor = (c: DashClient, path: string) =>
   c.calls.filter((m): m is Extract<Request, { type: 'api.get' }> => m.type === 'api.get' && m.path === path);
 
 describe('timeline dashboard', () => {
+  it('is the main landmark with a Timeline h1', async () => {
+    mountPage(client());
+    expect(screen.getByRole('main')).toBe(screen.getByTestId('timeline-page'));
+    expect(screen.getByRole('heading', { level: 1, name: 'Timeline' })).toBeInTheDocument();
+  });
+
   it('no bottom sheet: the list is in page flow on phones', async () => {
     mountPage(client());
     const box = await screen.findByRole('listbox', { name: /recordings/i });

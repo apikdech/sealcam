@@ -112,7 +112,8 @@
 
 <svelte:window {onkeydown} />
 
-<div data-testid="timeline-page" class="flex min-h-dvh flex-col">
+<main data-testid="timeline-page" class="flex min-h-dvh flex-col">
+  <h1 class="sr-only">Timeline</h1>
   <DayNav {day} {todayDay} {zone} onDay={(d) => (day = d)} />
   <FilterBar
     cameras={data.cameras ?? []}
@@ -255,4 +256,4 @@
       {/if}
     </div>
   {/if}
-</div>
+</main>

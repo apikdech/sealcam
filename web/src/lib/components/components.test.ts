@@ -154,12 +154,23 @@ describe('Player', () => {
     expect(within(video.parentElement!).queryByText('Select a recording')).toBeNull();
   });
 
-  it('caps its height on desktop, keeping 16:9 by width', () => {
+  it('caps its height on desktop in one column: video, integrity row and Export share the right edge', () => {
     render(Player, props());
-    const cls = screen.getByTestId('player').parentElement!.className;
-    expect(cls).toContain('md:w-[min(100%,calc(56vh*16/9))]');
+    const column = screen.getByTestId('player-column');
+    expect(column.className).toContain('md:w-[min(100%,calc(56vh*16/9))]');
+    expect(screen.getByTestId('player').parentElement!.className).not.toContain('calc(56vh');
+    expect(column).toContainElement(screen.getByRole('button', { name: 'Export' }));
+    expect(column).toContainElement(screen.getByTestId('integrity'));
     // Left-aligned with the rest of the page.
-    expect(cls).not.toContain('mx-auto');
+    expect(column.className).not.toContain('mx-auto');
+  });
+
+  it('the integrity banner seal is decorative: the alert already says it in words', async () => {
+    FakePlayer.nextIntegrity = 'tampered';
+    render(Player, props());
+    const alert = await screen.findByRole('alert');
+    expect(within(alert).queryByRole('img')).toBeNull();
+    expect(alert.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   });
 
   describe('clip controls', () => {
@@ -183,29 +194,23 @@ describe('Player', () => {
       expect(range.value).toBe('31');
     });
 
-    it('offers sound only when the clip has audio, and toggles it', async () => {
+    it('has no sound control: clips are video-only', async () => {
       render(Player, props());
       const v = screen.getByTestId('player') as HTMLVideoElement;
       await screen.findByRole('slider', { name: 'Position' });
-      expect(screen.queryByRole('button', { name: /turn sound/i })).toBeNull();
       stub(v, 'webkitAudioDecodedByteCount', 100);
       await fireEvent(v, new Event('timeupdate'));
-      await fireEvent.click(screen.getByRole('button', { name: 'Turn sound on' }));
-      expect(v.muted).toBe(false);
-      await fireEvent(v, new Event('volumechange'));
-      expect(screen.getByRole('button', { name: 'Turn sound off' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /sound/i })).toBeNull();
     });
 
-    it('sound follows the shared audio focus: another claimant mutes the clip', async () => {
-      const { claimAudio } = await import('../live/audioFocus');
+    it('gives the phone 44 px targets: a tall Position hit area, the Autoplay label and the Open Keys link', async () => {
+      FakePlayer.nextIntegrity = 'unknown-key';
       render(Player, props());
-      const v = screen.getByTestId('player') as HTMLVideoElement;
-      await screen.findByRole('slider', { name: 'Position' });
-      stub(v, 'webkitAudioDecodedByteCount', 100);
-      v.muted = false;
-      await fireEvent(v, new Event('volumechange'));
-      claimAudio('live-x', () => {})();
-      expect(v.muted).toBe(true);
+      const range = await screen.findByRole('slider', { name: 'Position' });
+      expect(range.className).toContain('max-md:h-11');
+      expect(screen.getByText('Autoplay next').closest('label')!.className).toContain('max-md:min-h-11');
+      const link = await screen.findByRole('link', { name: /key/i });
+      expect(link.className).toMatch(/max-md:min-h-11/);
     });
 
     it('has Full screen only where the browser supports it, and requests it on the frame', async () => {

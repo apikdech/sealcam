@@ -26,6 +26,17 @@ describe('EventList', () => {
     expect(screen.getByRole('button', { name: 'Show 50 more' })).toBeInTheDocument();
   });
 
+  it('the listbox holds only options: the footer and the empty note sit outside it', () => {
+    const a = render(EventList, { ...base, clips: many(120) });
+    const box = screen.getByRole('listbox', { name: 'Recordings' });
+    for (const child of Array.from(box.children)) expect(child.getAttribute('role')).toBe('option');
+    expect(box).not.toContainElement(screen.getByText('Showing 50 of 120'));
+    expect(box).not.toContainElement(screen.getByRole('button', { name: 'Show 50 more' }));
+    a.unmount();
+    render(EventList, { ...base, clips: [] });
+    expect(screen.getByRole('listbox', { name: 'Recordings' })).not.toContainElement(screen.getByText('No recordings on this day.'));
+  });
+
   it('Show 50 more adds 50', async () => {
     render(EventList, { ...base, clips: many(120) });
     await fireEvent.click(screen.getByRole('button', { name: 'Show 50 more' }));

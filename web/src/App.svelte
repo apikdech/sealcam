@@ -155,7 +155,7 @@
 <UpdatePrompt {updater} />
 
 <header class="flex items-center gap-4 border-b border-rule bg-ground px-4">
-  <p class="text-xl font-semibold tracking-wide" aria-label="zview"><span class="text-ink">z</span><span class="text-line">view</span></p>
+  <p class="text-xl font-semibold tracking-wide"><span class="text-ink">z</span><span class="text-line">view</span></p>
   <nav aria-label="Views" class="hidden gap-1 md:flex">
     {#each tabs as t (t.hash)}
       <a

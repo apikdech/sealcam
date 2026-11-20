@@ -135,11 +135,6 @@ const FACE = '"Atkinson Hyperlegible Next", system-ui, sans-serif';
 const FONT = `11px ${FACE}`;
 const FONT_BOLD = `bold 11px ${FACE}`;
 
-/** Tabular figures for the ruler times where the canvas supports it; otherwise proportional. */
-function tabular(ctx: CanvasRenderingContext2D): void {
-  if ('fontVariantNumeric' in ctx) (ctx as unknown as { fontVariantNumeric: string }).fontVariantNumeric = 'tabular-nums';
-}
-
 const hatchCache = new Map<string, CanvasPattern>();
 
 function hatchPattern(ctx: CanvasRenderingContext2D, color: string): CanvasPattern | string {
@@ -187,7 +182,6 @@ export function drawTimeline(ctx: CanvasRenderingContext2D, layout: Layout, o: D
 
   // Ruler and vertical grid in the display zone.
   ctx.font = FONT;
-  tabular(ctx);
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
   ctx.strokeStyle = p.grid;

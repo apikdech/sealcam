@@ -82,10 +82,7 @@
 </script>
 
 <div bind:this={list} role="listbox" aria-label="Recordings" tabindex="-1">
-  {#if clips.length === 0}
-    <p class="px-4 py-6 text-sm text-muted">No recordings on this day.</p>
-  {:else}
-    {#each visible as c, i (c.id)}
+  {#each visible as c, i (c.id)}
       {@const sel = c.id === selectedId}
       <div
         role="option"
@@ -115,17 +112,20 @@
           <span class="truncate"><b class="font-semibold text-ink">{c.cameraName}</b> · <span class="num">{formatDuration(c.durationMs)}</span></span>
         </span>
         <Seal seed={c.id} state={sealState(c)} size={38} />
-      </div>
-    {/each}
-    <div class="flex items-center justify-between gap-3 border-t border-rule px-4 py-3 text-sm text-muted">
-      <span class="num">Showing {shown} of {clips.length}</span>
-      {#if shown < clips.length}
-        <button
-          type="button"
-          onclick={() => (extra += pageSize)}
-          class="min-h-11 rounded px-3 font-semibold text-ink outline-foil hover:bg-plate focus-visible:outline-2">Show {pageSize} more</button
-        >
-      {/if}
     </div>
-  {/if}
+  {/each}
 </div>
+{#if clips.length === 0}
+  <p class="px-4 py-6 text-sm text-muted">No recordings on this day.</p>
+{:else}
+  <div class="flex items-center justify-between gap-3 border-t border-rule px-4 py-3 text-sm text-muted">
+    <span class="num">Showing {shown} of {clips.length}</span>
+    {#if shown < clips.length}
+      <button
+        type="button"
+        onclick={() => (extra += pageSize)}
+        class="min-h-11 rounded px-3 font-semibold text-ink outline-foil hover:bg-plate focus-visible:outline-2">Show {pageSize} more</button
+      >
+    {/if}
+  </div>
+{/if}
