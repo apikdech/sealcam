@@ -1,0 +1,643 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-20T06:15:02+00:00",
+  "title": "Design System: zview",
+  "extensions": {
+    "colorMeta": {
+      "ground": {
+        "role": "neutral",
+        "displayName": "Intaglio Ground",
+        "canonical": "oklch(20.9% 0.020 226.0)",
+        "tonalRamp": [
+          "#070c0e",
+          "#1f262a",
+          "#3a4448",
+          "#576369",
+          "#77858b",
+          "#9aa7ad",
+          "#c0cbd0",
+          "#e7f0f5"
+        ],
+        "purpose": "Dark page background; text on line-filled buttons and badges."
+      },
+      "plate": {
+        "role": "neutral",
+        "displayName": "Plate",
+        "canonical": "oklch(24.8% 0.025 218.5)",
+        "tonalRamp": [
+          "#060c0e",
+          "#1d272a",
+          "#374549",
+          "#546469",
+          "#73868c",
+          "#97a9ae",
+          "#bdccd1",
+          "#e4f1f5"
+        ],
+        "purpose": "One tonal step up: fields, lanes, tab bar, selected row, notices."
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Rule",
+        "canonical": "oklch(32.8% 0.031 216.0)",
+        "tonalRamp": [
+          "#050d0f",
+          "#1b272b",
+          "#34454a",
+          "#50656b",
+          "#6e878e",
+          "#93aab0",
+          "#bacdd2",
+          "#e2f2f6"
+        ],
+        "purpose": "Every 1 px divider and control border; timeline grid."
+      },
+      "line": {
+        "role": "primary",
+        "displayName": "Ink-Teal Line",
+        "canonical": "oklch(68.2% 0.074 186.5)",
+        "tonalRamp": [
+          "#00100d",
+          "#012c28",
+          "#174b47",
+          "#2f6d67",
+          "#489189",
+          "#76b2ab",
+          "#a2d5cf",
+          "#cef9f3"
+        ],
+        "purpose": "Verified seals, clip bars, current tab, primary fill, Live badge."
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "oklch(91.3% 0.017 91.6)",
+        "tonalRamp": [
+          "#0c0b08",
+          "#272520",
+          "#44423b",
+          "#646158",
+          "#868277",
+          "#a8a59b",
+          "#ccc9c0",
+          "#f1eee7"
+        ],
+        "purpose": "Primary text."
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted Ink",
+        "canonical": "oklch(71.0% 0.022 189.0)",
+        "tonalRamp": [
+          "#070d0c",
+          "#1e2726",
+          "#394544",
+          "#566563",
+          "#748785",
+          "#99a9a7",
+          "#becdcb",
+          "#e5f1f0"
+        ],
+        "purpose": "Secondary text, inactive tabs, unchecked seal, not-monitored hatch."
+      },
+      "foil": {
+        "role": "secondary",
+        "displayName": "Gold Foil",
+        "canonical": "oklch(73.5% 0.115 86.4)",
+        "tonalRamp": [
+          "#150800",
+          "#342100",
+          "#563e00",
+          "#7a5c01",
+          "#a07d1f",
+          "#c0a159",
+          "#e1c68a",
+          "#ffecbb"
+        ],
+        "purpose": "Focus ring, caret, selected-row outline, timeline now line."
+      },
+      "amber": {
+        "role": "tertiary",
+        "displayName": "Warm Amber",
+        "canonical": "oklch(75.1% 0.130 79.8)",
+        "tonalRamp": [
+          "#180600",
+          "#381f00",
+          "#5c3a00",
+          "#825800",
+          "#aa7800",
+          "#ca9d4d",
+          "#eac382",
+          "#ffeab4"
+        ],
+        "purpose": "Degraded: incomplete and mismatch seals, warnings."
+      },
+      "void": {
+        "role": "tertiary",
+        "displayName": "VOID Red",
+        "canonical": "oklch(61.0% 0.160 27.8)",
+        "tonalRamp": [
+          "#230000",
+          "#4a0706",
+          "#74201b",
+          "#a23931",
+          "#d0554a",
+          "#ef8174",
+          "#ffab9f",
+          "#ffd7cb"
+        ],
+        "purpose": "Tampered seals and spans, errors."
+      },
+      "ground-light": {
+        "role": "neutral",
+        "displayName": "Security Paper",
+        "canonical": "oklch(93.4% 0.014 88.7)",
+        "tonalRamp": [
+          "#0c0b08",
+          "#272520",
+          "#44423c",
+          "#646159",
+          "#868279",
+          "#a8a59d",
+          "#ccc9c2",
+          "#f1eee8"
+        ],
+        "purpose": "Light-theme page background."
+      },
+      "plate-light": {
+        "role": "neutral",
+        "displayName": "Paper Plate",
+        "canonical": "oklch(90.1% 0.018 89.4)",
+        "tonalRamp": [
+          "#0d0b07",
+          "#27251f",
+          "#45423a",
+          "#656157",
+          "#878276",
+          "#a9a59a",
+          "#ccc9c0",
+          "#f1eee6"
+        ],
+        "purpose": "Light-theme plate."
+      },
+      "rule-light": {
+        "role": "neutral",
+        "displayName": "Paper Rule",
+        "canonical": "oklch(81.5% 0.025 88.3)",
+        "tonalRamp": [
+          "#0d0b06",
+          "#28251d",
+          "#464237",
+          "#666154",
+          "#888272",
+          "#aaa596",
+          "#cec9bc",
+          "#f2eee4"
+        ],
+        "purpose": "Light-theme rule."
+      },
+      "line-light": {
+        "role": "primary",
+        "displayName": "Deep Teal Line",
+        "canonical": "oklch(50.2% 0.065 200.9)",
+        "tonalRamp": [
+          "#000f10",
+          "#072b2d",
+          "#1e4a4c",
+          "#366b6e",
+          "#508e92",
+          "#7bb0b3",
+          "#a6d3d6",
+          "#d2f7f9"
+        ],
+        "purpose": "Light-theme line ink."
+      },
+      "ink-light": {
+        "role": "neutral",
+        "displayName": "Paper Ink",
+        "canonical": "oklch(27.3% 0.021 216.1)",
+        "tonalRamp": [
+          "#070c0e",
+          "#1e2729",
+          "#394447",
+          "#566468",
+          "#75868b",
+          "#99a8ac",
+          "#beccd0",
+          "#e6f1f4"
+        ],
+        "purpose": "Light-theme primary text."
+      },
+      "muted-light": {
+        "role": "neutral",
+        "displayName": "Paper Muted",
+        "canonical": "oklch(49.6% 0.020 219.9)",
+        "tonalRamp": [
+          "#070c0e",
+          "#1f2729",
+          "#3a4447",
+          "#576468",
+          "#76858b",
+          "#9aa8ac",
+          "#bfccd0",
+          "#e6f1f4"
+        ],
+        "purpose": "Light-theme secondary text."
+      },
+      "foil-light": {
+        "role": "secondary",
+        "displayName": "Deep Foil",
+        "canonical": "oklch(54.3% 0.098 84.4)",
+        "tonalRamp": [
+          "#140900",
+          "#322200",
+          "#543e08",
+          "#785d1e",
+          "#9e7d36",
+          "#bea166",
+          "#dfc694",
+          "#ffecc3"
+        ],
+        "purpose": "Light-theme foil."
+      },
+      "amber-light": {
+        "role": "tertiary",
+        "displayName": "Deep Amber",
+        "canonical": "oklch(56.1% 0.112 75.8)",
+        "tonalRamp": [
+          "#170700",
+          "#371f00",
+          "#5b3a00",
+          "#81580e",
+          "#a87828",
+          "#c89d5d",
+          "#e8c28d",
+          "#ffe9bd"
+        ],
+        "purpose": "Light-theme amber."
+      },
+      "void-light": {
+        "role": "tertiary",
+        "displayName": "Deep VOID",
+        "canonical": "oklch(49.4% 0.155 28.1)",
+        "tonalRamp": [
+          "#220000",
+          "#490907",
+          "#73221c",
+          "#a03b32",
+          "#ce574b",
+          "#ed8275",
+          "#ffada0",
+          "#ffd8cc"
+        ],
+        "purpose": "Light-theme void."
+      },
+      "trigger-person": {
+        "role": "trigger",
+        "displayName": "Person (P)",
+        "canonical": "oklch(70.5% 0.187 47.6)",
+        "tonalRamp": [
+          "#250000",
+          "#4d0400",
+          "#781e00",
+          "#a63800",
+          "#d65400",
+          "#f48141",
+          "#ffad79",
+          "#ffd8ae"
+        ],
+        "purpose": "ui-spec §4.6 trigger colour, both themes."
+      },
+      "trigger-vehicle": {
+        "role": "trigger",
+        "displayName": "Vehicle (V)",
+        "canonical": "oklch(72.3% 0.192 149.6)",
+        "tonalRamp": [
+          "#001400",
+          "#003300",
+          "#00550c",
+          "#007922",
+          "#009f3a",
+          "#47c16a",
+          "#83e297",
+          "#b7ffc6"
+        ],
+        "purpose": "ui-spec §4.6 trigger colour, both themes."
+      },
+      "trigger-pet": {
+        "role": "trigger",
+        "displayName": "Pet (A)",
+        "canonical": "oklch(62.7% 0.233 303.9)",
+        "tonalRamp": [
+          "#16002f",
+          "#35005b",
+          "#57188a",
+          "#7c33bc",
+          "#a24fef",
+          "#c17fff",
+          "#e1abff",
+          "#ffd7ff"
+        ],
+        "purpose": "ui-spec §4.6 trigger colour, both themes."
+      },
+      "trigger-motion": {
+        "role": "trigger",
+        "displayName": "Motion (M)",
+        "canonical": "oklch(62.3% 0.188 259.8)",
+        "tonalRamp": [
+          "#000430",
+          "#001f5b",
+          "#0a3d8a",
+          "#205cbc",
+          "#377df0",
+          "#66a4ff",
+          "#94caff",
+          "#c3f0ff"
+        ],
+        "purpose": "ui-spec §4.6 trigger colour, both themes."
+      },
+      "trigger-other": {
+        "role": "trigger",
+        "displayName": "Other (•)",
+        "canonical": "oklch(71.4% 0.019 261.3)",
+        "tonalRamp": [
+          "#090b0f",
+          "#22252b",
+          "#3e424a",
+          "#5c616b",
+          "#7c838e",
+          "#9fa5b0",
+          "#c4c9d2",
+          "#eaeff6"
+        ],
+        "purpose": "ui-spec §4.6 trigger colour, both themes."
+      },
+      "on-trigger": {
+        "role": "neutral",
+        "displayName": "On-Trigger",
+        "canonical": "oklch(16.6% 0.016 226.9)",
+        "tonalRamp": [
+          "#080c0e",
+          "#202629",
+          "#3c4347",
+          "#596368",
+          "#79858a",
+          "#9ca7ac",
+          "#c2cbcf",
+          "#e8f0f3"
+        ],
+        "purpose": "Glyph on every trigger chip; >= 4.5:1 on all five (triggerContrast.test.ts)."
+      }
+    },
+    "themes": {
+      "default": "dark",
+      "light": "Under @media (prefers-color-scheme: light) each base token takes its -light value; trigger colours and on-trigger are unchanged.",
+      "overVideo": "--z-ov-ground:#0e1a1f;--z-ov-ink:#e6e2d6;--z-ov-muted:#93a6a4;--z-ov-line:#5fa8a0;--z-ov-rule:#22393f (web/src/lib/overVideo.ts), set on every container drawn over video, in both themes."
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "The one visible h1 (Keys, first run)."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Section heads and the wordmark."
+      },
+      "serial": {
+        "displayName": "Serial",
+        "purpose": "Event-row start times; tabular figures."
+      },
+      "day": {
+        "displayName": "Day",
+        "purpose": "Day title in the day row."
+      },
+      "body-field": {
+        "displayName": "Body (field)",
+        "purpose": "Inputs, selects and primary button text at 16 px."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Most UI text."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Tab labels, field labels, day subtitle, trigger glyphs, Live badge."
+      },
+      "canvas": {
+        "displayName": "Canvas",
+        "purpose": "Timeline ruler, lane names and span glyphs."
+      }
+    },
+    "fontFace": {
+      "family": "Atkinson Hyperlegible Next",
+      "src": "web/src/assets/fonts/atkinson-hyperlegible-next-latin.woff2",
+      "format": "woff2 (variable)",
+      "weights": "400 700",
+      "display": "swap",
+      "subset": "latin"
+    },
+    "shadows": [],
+    "focus": {
+      "value": "outline: 2px solid var(--z-foil); outline-offset: 2px",
+      "purpose": "Global :focus-visible ring on every control."
+    },
+    "scrim": {
+      "value": "linear-gradient(transparent, color-mix(in srgb, var(--z-ov-ground) 85%, transparent))",
+      "purpose": "Foot of live tiles and the player, under captions and controls."
+    },
+    "overVideoPanel": {
+      "value": "color-mix(in srgb, var(--z-ov-ground) 70%, transparent)",
+      "purpose": "Over-video button fill and reconnect / viewer-limit panels."
+    },
+    "selection": {
+      "value": "color-mix(in srgb, var(--z-line) 35%, transparent)",
+      "purpose": "::selection background."
+    },
+    "hatch": {
+      "value": "1.5 px diagonal hatch pattern (canvas)",
+      "purpose": "Not-monitored gaps in muted; tampered spans in void."
+    },
+    "motion": [
+      {
+        "name": "seal-spin",
+        "value": "rotate(360deg) 12s linear infinite",
+        "purpose": "Verifying seal rosette; none under prefers-reduced-motion."
+      },
+      {
+        "name": "status-pulse",
+        "value": "Tailwind animate-pulse",
+        "purpose": "Player status text over video while loading."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "md",
+        "value": "768px",
+        "purpose": "Tabs move to the top bar; Home becomes video and timeline | 22rem list."
+      }
+    ],
+    "layout": {
+      "gutter": "16px",
+      "homeListColumn": "22rem",
+      "formColumn": "36rem",
+      "playerWidth": "min(100%, calc(56vh * 16 / 9))",
+      "bottomBar": "64px + env(safe-area-inset-bottom)"
+    },
+    "icons": {
+      "source": "web/src/lib/components/Icon.svelte",
+      "grid": "24px",
+      "stroke": "1.75, round caps and joins, currentColor",
+      "note": "Paths adapted from Lucide (ISC) and redrawn; inline SVG only."
+    },
+    "seal": {
+      "source": "web/src/lib/seal/",
+      "stroke": 0.8,
+      "listThreshold": "44px",
+      "states": [
+        "unchecked",
+        "verifying",
+        "verified",
+        "incomplete",
+        "mismatch",
+        "tampered",
+        "unknown-key"
+      ],
+      "decorative": "Key fingerprints (40 px in the key list, 64 px on Key added) and the faded empty-player mark."
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Line fill, ground text; at most one per view (Add key, Scan QR code on phones).",
+      "html": "<button class=\"ds-btn-primary\">Add key</button>",
+      "css": ":host{--z-ground:#0e1a1f;--z-plate:#132429;--z-rule:#22393f;--z-line:#5fa8a0;--z-ink:#e6e2d6;--z-muted:#93a6a4;--z-foil:#c9a44c;--z-amber:#d9a441;--z-void:#d2554a;--z-on-trigger:#071014;}.ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;border:0;border-radius:4px;background:var(--z-line);color:var(--z-ground);font:600 16px/1.5 'Atkinson Hyperlegible Next', ui-sans-serif, system-ui, sans-serif;cursor:pointer}.ds-btn-primary:focus-visible{outline:2px solid var(--z-foil);outline-offset:2px}.ds-btn-primary:disabled{opacity:.4;cursor:not-allowed}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Default button: 1 px rule border, ink text, plate on hover.",
+      "html": "<button class=\"ds-btn-ghost\">Save a copy</button>",
+      "css": ":host{--z-ground:#0e1a1f;--z-plate:#132429;--z-rule:#22393f;--z-line:#5fa8a0;--z-ink:#e6e2d6;--z-muted:#93a6a4;--z-foil:#c9a44c;--z-amber:#d9a441;--z-void:#d2554a;--z-on-trigger:#071014;}.ds-btn-ghost{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:8px 12px;border:1px solid var(--z-rule);border-radius:4px;background:transparent;color:var(--z-ink);font:400 14px/1.43 'Atkinson Hyperlegible Next', ui-sans-serif, system-ui, sans-serif;cursor:pointer}.ds-btn-ghost:hover{background:var(--z-plate)}.ds-btn-ghost:focus-visible{outline:2px solid var(--z-foil);outline-offset:2px}.ds-btn-ghost:disabled{opacity:.4;cursor:not-allowed}"
+    },
+    {
+      "name": "Day Arrow",
+      "kind": "button",
+      "refersTo": "day-arrow",
+      "description": "44 px square day-row arrow, 10 px corner, authored stroke chevron.",
+      "html": "<button class=\"ds-day-arrow\" aria-label=\"Previous day\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m15 18-6-6 6-6\"/></svg></button>",
+      "css": ":host{--z-ground:#0e1a1f;--z-plate:#132429;--z-rule:#22393f;--z-line:#5fa8a0;--z-ink:#e6e2d6;--z-muted:#93a6a4;--z-foil:#c9a44c;--z-amber:#d9a441;--z-void:#d2554a;--z-on-trigger:#071014;}.ds-day-arrow{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border:1px solid var(--z-rule);border-radius:10px;background:transparent;color:var(--z-ink);cursor:pointer}.ds-day-arrow:hover{background:var(--z-plate)}.ds-day-arrow:focus-visible{outline:2px solid var(--z-foil);outline-offset:2px}.ds-day-arrow:disabled{color:var(--z-muted);opacity:.5}"
+    },
+    {
+      "name": "Key Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Plate-filled text field, 16 px text so phones never zoom.",
+      "html": "<input class=\"ds-field\" placeholder=\"zk1-…\" />",
+      "css": ":host{--z-ground:#0e1a1f;--z-plate:#132429;--z-rule:#22393f;--z-line:#5fa8a0;--z-ink:#e6e2d6;--z-muted:#93a6a4;--z-foil:#c9a44c;--z-amber:#d9a441;--z-void:#d2554a;--z-on-trigger:#071014;}.ds-field{width:100%;padding:12px;border:1px solid var(--z-rule);border-radius:4px;background:var(--z-plate);color:var(--z-ink);font:400 16px/1.5 'Atkinson Hyperlegible Next', ui-sans-serif, system-ui, sans-serif;caret-color:var(--z-foil)}.ds-field::placeholder{color:var(--z-muted)}.ds-field:focus-visible{outline:2px solid var(--z-line);outline-offset:2px}"
+    },
+    {
+      "name": "Bottom Tab Bar",
+      "kind": "nav",
+      "refersTo": "tab-bar",
+      "description": "Phone navigation: plate, rule on top, icon over label, current in line.",
+      "html": "<nav class=\"ds-tabs\"><a href=\"#\" class=\"ds-tab\" aria-current=\"page\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 11l9-8 9 8\"/><path d=\"M5 10v11h14V10\"/><path d=\"M10 21v-6h4v6\"/></svg><span>Home</span></a><a href=\"#\" class=\"ds-tab\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 12h18\"/><path d=\"M7 8v8\"/><path d=\"M12 5v14\"/><path d=\"M17 9v6\"/></svg><span>Timeline</span></a><a href=\"#\" class=\"ds-tab\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7.5 21a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z\"/><path d=\"M11 12l10-10\"/><path d=\"M18 5l3 3\"/><path d=\"M15 8l3 3\"/></svg><span>Keys</span></a></nav>",
+      "css": ":host{--z-ground:#0e1a1f;--z-plate:#132429;--z-rule:#22393f;--z-line:#5fa8a0;--z-ink:#e6e2d6;--z-muted:#93a6a4;--z-foil:#c9a44c;--z-amber:#d9a441;--z-void:#d2554a;--z-on-trigger:#071014;}.ds-tabs{display:grid;grid-template-columns:repeat(3,1fr);height:64px;border-top:1px solid var(--z-rule);background:var(--z-plate);font:400 12px/1.333 'Atkinson Hyperlegible Next', ui-sans-serif, system-ui, sans-serif}.ds-tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--z-muted);text-decoration:none}.ds-tab[aria-current=page]{color:var(--z-line)}.ds-tab:hover{color:var(--z-ink)}.ds-tab:focus-visible{outline:2px solid var(--z-line);outline-offset:2px}"
+    },
+    {
+      "name": "Trigger Chip",
+      "kind": "chip",
+      "refersTo": "trigger-chip",
+      "description": "Spec trigger colour with its glyph in on-trigger; never colour alone.",
+      "html": "<span class=\"ds-chip\" style=\"background:#f97316\">P</span> <span class=\"ds-chip\" style=\"background:#22c55e\">V</span> <span class=\"ds-chip\" style=\"background:#a855f7\">A</span> <span class=\"ds-chip\" style=\"background:#3b82f6\">M</span> <span class=\"ds-chip\" style=\"background:#9ca3af\">•</span>",
+      "css": ":host{--z-ground:#0e1a1f;--z-plate:#132429;--z-rule:#22393f;--z-line:#5fa8a0;--z-ink:#e6e2d6;--z-muted:#93a6a4;--z-foil:#c9a44c;--z-amber:#d9a441;--z-void:#d2554a;--z-on-trigger:#071014;}.ds-chip{display:inline-block;min-width:20px;padding:0 4px;border-radius:4px;color:var(--z-on-trigger);font:700 12px/1.333 'Atkinson Hyperlegible Next', ui-sans-serif, system-ui, sans-serif;text-align:center}"
+    },
+    {
+      "name": "Event Row",
+      "kind": "custom",
+      "refersTo": "event-row",
+      "description": "64 px row: serial time, trigger chips with camera and duration, the seal; selected gets plate and a 1 px foil outline.",
+      "html": "<div class=\"ds-row\" aria-selected=\"true\"><span class=\"ds-serial\">00:16</span><span class=\"ds-meta\"><span class=\"ds-chip\" style=\"background:#3b82f6\">M</span> <b>Front Door</b> · <span class=\"ds-num\">0:34</span></span><svg width=\"38\" height=\"38\" viewBox=\"0 0 38 38\" fill=\"none\" stroke-width=\"0.8\" role=\"img\" aria-label=\"Not checked yet\"><circle cx=\"19\" cy=\"19\" r=\"18.5\" stroke=\"#93a6a4\" stroke-dasharray=\"2 2.5\"/></svg></div>",
+      "css": ":host{--z-ground:#0e1a1f;--z-plate:#132429;--z-rule:#22393f;--z-line:#5fa8a0;--z-ink:#e6e2d6;--z-muted:#93a6a4;--z-foil:#c9a44c;--z-amber:#d9a441;--z-void:#d2554a;--z-on-trigger:#071014;}.ds-row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;min-height:64px;padding:0 16px;border-top:1px solid var(--z-rule);color:var(--z-ink);font:400 14px/1.43 'Atkinson Hyperlegible Next', ui-sans-serif, system-ui, sans-serif;cursor:pointer}.ds-row:hover{background:var(--z-plate)}.ds-row[aria-selected=true]{background:var(--z-plate);outline:1px solid var(--z-foil);outline-offset:-1px}.ds-serial{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.02em}.ds-meta{color:var(--z-muted)}.ds-meta b{color:var(--z-ink);font-weight:600}.ds-num{font-variant-numeric:tabular-nums;letter-spacing:.02em}.ds-chip{display:inline-block;min-width:20px;padding:0 4px;border-radius:4px;color:var(--z-on-trigger);font-weight:700;font-size:12px;text-align:center}"
+    },
+    {
+      "name": "Over-Video Bar",
+      "kind": "custom",
+      "refersTo": "over-video-button",
+      "description": "Scrim at the foot of live video with name, as-of time, Live badge and a 44 px button; always the dark values, in both themes.",
+      "html": "<div class=\"ds-ov\"><div><b>Front Door</b><br><span class=\"ds-ov-time\">as of 21:47:12</span></div><span class=\"ds-live\">Live</span><button class=\"ds-ov-btn\" aria-label=\"Sound on\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M11 5 6 9H2v6h4l5 4z\"/><path d=\"M22 9l-6 6\"/><path d=\"M16 9l6 6\"/></svg></button></div>",
+      "css": ":host{--z-ground:#0e1a1f;--z-plate:#132429;--z-rule:#22393f;--z-line:#5fa8a0;--z-ink:#e6e2d6;--z-muted:#93a6a4;--z-foil:#c9a44c;--z-amber:#d9a441;--z-void:#d2554a;--z-on-trigger:#071014;}.ds-ov{--z-ov-ground:#0e1a1f;--z-ov-ink:#e6e2d6;--z-ov-muted:#93a6a4;--z-ov-line:#5fa8a0;--z-ov-rule:#22393f;display:flex;align-items:center;gap:12px;padding:10px 12px;background:linear-gradient(transparent,color-mix(in srgb,var(--z-ov-ground) 85%,transparent)),#41524a;color:var(--z-ov-ink);font:400 14px/1.43 'Atkinson Hyperlegible Next', ui-sans-serif, system-ui, sans-serif}.ds-ov>div{flex:1}.ds-ov b{font-weight:600}.ds-ov-time{color:var(--z-ov-muted);font-variant-numeric:tabular-nums;letter-spacing:.02em}.ds-live{padding:2px 8px;border-radius:4px;background:var(--z-ov-line);color:var(--z-ov-ground);font-size:12px;font-weight:600;letter-spacing:.05em}.ds-ov-btn{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border:1px solid var(--z-ov-rule);border-radius:10px;background:color-mix(in srgb,var(--z-ov-ground) 70%,transparent);color:var(--z-ov-ink);cursor:pointer}.ds-ov-btn:focus-visible{outline:2px solid var(--z-foil);outline-offset:2px}"
+    },
+    {
+      "name": "Seal",
+      "kind": "custom",
+      "refersTo": "seal",
+      "description": "Per-clip seal at list size: a seeded rosette of rotated ellipses (verified), and the tampered VOID seal. At 44 px and above the rosette becomes three guilloché bands.",
+      "html": "<span class=\"ds-seal\"><svg width=\"38\" height=\"38\" viewBox=\"0 0 38 38\" fill=\"none\" stroke-width=\"0.8\" role=\"img\" aria-label=\"Encrypted recording verified\"><circle cx=\"19\" cy=\"19\" r=\"18.5\" stroke=\"var(--z-line)\"/><g stroke=\"var(--z-line)\"><ellipse cx=\"19\" cy=\"19\" rx=\"15\" ry=\"6\" transform=\"rotate(0 19 19)\"/><ellipse cx=\"19\" cy=\"19\" rx=\"15\" ry=\"6\" transform=\"rotate(18 19 19)\"/><ellipse cx=\"19\" cy=\"19\" rx=\"15\" ry=\"6\" transform=\"rotate(36 19 19)\"/><ellipse cx=\"19\" cy=\"19\" rx=\"15\" ry=\"6\" transform=\"rotate(54 19 19)\"/><ellipse cx=\"19\" cy=\"19\" rx=\"15\" ry=\"6\" transform=\"rotate(72 19 19)\"/><ellipse cx=\"19\" cy=\"19\" rx=\"15\" ry=\"6\" transform=\"rotate(90 19 19)\"/><ellipse cx=\"19\" cy=\"19\" rx=\"15\" ry=\"6\" transform=\"rotate(108 19 19)\"/><ellipse cx=\"19\" cy=\"19\" rx=\"15\" ry=\"6\" transform=\"rotate(126 19 19)\"/><ellipse cx=\"19\" cy=\"19\" rx=\"15\" ry=\"6\" transform=\"rotate(144 19 19)\"/><ellipse cx=\"19\" cy=\"19\" rx=\"15\" ry=\"6\" transform=\"rotate(162 19 19)\"/></g></svg><svg width=\"38\" height=\"38\" viewBox=\"0 0 38 38\" fill=\"none\" stroke-width=\"0.8\" role=\"img\" aria-label=\"Tampered\"><defs><clipPath id=\"ds-void\"><circle cx=\"19\" cy=\"19\" r=\"17.5\"/></clipPath></defs><circle cx=\"19\" cy=\"19\" r=\"18.5\" stroke=\"var(--z-void)\"/><g clip-path=\"url(#ds-void)\" transform=\"rotate(-35 19 19)\" fill=\"var(--z-void)\" stroke=\"none\" font-size=\"5\" font-weight=\"600\" letter-spacing=\"0.5\"><text x=\"-19\" y=\"0\">VOID VOID VOID VOID VOID VOID</text><text x=\"-19\" y=\"6\">VOID VOID VOID VOID VOID VOID</text><text x=\"-19\" y=\"12\">VOID VOID VOID VOID VOID VOID</text><text x=\"-19\" y=\"18\">VOID VOID VOID VOID VOID VOID</text><text x=\"-19\" y=\"24\">VOID VOID VOID VOID VOID VOID</text><text x=\"-19\" y=\"30\">VOID VOID VOID VOID VOID VOID</text><text x=\"-19\" y=\"36\">VOID VOID VOID VOID VOID VOID</text><text x=\"-19\" y=\"42\">VOID VOID VOID VOID VOID VOID</text></g></svg></span>",
+      "css": ":host{--z-ground:#0e1a1f;--z-plate:#132429;--z-rule:#22393f;--z-line:#5fa8a0;--z-ink:#e6e2d6;--z-muted:#93a6a4;--z-foil:#c9a44c;--z-amber:#d9a441;--z-void:#d2554a;--z-on-trigger:#071014;}.ds-seal{display:inline-flex;align-items:center;gap:12px;font-family:'Atkinson Hyperlegible Next', ui-sans-serif, system-ui, sans-serif}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Intaglio Seal",
+    "overview": "zview treats every recording like a stamped document from a security printer: banknotes, the Indonesian meterai. The ground is a deep intaglio blue-green in the dark theme and an off-white security paper in the light one; everything on it is drawn in fine 1 px rules and a few printing inks. Each clip carries its own guilloché seal, generated from the clip's id and drawn from its verification state, wherever the clip appears: event row, player, timeline bar, and the key screen, where the key's fingerprint is the same rosette.\n\nThe system is quiet so the footage and the timeline can own the space. Chrome is a top bar, a day row and a bottom tab bar, separated by rules, never boxed into cards or lifted with shadows. Density is moderate and phone-first: 44 px targets, 64 px event rows, one face at a few sizes, and tabular \"serial\" figures for every time so a column of clock readings reads like a register.\n\nThe world rejects the category default (a black NVR grid with a red REC dot and a dashboard of cards) and the generic Tailwind look it replaced.",
+    "keyCharacteristics": [
+      "Dark intaglio ground by default; light security paper follows `prefers-color-scheme`.",
+      "Four inks with fixed meanings: teal line (verified, selection, primary action), gold foil (focus, today, now), amber (degraded), VOID red (tampered).",
+      "One face, Atkinson Hyperlegible Next; tabular figures for every time and duration.",
+      "Flat: 1 px rules and tonal plates, no shadows, no cards.",
+      "The per-clip guilloché seal is the signature; it never claims more than was checked."
+    ],
+    "rules": [
+      {
+        "name": "The Fixed Inks Rule",
+        "body": "Each ink has one meaning: line is verified or chosen, foil is focus or now, amber is degraded, void is tampered. Never reuse an ink for decoration or brand emphasis.",
+        "section": "colors"
+      },
+      {
+        "name": "The Spec Colours Rule",
+        "body": "The five trigger colours, their glyphs and `on-trigger` are spec-fixed. Do not retint them per theme, and never show a trigger colour without its glyph.",
+        "section": "colors"
+      },
+      {
+        "name": "The Dark Over Video Rule",
+        "body": "Anything drawn over video (scrims, captions, buttons, the Live badge, reconnect panels) uses the dark values in both themes, set through the over-video variables (`--z-ov-ground`, `--z-ov-ink`, `--z-ov-muted`, `--z-ov-line`, `--z-ov-rule` from `lib/overVideo.ts`). Light paper on top of footage is never correct.",
+        "section": "colors"
+      },
+      {
+        "name": "The Serial Figures Rule",
+        "body": "Every time, duration, count and fingerprint uses tabular figures with +0.02em tracking (the `.num` class). A column of times must align digit for digit.",
+        "section": "typography"
+      },
+      {
+        "name": "The One Face Rule",
+        "body": "Atkinson Hyperlegible Next is the only face. Do not add a display face, a serif or a system mono for flavour.",
+        "section": "typography"
+      },
+      {
+        "name": "The Printed Sheet Rule",
+        "body": "Surfaces are flat and separated by 1 px rules. No drop shadows, no elevated cards, no blur. If a region needs to stand out, it moves one tone to plate.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** separate regions with 1 px `rule` lines and one tonal step to `plate`.",
+      "**Do** keep each ink to its meaning: `line` verified or chosen, `foil` focus or now, `amber` degraded, `void` tampered.",
+      "**Do** set every time, duration and count in tabular figures (`.num`, +0.02em).",
+      "**Do** give every phone target at least 44px, and use 16px text in fields.",
+      "**Do** use the dark over-video values for anything drawn on footage, in both themes.",
+      "**Do** show a seal beside every clip and draw it from what was actually checked; unchecked stays an empty dashed ring.",
+      "**Do** print every trigger colour with its glyph in `on-trigger`.",
+      "**Do** use the authored 24px stroke icons (1.75 stroke, round caps) from the Icon set."
+    ],
+    "donts": [
+      "**Don't** use drop shadows, elevated cards, card grids or blur.",
+      "**Don't** retint the trigger colours or `on-trigger` per theme; they are fixed by ui-spec §4.6.",
+      "**Don't** put light-theme paper or ink on top of video.",
+      "**Don't** let a seal or any copy claim more than was checked, or soften a tampered or mismatch state.",
+      "**Don't** add a second typeface.",
+      "**Don't** fall back to the black NVR grid with a red REC dot, or default Tailwind greys."
+    ]
+  }
+}
