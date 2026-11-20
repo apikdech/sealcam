@@ -46,16 +46,23 @@ From now on, open zview from the new icon.
    **Only for now**.
 6. Tap **Open Home**.
 
-Now open **Timeline**. Select a day and tap a recording to watch it. **Live** shows the cameras
-now.
+**Home** opens by default. It shows the live cameras above the events of today. Tap an event to
+watch the recording. Open **Timeline** to choose another day.
 
 ## Important information
 
 * The key never goes into a link, a message, or the address bar. Do not give the key to persons
   outside the family. A person with the key and Tailscale access can watch the cameras.
-* To remove the key from a device, open **Keys** and tap **Forget** next to the key. Then tap **Forget key** to confirm. If you lose a
-  phone, tell the owner immediately.
+* To remove the key from a device, open **Keys** and tap **Forget** next to the key. Then tap
+  **Forget key** to confirm. If you lose a phone, tell the owner immediately.
 * When an update is available, the app shows "New version available — reload". Tap reload when
   no video plays.
-* If a recording shows **tampered** or **incomplete**, somebody changed the file, or the file is
-  not complete. Tell the owner.
+* Each recording has a round seal. The seal shows the result of the check that the app did on
+  the recording. A full round pattern means that the recording is verified.
+* If the app says **Failed verification** or "This recording failed verification at ~mm:ss",
+  the file was changed or is damaged. Tell the owner.
+* If the app says **Recording was interrupted**, the recording is not complete. Tell the owner.
+* If the app says **Metadata mismatch**, the description of the recording does not agree with
+  the recording. Tell the owner.
+* If the app says **Recorded with another key**, you do not have the key for this recording.
+  Ask the owner for that key.
