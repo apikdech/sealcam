@@ -3,7 +3,7 @@
   import EventList, { type EventRow } from '../lib/components/EventList.svelte';
   import Header from '../lib/components/Header.svelte';
   import Player, { type Target } from '../lib/components/Player.svelte';
-  import { loadDay, localDayOf, toTimelineClip } from '../lib/dashboard/data';
+  import { loadDay, localDayOf, toEventRow, toTimelineClip } from '../lib/dashboard/data';
   import type { Profile } from '../lib/player/buffer';
   import type { createPlayer, IntegrityState, PlayerState } from '../lib/player/engine';
   import { adjacentClip, commandFor, type Command } from '../lib/shortcuts';
@@ -126,14 +126,7 @@
   const rows: EventRow[] = $derived(
     [...clips]
       .sort((a, b) => Date.parse(b.start_time) - Date.parse(a.start_time))
-      .map((c) => ({
-        id: c.clip_id,
-        cameraName: c.camera.name,
-        startMs: Date.parse(c.start_time),
-        durationMs: c.duration_ms,
-        triggers: [...new Set(c.triggers.map((t) => t.type))],
-        status: c.status,
-      })),
+      .map(toEventRow),
   );
   const lanes = $derived((cameras ?? []).filter((c) => !camera || c.id === camera));
 

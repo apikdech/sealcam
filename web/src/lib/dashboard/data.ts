@@ -1,5 +1,6 @@
 // Loading one local day of clips and coverage for the timeline page, and the
 // mapping from API shapes to the timeline model.
+import type { EventRow } from '../components/EventList.svelte';
 import type { Request } from '../../worker/protocol';
 import type { Coverage as ApiCoverage, Sidecar } from '../../worker/schemas';
 import type { Coverage, TimelineClip } from '../timeline/model';
@@ -9,6 +10,17 @@ import { localDayOf, localDayRange } from '../timeline/timezone';
 export const ASSUMED_MAX_CLIP_MS = 300_000;
 
 export { localDayOf };
+
+export function toEventRow(c: Sidecar): EventRow {
+  return {
+    id: c.clip_id,
+    cameraName: c.camera.name,
+    startMs: Date.parse(c.start_time),
+    durationMs: c.duration_ms,
+    triggers: [...new Set(c.triggers.map((t) => t.type))],
+    status: c.status,
+  };
+}
 
 export function toTimelineClip(c: Sidecar): TimelineClip {
   const startMs = Date.parse(c.start_time);
