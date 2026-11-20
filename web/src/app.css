@@ -29,8 +29,8 @@
   --z-pet: #a855f7;
   --z-motion: #3b82f6;
   --z-other: #9ca3af;
-  /* Letter on a trigger chip: fixed dark so it holds 4.5:1 on all five colours in both themes. */
-  --z-on-trigger: #0e1a1f;
+  /* Letter on a trigger chip: fixed dark; >= 4.5:1 on all five colours in both themes (checked by triggerContrast.test.ts). */
+  --z-on-trigger: #071014;
 }
 
 @media (prefers-color-scheme: light) {
