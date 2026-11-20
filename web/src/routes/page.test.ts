@@ -261,13 +261,30 @@ describe('timeline dashboard', () => {
     mountPage(c);
     expect(await screen.findByText(/2 recordings could not be read/i)).toBeInTheDocument();
     const ok = c.call.bind(c);
+    let fail = true;
     c.call = (async (m: Request) => {
-      if (m.type === 'api.get' && m.path === '/api/v1/clips') throw new Error('down');
+      if (fail && m.type === 'api.get' && m.path === '/api/v1/clips') throw new Error('down');
       return ok(m);
     }) as never;
     await fireEvent.change(screen.getByLabelText('Trigger'), { target: { value: 'person' } });
     await screen.findByRole('button', { name: 'Try again' });
+    // Back to the filter that did load: the loaded rows match again, but the error is current.
+    await fireEvent.change(screen.getByLabelText('Trigger'), { target: { value: '' } });
+    await screen.findByRole('button', { name: 'Try again' });
     expect(screen.queryByText(/could not be read/i)).toBeNull();
+    fail = false;
+  });
+
+  it('keeps the zoom when a filter changes', async () => {
+    mountPage(client());
+    await listRows();
+    await fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+    expect(screen.getByText('6 h')).toBeInTheDocument();
+    await fireEvent.change(screen.getByLabelText('Trigger'), { target: { value: 'person' } });
+    await listRows();
+    await waitFor(() => expect(screen.getByLabelText('Trigger')).toHaveValue('person'));
+    expect(screen.getByText('6 h')).toBeInTheDocument();
+    expect(screen.queryByText('24 h')).toBeNull();
   });
 
   it('never shows the previous filter rows under a new filter', async () => {

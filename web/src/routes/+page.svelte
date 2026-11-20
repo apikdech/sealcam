@@ -87,7 +87,7 @@
   const ctx = (): DispatchContext => ({
     playerView,
     timeline,
-    timelineClips: data.timelineClips,
+    timelineClips: data.ready ? data.timelineClips : [],
     selectedId,
     select,
     goToday() {
@@ -158,8 +158,6 @@
 
         {#if data.dayError}
           <LoadProblem kind={data.dayError} text="Could not load recordings." onRetry={data.retry} />
-        {:else if !data.ready}
-          <p role="status" class="py-3 text-sm text-muted">Loading…</p>
         {:else}
           <div class="mt-2 flex flex-wrap items-center gap-2">
             <button type="button" class={tool} aria-label="Zoom out" title="Zoom out ([)" onclick={() => runCommand('zoomOut', ctx())}>
@@ -170,6 +168,7 @@
               <Icon name="zoom-in" />
             </button>
             <button type="button" class={tool} title="Jump to now (T)" onclick={() => runCommand('now', ctx())}>Now</button>
+            {#if !data.ready}<span role="status" class="text-sm text-muted">Loading…</span>{/if}
             <button
               type="button"
               class="{tool} ml-auto"
@@ -193,8 +192,8 @@
             <Timeline
               bind:this={timeline}
               cameras={lanes.map((c) => ({ id: c.id, name: c.name }))}
-              clips={data.timelineClips}
-              coverage={data.coverage}
+              clips={data.ready ? data.timelineClips : []}
+              coverage={data.ready ? data.coverage : []}
               {day}
               {zone}
               nowMs={now}
