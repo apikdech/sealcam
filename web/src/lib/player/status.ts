@@ -1,4 +1,6 @@
 // User-facing wording for the integrity states (ui-spec §4.4).
+import { fingerprint } from '../../routes/onboarding/keyInput';
+import { formatClock } from '../timeline/timezone';
 import type { PlayerState } from './engine';
 
 export function initialState(): PlayerState {
@@ -22,8 +24,6 @@ export function formatMmss(ms: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-const utc = (ms: number): string => new Date(ms).toISOString().slice(0, 19).replace('T', ' ') + ' UTC';
-
 export interface IntegrityView {
   kind: PlayerState['integrity'];
   /** Short text for the badge or banner. */
@@ -33,31 +33,42 @@ export interface IntegrityView {
   spinner: boolean;
   /** Whether exporting the recording may be offered. */
   export: boolean;
+  /** What the viewer can do about it, when anything. */
+  next: string | null;
+  /** Where `next` leads, when it is a link. */
+  nextHref: string | null;
 }
 
-export function describeIntegrity(s: PlayerState): IntegrityView {
+export interface IntegrityContext {
+  zone: string;
+  cameraName: (id: string) => string;
+}
+
+export function describeIntegrity(s: PlayerState, ctx: IntegrityContext): IntegrityView {
   switch (s.integrity) {
     case 'verifying':
       // The clip could not be opened (network, no key): there is nothing left to wait for.
       if (s.message !== null) {
-        return { kind: 'verifying', text: 'Could not verify this recording', title: 'Not verified', spinner: false, export: false };
+        return { kind: 'verifying', text: 'Could not verify this recording', title: 'Not verified', spinner: false, export: false, next: null, nextHref: null };
       }
       // Nothing selected yet: nothing is being verified.
       if (s.clipId === null) {
-        return { kind: 'verifying', text: '', title: 'No recording selected', spinner: false, export: false };
+        return { kind: 'verifying', text: '', title: 'No recording selected', spinner: false, export: false, next: null, nextHref: null };
       }
-      return { kind: 'verifying', text: 'Verifying…', title: 'Verifying the encrypted recording', spinner: true, export: false };
+      return { kind: 'verifying', text: 'Verifying…', title: 'Verifying the encrypted recording', spinner: true, export: false, next: null, nextHref: null };
     case 'verified':
-      return { kind: 'verified', text: 'Verified', title: 'Encrypted recording verified', spinner: false, export: true };
+      return { kind: 'verified', text: 'Verified', title: 'Encrypted recording verified', spinner: false, export: true, next: null, nextHref: null };
     case 'mismatch': {
       const h = s.header;
-      const shown = h ? ` Showing the encrypted header's values: camera ${h.cameraId}, started ${utc(h.startUnixMs)}.` : '';
+      const shown = h ? ` Showing the header's values: ${ctx.cameraName(h.cameraId)}, started ${formatClock(h.startUnixMs, ctx.zone, true)}.` : '';
       return {
         kind: 'mismatch',
-        text: `Metadata mismatch: the unencrypted description of this clip disagrees with its encrypted header.${shown}`,
-        title: 'Metadata mismatch',
+        text: `This recording's description disagrees with its encrypted header.${shown}`,
+        title: 'Description mismatch',
         spinner: false,
         export: true,
+        next: null,
+        nextHref: null,
       };
     }
     case 'tampered': {
@@ -68,6 +79,8 @@ export function describeIntegrity(s: PlayerState): IntegrityView {
         title: 'Tampered or corrupted',
         spinner: false,
         export: false,
+        next: 'Export is turned off for this recording.',
+        nextHref: null,
       };
     }
     case 'incomplete':
@@ -77,14 +90,18 @@ export function describeIntegrity(s: PlayerState): IntegrityView {
         title: 'Incomplete: only the verified portion plays',
         spinner: false,
         export: true,
+        next: null,
+        nextHref: null,
       };
     case 'unknown-key':
       return {
         kind: 'unknown-key',
-        text: `Recorded with key ${s.keyId ?? '(unknown)'}; add that key to play`,
+        text: `Recorded with key ${s.keyId ? fingerprint(s.keyId.replaceAll('-', '')) : '(unknown)'}; add that key to play`,
         title: 'Unknown key',
         spinner: false,
         export: false,
+        next: 'Open Keys',
+        nextHref: '#/key',
       };
   }
 }

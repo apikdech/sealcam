@@ -6,7 +6,9 @@
   import { describeIntegrity, initialState } from '../player/status';
   import type { WorkerClient } from '../workerClient';
   import ExportDialog from './ExportDialog.svelte';
-  import IntegrityBadge from './IntegrityBadge.svelte';
+  import Icon from './Icon.svelte';
+  import Seal from '../seal/Seal.svelte';
+  import { formatClock } from '../timeline/timezone';
 
   /** Where to play: a clip, and how far into it. A new object (`n`) seeks again even within the same clip. */
   export interface Target {
@@ -26,20 +28,39 @@
     env?: ExportEnv;
     /** Called with every state the engine reports. */
     onState?: (s: PlayerState) => void;
+    /** Display name of a camera, for the plain integrity messages. */
+    cameraName?: (id: string) => string;
+    /** When set, a "Back to live" button is shown. */
+    onBack?: () => void;
+    onPrev?: () => void;
+    onNext?: () => void;
   }
 
-  let { client, cue, zone, profile, factory = createPlayer, env, onState }: Props = $props();
+  let {
+    client,
+    cue,
+    zone,
+    profile,
+    factory = createPlayer,
+    env,
+    onState,
+    cameraName = (id: string) => id,
+    onBack,
+    onPrev,
+    onNext,
+  }: Props = $props();
 
   let video: HTMLVideoElement | undefined = $state();
   let player: Player | undefined = $state();
   let snap: PlayerState = $state(initialState());
   let loadError = $state('');
   let autoAdvance = $state(true);
+  let playing = $state(false);
   /** The clip the engine has been asked for (kept in step with auto-advance). */
   let current: string | null = null;
   let chain: Promise<void> = Promise.resolve();
 
-  const view = $derived(describeIntegrity(snap));
+  const view = $derived(describeIntegrity(snap, { zone, cameraName }));
   const mp4Profile = $derived(profile ?? detectProfile());
 
   onMount(() => {
@@ -52,6 +73,7 @@
     });
     player = p;
     return () => {
+      clearTimeout(savedTimer);
       off();
       p.destroy();
     };
@@ -107,12 +129,19 @@
     void player.seek(to);
   }
 
+  const icon =
+    'inline-flex h-10 w-10 items-center justify-center rounded border border-rule text-ink hover:bg-plate disabled:cursor-not-allowed disabled:opacity-40';
+  const ghost =
+    'inline-flex items-center gap-2 rounded border border-rule px-3 py-2 text-sm text-ink hover:bg-plate disabled:cursor-not-allowed disabled:opacity-40';
+
   // ---- export --------------------------------------------------------------
 
   let exporting = $state(false);
   let exportBusy = $state(false);
   let exportBytes = $state(0);
   let exportError = $state('');
+  let saved = $state(false);
+  let savedTimer: ReturnType<typeof setTimeout> | undefined;
 
   const header = $derived(snap.header);
   const exportName = $derived(
@@ -131,6 +160,7 @@
     video?.pause();
     exportError = '';
     exportBytes = 0;
+    saved = false;
     exporting = true;
   }
 
@@ -154,10 +184,17 @@
         onProgress: (n) => (exportBytes = n),
       });
       touched = res.kind === 'saved';
-      if (touched) exporting = false;
-    } catch (e) {
+      if (touched) {
+        saved = true;
+        clearTimeout(savedTimer);
+        savedTimer = setTimeout(() => {
+          exporting = false;
+          saved = false;
+        }, 4000);
+      }
+    } catch {
       touched = true;
-      exportError = e instanceof Error && e.message ? e.message : 'Export failed.';
+      exportError = 'Could not save the file. Try again.';
     } finally {
       exportBusy = false;
       // Exporting reopened the clip in the worker, which dropped the player's session: open it again where it was.
@@ -177,48 +214,92 @@
 </script>
 
 <section class="min-w-0" aria-label="Player">
-  <div class="relative overflow-hidden rounded-lg border border-neutral-800 bg-black">
-    <video bind:this={video} data-testid="player" data-clip-player controls muted playsinline class="aspect-video w-full bg-black object-contain"></video>
+  {#if onBack}
+    <button type="button" class="{ghost} mb-2" onclick={onBack}>
+      <Icon name="home" size={16} />
+      <span>Back to live</span>
+    </button>
+  {/if}
+  <div class="relative overflow-hidden rounded-lg border border-rule bg-black">
+    <video
+      bind:this={video}
+      data-testid="player"
+      data-clip-player
+      controls
+      muted
+      playsinline
+      onplay={() => (playing = true)}
+      onpause={() => (playing = false)}
+      class="aspect-video w-full bg-black object-contain"
+    ></video>
     {#if view.spinner}
-      <div class="absolute inset-0 flex items-center justify-center bg-black/50 text-sm" role="progressbar" aria-label="Verifying">
+      <div class="absolute inset-0 flex items-center justify-center bg-black/50 text-sm text-ink" role="progressbar" aria-label="Verifying">
         <span class="animate-pulse">{view.text}</span>
       </div>
     {/if}
   </div>
 
-  <div class="mt-2 flex flex-wrap items-center gap-3 text-sm">
-    <span data-testid="integrity" data-kind={view.kind} class="flex items-center gap-1" title={view.title}>
-      <IntegrityBadge state={snap.integrity} />
+  <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+    <span data-testid="integrity" data-kind={view.kind} class="flex items-center gap-2" title={view.title}>
       {#if snap.clipId === null}
-        <span class="text-neutral-400">Select a recording</span>
+        <span class="text-muted">Select a recording</span>
+      {:else}
+        <Seal seed={snap.clipId} state={snap.integrity === 'verifying' ? 'unchecked' : snap.integrity} showLabel />
       {/if}
     </span>
-    <label class="ml-auto flex items-center gap-1 text-neutral-300">
+    {#if header}
+      <span class="num text-muted">{cameraName(header.cameraId)}, {formatClock(header.startUnixMs, zone, true)}</span>
+    {/if}
+    <label class="ml-auto flex items-center gap-1 text-muted">
       <input type="checkbox" bind:checked={autoAdvance} />
       <span>Autoplay next</span>
     </label>
-    <button
-      type="button"
-      class="rounded border border-neutral-600 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-40"
-      disabled={!exportable}
-      title={exportHint}
-      onclick={openExport}>Export</button
-    >
+  </div>
+
+  <div class="mt-2 flex items-center gap-2">
+    <div class="flex items-center gap-1" role="group" aria-label="Transport">
+      <button type="button" class={icon} title="Previous clip (J)" aria-label="Previous clip" disabled={!onPrev} onclick={onPrev}>
+        <Icon name="prev" />
+      </button>
+      <button type="button" class={icon} title="Back 10 seconds (Left)" aria-label="Back 10 seconds" onclick={() => skip(-10_000)}>
+        <Icon name="back10" />
+      </button>
+      <button type="button" class={icon} title="Play or pause (Space)" aria-label={playing ? 'Pause' : 'Play'} onclick={togglePlay}>
+        <Icon name={playing ? 'pause' : 'play'} />
+      </button>
+      <button type="button" class={icon} title="Forward 10 seconds (Right)" aria-label="Forward 10 seconds" onclick={() => skip(10_000)}>
+        <Icon name="fwd10" />
+      </button>
+      <button type="button" class={icon} title="Next clip (K)" aria-label="Next clip" disabled={!onNext} onclick={onNext}>
+        <Icon name="next" />
+      </button>
+    </div>
+    <!-- Export saves plaintext: it sits apart from the routine controls. -->
+    <button type="button" class="{ghost} ml-auto" disabled={!exportable} title={exportHint} onclick={openExport}>
+      <Icon name="download" size={16} />
+      <span>Export</span>
+    </button>
   </div>
 
   {#if view.kind !== 'verified' && snap.clipId !== null && !view.spinner}
-    <p
+    <div
       role={view.kind === 'incomplete' ? 'status' : 'alert'}
-      class="mt-2 rounded px-3 py-2 text-sm {view.kind === 'tampered' ? 'bg-red-900/60 text-red-100' : 'bg-amber-900/50 text-amber-100'}"
+      class="mt-2 flex items-start gap-2 rounded border bg-plate px-3 py-2 text-sm text-ink {view.kind === 'tampered' ? 'border-void' : 'border-amber'}"
     >
-      {view.text}
-    </p>
+      <Seal seed={snap.clipId} state={snap.integrity === 'verifying' ? 'unchecked' : snap.integrity} size={20} />
+      <p>
+        {view.text}
+        {#if view.next}
+          {#if view.nextHref}<a href={view.nextHref} class="underline">{view.next}</a>{:else}<span class="block text-muted">{view.next}</span>{/if}
+        {/if}
+      </p>
+    </div>
   {/if}
   {#if snap.message}
-    <p role="status" class="mt-2 text-sm text-amber-300">{snap.message}</p>
+    <p role="status" class="mt-2 text-sm text-amber">{snap.message}</p>
   {/if}
   {#if loadError}
-    <p role="alert" class="mt-2 text-sm text-red-400">{loadError}</p>
+    <p role="alert" class="mt-2 text-sm text-void">{loadError}</p>
   {/if}
 </section>
 
@@ -228,6 +309,7 @@
     busy={exportBusy}
     bytes={exportBytes}
     error={exportError}
+    {saved}
     onConfirm={() => void confirmExport()}
     onCancel={() => (exporting = false)}
   />

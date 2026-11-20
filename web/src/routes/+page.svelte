@@ -238,15 +238,21 @@
     <div class="min-w-0">
       <!-- On a phone the player stays pinned at the top while the page scrolls. -->
       <div class="sticky top-0 z-10 bg-[var(--bg,#0a0a0a)] pb-2 md:static">
-        <Player bind:this={playerView} {client} {cue} {zone} {profile} {factory} env={exportEnv} onState={onPlayerState} />
+        <Player
+          bind:this={playerView}
+          {client}
+          {cue}
+          {zone}
+          {profile}
+          {factory}
+          env={exportEnv}
+          onState={onPlayerState}
+          onPrev={() => void run('prev')}
+          onNext={() => void run('next')}
+        />
       </div>
 
       <div class="mt-2 flex flex-wrap items-center gap-2" role="group" aria-label="Transport">
-        <button type="button" class={btn} title="Previous clip (J)" onclick={() => run('prev')}>Prev</button>
-        <button type="button" class={btn} title="Play or pause (Space)" onclick={() => run('toggle')}>Play/Pause</button>
-        <button type="button" class={btn} title="Next clip (K)" onclick={() => run('next')}>Next</button>
-        <button type="button" class={btn} title="Back 10 seconds (Left)" onclick={() => run('back10')}>-10 s</button>
-        <button type="button" class={btn} title="Forward 10 seconds (Right)" onclick={() => run('fwd10')}>+10 s</button>
         <span class="mx-1 hidden h-5 border-l border-neutral-700 md:inline"></span>
         <button type="button" class={btn} title="Zoom out ([)" onclick={() => run('zoomOut')}>Zoom out</button>
         <button type="button" class={btn} title="Zoom in (])" onclick={() => run('zoomIn')}>Zoom in</button>

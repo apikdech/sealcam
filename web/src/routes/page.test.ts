@@ -348,25 +348,25 @@ describe('shortcuts and transport', () => {
     it('Play/Pause toggles playback', async () => {
       await ready();
       const { play, pause } = stubVideo({ paused: true });
-      await press('Play/Pause');
+      await press('Play');
       expect(play).toHaveBeenCalledTimes(1);
-      await press('Play/Pause');
+      await press('Play');
       expect(pause).toHaveBeenCalledTimes(1);
     });
 
     it('-10 s and +10 s seek the player', async () => {
       await ready();
       stubVideo({ currentTimeSec: 30 });
-      await press('+10 s');
-      await press('-10 s');
+      await press('Forward 10 seconds');
+      await press('Back 10 seconds');
       expect(FakePlayer.instances[0]!.seeks).toEqual([40_000, 20_000]);
     });
 
     it('Prev and Next select the neighbouring clips', async () => {
       await ready();
-      await press('Next');
+      await press('Next clip');
       expect(selected()).toBe(ids.c);
-      await press('Prev');
+      await press('Previous clip');
       expect(selected()).toBe(ids.b);
     });
 

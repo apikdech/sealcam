@@ -4,6 +4,8 @@
   interface Props {
     filename: string;
     busy: boolean;
+    /** The file was written; shown briefly before the dialog closes. */
+    saved?: boolean;
     /** Plaintext bytes saved so far. */
     bytes: number;
     error: string;
@@ -11,7 +13,7 @@
     onCancel: () => void;
   }
 
-  let { filename, busy, bytes, error, onConfirm, onCancel }: Props = $props();
+  let { filename, busy, saved = false, bytes, error, onConfirm, onCancel }: Props = $props();
 
   let dialog: HTMLDivElement;
   onMount(() => dialog.focus());
@@ -51,22 +53,25 @@
         onCancel();
       }
     }}
-    class="w-full max-w-md rounded-lg border border-neutral-700 bg-neutral-900 p-5 text-sm shadow-xl"
+    class="w-full max-w-md rounded-lg border border-rule bg-plate text-ink p-5 text-sm shadow-xl"
   >
     <h2 id="export-title" class="mb-2 text-base font-semibold">Export recording</h2>
     <p class="mb-2">This saves an <strong>unencrypted</strong> copy on this device.</p>
-    <p class="mb-3 break-all font-mono text-xs text-neutral-400">{filename}</p>
+    <p class="mb-3 break-all font-mono text-xs text-muted">{filename}</p>
     {#if busy}
-      <p role="status" class="mb-3 text-neutral-300">Saving… {bytes > 0 ? mib(bytes) : ''}</p>
+      <p role="status" class="mb-3 text-ink">Saving… {bytes > 0 ? mib(bytes) : ''}</p>
     {:else if bytes > 0 && !error}
-      <p class="mb-3 text-neutral-400">{mib(bytes)}</p>
+      <p class="mb-3 text-muted">{mib(bytes)}</p>
+    {/if}
+    {#if saved}
+      <p role="status" class="mb-3 text-foil">Saved.</p>
     {/if}
     {#if error}
-      <p role="alert" class="mb-3 text-red-400">{error}</p>
+      <p role="alert" class="mb-3 text-void">{error}</p>
     {/if}
     <div class="flex justify-end gap-2">
-      <button type="button" class="rounded border border-neutral-600 px-3 py-1.5" disabled={busy} onclick={onCancel}>Cancel</button>
-      <button type="button" class="rounded bg-sky-600 px-3 py-1.5 text-white disabled:opacity-50" disabled={busy} onclick={onConfirm}>
+      <button type="button" class="rounded border border-rule px-3 py-1.5" disabled={busy} onclick={onCancel}>Cancel</button>
+      <button type="button" class="rounded border border-foil bg-ground px-3 py-1.5 text-foil disabled:opacity-50" disabled={busy} onclick={onConfirm}>
         {busy ? 'Saving…' : 'Save'}
       </button>
     </div>

@@ -5,7 +5,6 @@ import { FakePlayer, fakePlayerFactory, ids } from '../../../test-support/dashbo
 import type { PlayerState } from '../player/engine';
 import { initialState } from '../player/status';
 import ExportDialog from './ExportDialog.svelte';
-import IntegrityBadge from './IntegrityBadge.svelte';
 import Player from './Player.svelte';
 
 beforeEach(() => {
@@ -14,26 +13,16 @@ beforeEach(() => {
   HTMLMediaElement.prototype.play = () => Promise.resolve();
   HTMLMediaElement.prototype.pause = () => {};
 });
-afterEach(cleanup);
-
-describe('IntegrityBadge', () => {
-  it.each([
-    ['verified', /verified/i],
-    ['mismatch', /mismatch/i],
-    ['tampered', /failed verification|tampered/i],
-    ['incomplete', /interrupted|incomplete/i],
-    ['unknown-key', /key/i],
-  ] as const)('labels %s', (state, label) => {
-    render(IntegrityBadge, { state });
-    expect(screen.getByLabelText(label)).toBeInTheDocument();
-  });
-  it('renders nothing while unknown', () => {
-    const { container } = render(IntegrityBadge, { state: undefined });
-    expect(container.textContent).toBe('');
-  });
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
 });
 
 describe('ExportDialog', () => {
+  it('shows Saved after a save', () => {
+    render(ExportDialog, { filename: 'a.mp4', busy: false, saved: true, bytes: 0, error: '', onConfirm: () => {}, onCancel: () => {} });
+    expect(screen.getByRole('status')).toHaveTextContent('Saved.');
+  });
   it('states that the copy is unencrypted, with the word emphasised', () => {
     render(ExportDialog, { filename: 'a.mp4', busy: false, bytes: 0, error: '', onConfirm: () => {}, onCancel: () => {} });
     const dialog = screen.getByRole('dialog');
@@ -206,6 +195,7 @@ describe('Player', () => {
   });
 
   it('exports through the confirmation, then restores the playing clip', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     const written: number[] = [];
     const calls: string[] = [];
     const client = {
@@ -232,13 +222,15 @@ describe('Player', () => {
     await waitFor(() => expect(btn).toBeEnabled());
     await fireEvent.click(btn);
     await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Saved.')).toHaveAttribute('role', 'status');
+    vi.advanceTimersByTime(4000);
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(written).toEqual([1, 2]);
     // The export replaced the worker's session for this clip, so the player opens it again.
     await waitFor(() => expect(FakePlayer.instances[0]!.loads).toEqual([ids.a, ids.a]));
   });
 
-  it('keeps the dialog open with the reason when the export fails', async () => {
+  it('shows the fixed error text when the export fails', async () => {
     const client = {
       call: async (m: { type: string }) => {
         if (m.type === 'clip.open') throw new Error('network down');
@@ -251,7 +243,56 @@ describe('Player', () => {
     await waitFor(() => expect(btn).toBeEnabled());
     await fireEvent.click(btn);
     await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    expect(await screen.findByRole('dialog')).toHaveTextContent(/network down/);
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(dialog).toHaveTextContent('Could not save the file. Try again.'));
+    expect(dialog).not.toHaveTextContent(/network down/);
+  });
+
+  it('Back to live calls onBack', async () => {
+    const onBack = vi.fn();
+    render(Player, props({ onBack }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Back to live' }));
+    expect(onBack).toHaveBeenCalledOnce();
+  });
+
+  it('has no Back to live button without onBack', () => {
+    render(Player, props());
+    expect(screen.queryByRole('button', { name: 'Back to live' })).toBeNull();
+  });
+
+  it('play button label follows the state', async () => {
+    render(Player, props());
+    const v = screen.getByTestId('player') as HTMLVideoElement;
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
+    await fireEvent.play(v);
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+    await fireEvent.pause(v);
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
+  });
+
+  it('prev and next call their handlers', async () => {
+    const onPrev = vi.fn();
+    const onNext = vi.fn();
+    render(Player, props({ onPrev, onNext }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Previous clip' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Next clip' }));
+    expect(onPrev).toHaveBeenCalledOnce();
+    expect(onNext).toHaveBeenCalledOnce();
+  });
+
+  it('names the camera in the mismatch banner and links unknown keys to Keys', async () => {
+    render(Player, props({ cameraName: () => 'Front door' }));
+    await waitFor(() => expect(FakePlayer.instances).toHaveLength(1));
+    FakePlayer.instances[0]!.emit({
+      ...initialState(),
+      clipId: ids.a,
+      integrity: 'mismatch',
+      header: { cameraId: 'front-door', startUnixMs: Date.UTC(2026, 10, 6, 16, 44, 6) },
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Front door, started 23:44:06.');
+    FakePlayer.instances[0]!.emit({ ...initialState(), clipId: ids.a, integrity: 'unknown-key', keyId: 'a1b2-c3d4-e5f6-0718' });
+    const link = await screen.findByRole('link', { name: 'Open Keys' });
+    expect(link).toHaveAttribute('href', '#/key');
   });
 
   describe('transport', () => {

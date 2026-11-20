@@ -24,7 +24,7 @@
   let loadError = $state('');
   let profile = $state('');
 
-  const view = $derived(describeIntegrity(snap));
+  const view = $derived(describeIntegrity(snap, { zone: 'UTC', cameraName: (id) => id }));
 
   onMount(() => {
     if (!video) return;
@@ -119,7 +119,8 @@
           ? 'text-neutral-400'
           : 'bg-amber-900/50 text-amber-100'}"
   >
-    {#if view.kind === 'verified'}<span aria-hidden="true">✓ </span>{/if}{view.text}
+    {view.text}{#if view.nextHref}
+      <a href={view.nextHref} class="underline">{view.next}</a>{/if}
   </div>
   {#if snap.message}
     <p role="alert" data-testid="message" class="mt-2 text-sm text-amber-300">{snap.message}</p>
