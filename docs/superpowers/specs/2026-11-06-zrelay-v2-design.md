@@ -529,6 +529,7 @@ Ordered so the camera core and live view come first. They exercise the real C220
 * §0, §2.1–§2.3: single origin, `--mode both` only (D18). Topology A moves to future work.
 * §1.2: live view is **no longer** a non-goal. Multi-camera synchronized grid **playback** of clips remains a non-goal; the live grid is separate.
 * §2.4: `connect-src 'self'`.
+* §2.4: add `font-src 'self'` (the self-hosted UI face).
 * §3.3: CORS removed.
 * §3.4: the `video-link` endpoint is removed. `/api/v1/status` adds `storage`. Add the `/live/*` proxy (§7.1 here).
 * §3.6: replaced by §8.2 here.

@@ -20,7 +20,7 @@ func TestAppSecurityHeadersOnRoot(t *testing.T) {
 	csp := h.Get("Content-Security-Policy")
 	for _, want := range []string{
 		"default-src 'none'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
-		"img-src 'self' blob: data:", "media-src 'self' blob:", "worker-src 'self'",
+		"img-src 'self' blob: data:", "font-src 'self'", "media-src 'self' blob:", "worker-src 'self'",
 		"connect-src 'self';", "manifest-src 'self'", "base-uri 'none'", "form-action 'none'", "frame-ancestors 'none'",
 	} {
 		if !strings.Contains(csp, want) {

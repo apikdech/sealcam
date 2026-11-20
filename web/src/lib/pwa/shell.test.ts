@@ -18,6 +18,12 @@ describe('shellAssets', () => {
     expect(shellAssets(files)).toEqual(['/assets/index-Bx3k9QaZ.js', '/assets/index-Dq1_a-Zx.css', '/assets/worker-Cc82LmPq.js']);
   });
 
+  it('includes the hashed self-hosted font files', () => {
+    expect(shellAssets(['assets/atkinson-hyperlegible-next-latin-Bx3k9QaZ.woff2'])).toEqual([
+      '/assets/atkinson-hyperlegible-next-latin-Bx3k9QaZ.woff2',
+    ]);
+  });
+
   it('never lists a data path, whatever the file is called', () => {
     expect(shellAssets(['api/v1/clips-Bx3k9QaZ.json', 'live/front-Bx3k9QaZ.js'])).toEqual([]);
   });

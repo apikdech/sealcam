@@ -8,7 +8,7 @@ import (
 // wantCSP is ui-spec §2.4 with design §7.1 applied: connect-src 'self', no
 // other origin.
 const wantCSP = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
-	"img-src 'self' blob: data:; media-src 'self' blob:; worker-src 'self'; connect-src 'self'; " +
+	"img-src 'self' blob: data:; font-src 'self'; media-src 'self' blob:; worker-src 'self'; connect-src 'self'; " +
 	"manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
 func TestCSPEnforced(t *testing.T) {
