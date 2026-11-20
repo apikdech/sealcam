@@ -1,23 +1,24 @@
 <script lang="ts">
-  import { onMount, untrack } from 'svelte';
+  import { untrack } from 'svelte';
   import DayNav from '../lib/components/DayNav.svelte';
   import EventList from '../lib/components/EventList.svelte';
   import FilterBar from '../lib/components/FilterBar.svelte';
   import Icon from '../lib/components/Icon.svelte';
+  import LoadProblem from '../lib/components/LoadProblem.svelte';
   import Player, { type Target } from '../lib/components/Player.svelte';
-  import { loadDay, localDayOf, toEventRow, toTimelineClip } from '../lib/dashboard/data';
+  import { localDayOf } from '../lib/dashboard/data';
+  import { createDayData, createViewEnv } from '../lib/dashboard/dayData.svelte';
+  import { handleKeydown, runCommand, type DispatchContext } from '../lib/dashboard/shortcutDispatch';
   import type { Profile } from '../lib/player/buffer';
   import type { createPlayer, IntegrityState, PlayerState } from '../lib/player/engine';
   import { sealLabel } from '../lib/seal/rosette';
-  import { adjacentClip, commandFor, type Command } from '../lib/shortcuts';
   import Timeline from '../lib/timeline/Timeline.svelte';
-  import { triggerStyle, type Coverage } from '../lib/timeline/model';
+  import { triggerStyle } from '../lib/timeline/model';
   import { browserZone } from '../lib/timeline/timezone';
   import { loadZonePref, saveZonePref } from '../lib/timeline/zonePref';
   import { spanLabel } from '../lib/timeline/zoom';
   import { getWorkerClient, type WorkerClient } from '../lib/workerClient';
   import type { ExportEnv } from '../lib/export';
-  import type { Camera, Sidecar } from '../worker/schemas';
 
   interface Props {
     /** The crypto/data worker; it holds K_api and does every authenticated request. */
@@ -38,94 +39,25 @@
   const ownZone = browserZone();
   const zone = $derived(forcedZone ?? ownZone);
 
-  let wall = $state(Date.now());
-  const now = $derived(nowMs ?? wall);
+  const env = createViewEnv();
+  const now = $derived(nowMs ?? env.wall);
   const todayDay = $derived(localDayOf(now, zone));
-
-  let cameras = $state<Camera[] | null>(null);
-  let clips = $state<Sidecar[]>([]);
-  let coverage = $state<Coverage[]>([]);
-  let invalid = $state(0);
-  // A failed cameras request leaves nothing to show; a failed day only replaces the day section.
-  let error = $state<'' | 'key' | 'failed'>('');
-  let dayError = $state<'' | 'key' | 'failed'>('');
-  /** The day `clips` and `coverage` belong to; the lists wait for it to match `day`. */
-  let loadedDay = $state('');
-  let attempt = $state(0);
 
   let camera = $state('');
   let trigger = $state('');
   let day = $state(untrack(() => localDayOf(nowMs ?? Date.now(), zone)));
 
+  const data = createDayData(untrack(() => client), () => ({ day, zone, camera, trigger }));
+
   let selectedId = $state<string | null>(null);
   let cue = $state<Target | null>(null);
   let cueN = 0;
   let integrity = $state<Record<string, IntegrityState | undefined>>({});
-  let phone = $state(false);
   let spanMs = $state(0);
   let shortcutsOpen = $state(false);
 
   let playerView: { togglePlay(): void; skip(ms: number): void } | undefined = $state();
   let timeline: { stepZoom(dir: 'in' | 'out'): void; jumpToNow(): void } | undefined = $state();
-
-  const noKey = (e: unknown): boolean => e instanceof Error && e.name === 'ErrNoKey';
-
-  // ---- data ------------------------------------------------------------------
-
-  onMount(() => {
-    const clock = setInterval(() => (wall = Date.now()), 30_000);
-    const mq = window.matchMedia?.('(max-width: 767px)');
-    const sync = () => (phone = mq?.matches ?? false);
-    sync();
-    mq?.addEventListener?.('change', sync);
-    return () => {
-      clearInterval(clock);
-      mq?.removeEventListener?.('change', sync);
-    };
-  });
-
-  // Cameras load again on every "Try again".
-  $effect(() => {
-    void attempt;
-    let alive = true;
-    client
-      .call<Camera[]>({ type: 'api.get', path: '/api/v1/cameras', query: {} })
-      .then((c) => {
-        if (alive) cameras = c;
-      })
-      .catch((e: unknown) => {
-        if (alive) error = noKey(e) ? 'key' : 'failed';
-      });
-    return () => {
-      alive = false;
-    };
-  });
-
-  let loadGen = 0;
-  $effect(() => {
-    if (cameras === null) return;
-    void attempt;
-    const q = { day, zone, camera, trigger, cameras: cameras.map((c) => c.id) };
-    const gen = ++loadGen;
-    dayError = '';
-    loadDay(client, q)
-      .then((d) => {
-        if (gen !== loadGen) return;
-        clips = d.clips;
-        coverage = d.coverage;
-        invalid = d.invalid;
-        loadedDay = q.day;
-      })
-      .catch((e: unknown) => {
-        if (gen === loadGen) dayError = noKey(e) ? 'key' : 'failed';
-      });
-  });
-
-  function retry(): void {
-    error = '';
-    dayError = '';
-    attempt++;
-  }
 
   /** Pick the display zone; the view moves to "today" there, which can be another date. */
   function setZone(z: string | null): void {
@@ -136,11 +68,7 @@
 
   // ---- derived views -----------------------------------------------------------
 
-  const timelineClips = $derived(clips.map(toTimelineClip).sort((a, b) => a.startMs - b.startMs));
-  const rows = $derived([...clips].sort((a, b) => Date.parse(b.start_time) - Date.parse(a.start_time)).map(toEventRow));
-  const nameOf = $derived((id: string) => cameras?.find((c) => c.id === id)?.name ?? id);
-  const dayReady = $derived(loadedDay === day);
-  const lanes = $derived((cameras ?? []).filter((c) => !camera || c.id === camera));
+  const lanes = $derived((data.cameras ?? []).filter((c) => !camera || c.id === camera));
 
   // ---- selection and playback ------------------------------------------------------
 
@@ -156,47 +84,19 @@
     if (s.integrity !== 'verifying' && integrity[s.clipId] !== s.integrity) integrity[s.clipId] = s.integrity;
   }
 
-  /** Runs a command; false when there was nothing for it to act on (the key keeps its default). */
-  function run(cmd: Command): boolean {
-    switch (cmd) {
-      case 'toggle':
-        playerView?.togglePlay();
-        return !!playerView;
-      case 'back10':
-        playerView?.skip(-10_000);
-        return !!playerView;
-      case 'fwd10':
-        playerView?.skip(10_000);
-        return !!playerView;
-      case 'prev':
-      case 'next': {
-        const id = adjacentClip(timelineClips, selectedId, cmd);
-        if (id === null) return false;
-        if (id !== selectedId) select(id);
-        return true;
-      }
-      case 'zoomIn':
-      case 'zoomOut':
-        timeline?.stepZoom(cmd === 'zoomIn' ? 'in' : 'out');
-        return !!timeline;
-      case 'now':
-        if (day !== todayDay) {
-          // The timeline shows the whole new day first.
-          day = todayDay;
-          return true;
-        }
-        timeline?.jumpToNow();
-        return !!timeline;
-    }
-  }
-
-  function onkeydown(e: KeyboardEvent): void {
-    // A modal dialog (the export confirmation) owns the keyboard: nothing behind it may react.
-    if (document.querySelector('[aria-modal="true"]')) return;
-    const cmd = commandFor(e);
-    if (cmd === null) return;
-    if (run(cmd)) e.preventDefault();
-  }
+  const ctx = (): DispatchContext => ({
+    playerView,
+    timeline,
+    timelineClips: data.timelineClips,
+    selectedId,
+    select,
+    goToday() {
+      if (day === todayDay) return false;
+      day = todayDay;
+      return true;
+    },
+  });
+  const onkeydown = (e: KeyboardEvent) => handleKeydown(e, ctx());
 
   const LEGEND_TRIGGERS = ['person', 'vehicle', 'pet', 'motion', 'other'] as const;
   const SHORTCUTS: readonly (readonly [string[], string])[] = [
@@ -210,24 +110,12 @@
     'inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-[10px] border border-rule px-3 text-sm font-semibold text-ink md:min-h-9 md:min-w-9';
 </script>
 
-{#snippet problem(kind: 'key' | 'failed', text: string)}
-  <div role="alert" class="px-4 py-3 text-sm text-ink max-md:px-0">
-    {#if kind === 'key'}
-      <p>Your key is locked.</p>
-      <a href="#/key" class="inline-flex min-h-11 items-center font-semibold text-line underline">Unlock</a>
-    {:else}
-      <p>{text}</p>
-      <button type="button" class="min-h-11 rounded-[10px] border border-rule px-4 font-semibold text-ink" onclick={retry}>Try again</button>
-    {/if}
-  </div>
-{/snippet}
-
 <svelte:window {onkeydown} />
 
 <div data-testid="timeline-page" class="flex min-h-dvh flex-col">
   <DayNav {day} {todayDay} {zone} onDay={(d) => (day = d)} />
   <FilterBar
-    cameras={cameras ?? []}
+    cameras={data.cameras ?? []}
     {camera}
     {trigger}
     {forcedZone}
@@ -237,16 +125,16 @@
     onZone={setZone}
   />
 
-  {#if error}
-    {@render problem(error, 'Could not load recordings.')}
-  {:else if cameras === null}
+  {#if data.error}
+    <LoadProblem kind={data.error} text="Could not load recordings." onRetry={data.retry} />
+  {:else if data.cameras === null}
     <p role="status" class="px-4 py-3 text-sm text-muted">Loading…</p>
-  {:else if cameras.length === 0}
+  {:else if data.cameras.length === 0}
     <p class="px-4 py-3 text-sm text-muted">No cameras are set up yet.</p>
   {:else}
-    {#if invalid > 0 && dayReady}
+    {#if data.invalid > 0 && data.ready && !data.dayError}
       <p role="status" class="px-4 pb-2 text-xs text-amber">
-        {invalid} {invalid === 1 ? 'recording' : 'recordings'} could not be read and {invalid === 1 ? 'is' : 'are'} not shown.
+        {data.invalid} {data.invalid === 1 ? 'recording' : 'recordings'} could not be read and {data.invalid === 1 ? 'is' : 'are'} not shown.
       </p>
     {/if}
     <div class="grid min-w-0 flex-1 md:grid-cols-[minmax(0,1fr)_22rem] md:gap-4 md:px-4">
@@ -261,27 +149,27 @@
             {profile}
             {factory}
             env={exportEnv}
-            cameraName={nameOf}
+            cameraName={data.nameOf}
             onState={onPlayerState}
-            onPrev={() => run('prev')}
-            onNext={() => run('next')}
+            onPrev={() => runCommand('prev', ctx())}
+            onNext={() => runCommand('next', ctx())}
           />
         </div>
 
-        {#if dayError}
-          {@render problem(dayError, 'Could not load recordings.')}
-        {:else if !dayReady}
+        {#if data.dayError}
+          <LoadProblem kind={data.dayError} text="Could not load recordings." onRetry={data.retry} />
+        {:else if !data.ready}
           <p role="status" class="py-3 text-sm text-muted">Loading…</p>
         {:else}
           <div class="mt-2 flex flex-wrap items-center gap-2">
-            <button type="button" class={tool} aria-label="Zoom out" title="Zoom out ([)" onclick={() => run('zoomOut')}>
+            <button type="button" class={tool} aria-label="Zoom out" title="Zoom out ([)" onclick={() => runCommand('zoomOut', ctx())}>
               <Icon name="zoom-out" />
             </button>
             <span class="num min-w-12 text-center text-sm text-ink" aria-live="polite">{spanLabel(spanMs)}</span>
-            <button type="button" class={tool} aria-label="Zoom in" title="Zoom in (])" onclick={() => run('zoomIn')}>
+            <button type="button" class={tool} aria-label="Zoom in" title="Zoom in (])" onclick={() => runCommand('zoomIn', ctx())}>
               <Icon name="zoom-in" />
             </button>
-            <button type="button" class={tool} title="Jump to now (T)" onclick={() => run('now')}>Now</button>
+            <button type="button" class={tool} title="Jump to now (T)" onclick={() => runCommand('now', ctx())}>Now</button>
             <button
               type="button"
               class="{tool} ml-auto"
@@ -305,14 +193,14 @@
             <Timeline
               bind:this={timeline}
               cameras={lanes.map((c) => ({ id: c.id, name: c.name }))}
-              clips={timelineClips}
-              {coverage}
+              clips={data.timelineClips}
+              coverage={data.coverage}
               {day}
               {zone}
               nowMs={now}
               selectedClipId={selectedId}
               {integrity}
-              laneHeight={phone ? 56 : 44}
+              laneHeight={env.phone ? 56 : 44}
               onSpan={(ms) => (spanMs = ms)}
               onSelect={(id, offset) => select(id, offset)}
             />
@@ -358,12 +246,12 @@
         {/if}
       </div>
 
-      {#if dayReady && !dayError}
+      {#if data.ready && !data.dayError}
         <section class="min-w-0 md:sticky md:top-0 md:max-h-dvh md:self-start md:overflow-y-auto">
           <h2 class="num px-4 pt-3.5 pb-1.5 text-sm font-semibold text-muted md:px-0">
-            {rows.length} {rows.length === 1 ? 'event' : 'events'}
+            {data.rows.length} {data.rows.length === 1 ? 'event' : 'events'}
           </h2>
-          <EventList clips={rows} {selectedId} {zone} {integrity} onSelect={(id) => select(id)} />
+          <EventList clips={data.rows} {selectedId} {zone} {integrity} onSelect={(id) => select(id)} />
         </section>
       {/if}
     </div>

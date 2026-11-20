@@ -1,6 +1,4 @@
-// @vitest-environment jsdom
-import { cleanup } from '@testing-library/svelte';
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Status } from '../worker/schemas';
 import { recorderWords, relayHealth } from './relayStatus';
 
@@ -19,8 +17,6 @@ function status(over: Partial<Status> & { ageMs?: number } = {}): Status {
     ...rest,
   };
 }
-
-afterEach(cleanup);
 
 describe('relayHealth', () => {
   it('is ok when fresh, cameras up and storage closed', () => {

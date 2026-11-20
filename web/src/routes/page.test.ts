@@ -255,6 +255,44 @@ describe('timeline dashboard', () => {
     expect(await screen.findByText(/2 recordings could not be read/i)).toBeInTheDocument();
   });
 
+  it('hides the could-not-be-read note while a day error shows', async () => {
+    const c = client();
+    c.invalid = 2;
+    mountPage(c);
+    expect(await screen.findByText(/2 recordings could not be read/i)).toBeInTheDocument();
+    const ok = c.call.bind(c);
+    c.call = (async (m: Request) => {
+      if (m.type === 'api.get' && m.path === '/api/v1/clips') throw new Error('down');
+      return ok(m);
+    }) as never;
+    await fireEvent.change(screen.getByLabelText('Trigger'), { target: { value: 'person' } });
+    await screen.findByRole('button', { name: 'Try again' });
+    expect(screen.queryByText(/could not be read/i)).toBeNull();
+  });
+
+  it('never shows the previous filter rows under a new filter', async () => {
+    const c = client();
+    c.cameras = [
+      { id: 'front-door', name: 'Front Door' },
+      { id: 'yard', name: 'Yard' },
+    ];
+    mountPage(c);
+    await listRows();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const ok = c.call.bind(c);
+    c.call = (async (m: Request) => {
+      if (m.type === 'api.get' && m.path === '/api/v1/clips') await gate;
+      return ok(m);
+    }) as never;
+    await fireEvent.change(screen.getByLabelText('Camera'), { target: { value: 'yard' } });
+    expect(await screen.findByText('Loading…')).toBeInTheDocument();
+    expect(screen.queryByRole('listbox', { name: /recordings/i })).toBeNull();
+    release();
+    expect(await listRows()).toHaveLength(3);
+    expect(screen.queryByText('Loading…')).toBeNull();
+  });
+
   it('marks an incomplete clip in the list before it is opened', async () => {
     const c = client();
     c.clips = [sidecar(ids.a, '2026-11-06T10:00:00Z', { status: 'incomplete', end_time: null, duration_ms: null })];
