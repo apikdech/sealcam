@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick, untrack } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import DayNav from '../../lib/components/DayNav.svelte';
   import EventList from '../../lib/components/EventList.svelte';
   import Player, { type Target } from '../../lib/components/Player.svelte';
@@ -43,7 +43,11 @@
   let clips = $state<Sidecar[]>([]);
   let coverage = $state<Coverage[]>([]);
   let invalid = $state(0);
+  // A failed cameras request leaves nothing to show; a failed day only replaces the day section.
   let error = $state<'' | 'key' | 'failed'>('');
+  let dayError = $state<'' | 'key' | 'failed'>('');
+  /** The day `clips` and `coverage` belong to; the lists wait for it to match `day`. */
+  let loadedDay = $state('');
   let attempt = $state(0);
   let day = $state(untrack(() => localDayOf(nowMs ?? Date.now(), zone)));
 
@@ -95,21 +99,23 @@
     void attempt;
     const q = { day, zone, camera: '', trigger: '', cameras: cameras.map((c) => c.id) };
     const gen = ++loadGen;
+    dayError = '';
     loadDay(client, q)
       .then((d) => {
         if (gen !== loadGen) return;
         clips = d.clips;
         coverage = d.coverage;
         invalid = d.invalid;
-        error = '';
+        loadedDay = q.day;
       })
       .catch((e: unknown) => {
-        if (gen === loadGen) error = noKey(e) ? 'key' : 'failed';
+        if (gen === loadGen) dayError = noKey(e) ? 'key' : 'failed';
       });
   });
 
   function retry(): void {
     error = '';
+    dayError = '';
     attempt++;
   }
 
@@ -119,6 +125,7 @@
   const rows = $derived([...clips].sort((a, b) => Date.parse(b.start_time) - Date.parse(a.start_time)).map(toEventRow));
   const nameOf = $derived((id: string) => cameras?.find((c) => c.id === id)?.name ?? id);
 
+  const dayReady = $derived(loadedDay === day);
   const heading = $derived(`${day === todayDay ? 'Today' : dayTitle(day, todayDay)} · ${rows.length} ${rows.length === 1 ? 'event' : 'events'}`);
   const summary = $derived.by(() => {
     if (rows.length === 0) return '';
@@ -135,6 +142,12 @@
     cue = { clipId, offsetMs, n: ++cueN };
   }
 
+  /** Another day starts from live again: the player and its selection belong to the day left. */
+  function setDay(d: string): void {
+    day = d;
+    backToLive();
+  }
+
   function backToLive(): void {
     selectedId = null;
     cue = null;
@@ -147,37 +160,36 @@
     if (s.integrity !== 'verifying' && integrity[s.clipId] !== s.integrity) integrity[s.clipId] = s.integrity;
   }
 
-  async function run(cmd: Command): Promise<void> {
+  /** Runs a command; false when there was nothing for it to act on (the key keeps its default). */
+  function run(cmd: Command): boolean {
     switch (cmd) {
       case 'toggle':
         playerView?.togglePlay();
-        break;
+        return playerView !== undefined;
       case 'back10':
         playerView?.skip(-10_000);
-        break;
+        return playerView !== undefined;
       case 'fwd10':
         playerView?.skip(10_000);
-        break;
+        return playerView !== undefined;
       case 'prev':
       case 'next': {
         const id = adjacentClip(timelineClips, selectedId, cmd);
-        if (id !== null && id !== selectedId) select(id);
-        break;
+        if (id === null) return false;
+        if (id !== selectedId) select(id);
+        return true;
       }
       case 'zoomIn':
-        timeline?.stepZoom('in');
-        break;
       case 'zoomOut':
-        timeline?.stepZoom('out');
-        break;
+        timeline?.stepZoom(cmd === 'zoomIn' ? 'in' : 'out');
+        return timeline !== undefined;
       case 'now':
         if (day !== todayDay) {
-          day = todayDay;
-          // The strip shows the whole new day first; centre on now after it has.
-          await tick();
+          setDay(todayDay);
+          return true;
         }
         timeline?.jumpToNow();
-        break;
+        return timeline !== undefined;
     }
   }
 
@@ -186,32 +198,35 @@
     if (document.querySelector('[aria-modal="true"]')) return;
     const cmd = commandFor(e);
     if (cmd === null) return;
-    e.preventDefault();
-    void run(cmd);
+    if (run(cmd)) e.preventDefault();
   }
 </script>
+
+{#snippet problem(kind: 'key' | 'failed', text: string)}
+  <div role="alert" class="px-4 py-3 text-sm text-ink max-md:px-0">
+    {#if kind === 'key'}
+      <p>Your key is locked.</p>
+      <a href="#/key" class="inline-flex min-h-11 items-center font-semibold text-line underline">Unlock</a>
+    {:else}
+      <p>{text}</p>
+      <button type="button" class="min-h-11 rounded-[10px] border border-rule px-4 font-semibold text-ink" onclick={retry}>Try again</button>
+    {/if}
+  </div>
+{/snippet}
 
 <svelte:window {onkeydown} />
 
 <div data-testid="home" class="flex min-h-dvh flex-col">
-  <DayNav {day} {todayDay} {zone} onDay={(d) => (day = d)} />
+  <DayNav {day} {todayDay} {zone} onDay={setDay} />
 
   {#if error}
-    <div role="alert" class="px-4 py-3 text-sm text-ink">
-      {#if error === 'key'}
-        <p>Your key is locked.</p>
-        <a href="#/key" class="inline-flex min-h-11 items-center font-semibold text-line underline">Unlock</a>
-      {:else}
-        <p>Could not load recordings.</p>
-        <button type="button" class="min-h-11 rounded-[10px] border border-rule px-4 font-semibold text-ink" onclick={retry}>Try again</button>
-      {/if}
-    </div>
+    {@render problem(error, 'Could not load recordings.')}
   {:else if cameras === null}
     <p role="status" class="px-4 py-3 text-sm text-muted">Loading…</p>
   {:else if cameras.length === 0}
     <p class="px-4 py-3 text-sm text-muted">No cameras are set up yet.</p>
   {:else}
-    {#if invalid > 0}
+    {#if invalid > 0 && dayReady}
       <p role="status" class="px-4 pb-2 text-xs text-amber">
         {invalid} {invalid === 1 ? 'recording' : 'recordings'} could not be read and {invalid === 1 ? 'is' : 'are'} not shown.
       </p>
@@ -233,34 +248,42 @@
             cameraName={nameOf}
             onState={onPlayerState}
             onBack={backToLive}
-            onPrev={() => void run('prev')}
-            onNext={() => void run('next')}
+            onPrev={() => run('prev')}
+            onNext={() => run('next')}
           />
         {/if}
-        <div class="mt-3.5 mb-1.5">
-          <Timeline
-            bind:this={timeline}
-            cameras={cameras.map((c) => ({ id: c.id, name: c.name }))}
-            clips={timelineClips}
-            {coverage}
-            {day}
-            {zone}
-            nowMs={now}
-            selectedClipId={selectedId}
-            {integrity}
-            laneHeight={phone ? 56 : 44}
-            onSelect={(id, offset) => select(id, offset)}
-          />
-        </div>
+        {#if dayError}
+          {@render problem(dayError, 'Could not load recordings.')}
+        {:else if !dayReady}
+          <p role="status" class="py-3 text-sm text-muted">Loading…</p>
+        {:else}
+          <div class="mt-3.5 mb-1.5">
+            <Timeline
+              bind:this={timeline}
+              cameras={cameras.map((c) => ({ id: c.id, name: c.name }))}
+              clips={timelineClips}
+              {coverage}
+              {day}
+              {zone}
+              nowMs={now}
+              selectedClipId={selectedId}
+              {integrity}
+              laneHeight={phone ? 56 : 44}
+              onSelect={(id, offset) => select(id, offset)}
+            />
+          </div>
+        {/if}
       </div>
 
-      <section class="min-w-0">
-        <div class="flex items-baseline justify-between gap-3 px-4 pt-3.5 pb-1.5 text-sm text-muted md:px-0">
-          <h2 class="num font-semibold">{heading}</h2>
-          {#if summary}<span>{summary}</span>{/if}
-        </div>
-        <EventList clips={rows} {selectedId} {zone} {integrity} onSelect={(id) => select(id)} />
-      </section>
+      {#if dayReady && !dayError}
+        <section class="min-w-0">
+          <div class="flex items-baseline justify-between gap-3 px-4 pt-3.5 pb-1.5 text-sm text-muted md:px-0">
+            <h2 class="num font-semibold">{heading}</h2>
+            {#if summary}<span>{summary}</span>{/if}
+          </div>
+          <EventList clips={rows} {selectedId} {zone} {integrity} onSelect={(id) => select(id)} />
+        </section>
+      {/if}
     </div>
   {/if}
 </div>
