@@ -6,6 +6,9 @@
 /** localStorage key of the forced zone. */
 export const ZONE_KEY = 'zview.zone';
 
+/** Fired on `window` after the forced zone is saved. */
+export const ZONE_EVENT = 'zview:zone';
+
 /** Whether `zone` is a time zone name this browser's Intl knows. */
 export function isValidZone(zone: string): boolean {
   if (zone === '') return false;
@@ -35,6 +38,8 @@ export function saveZonePref(zone: string | null): void {
   } catch {
     // Storage unavailable: the choice lasts for this visit only.
   }
+  // Other parts of the page (the app shell's status pill) follow the choice without a reload.
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(ZONE_EVENT));
 }
 
 /** Zones offered by the picker: every IANA zone the browser lists, plus `current`. */

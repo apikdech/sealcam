@@ -10,7 +10,7 @@
   import type { Updater } from './lib/pwa/update';
   import { createViewEnv } from './lib/dashboard/dayData.svelte';
   import { browserZone } from './lib/timeline/timezone';
-  import { loadZonePref } from './lib/timeline/zonePref';
+  import { loadZonePref, ZONE_EVENT } from './lib/timeline/zonePref';
   import { onMount } from 'svelte';
   import { workerClient } from './lib/workerClient';
   import { acquireIdleLock, type LockClient } from './routes/onboarding/idleService';
@@ -22,6 +22,7 @@
   let { updater = null, client = workerClient }: { updater?: Updater | null; client?: LockClient } = $props();
 
   const STATUS_EVERY_MS = 60_000;
+  const KEYS_HANG_MS = 5_000;
 
   // Top-level views (design §7.2 as amended): Home is the default; `#/live` is its old name.
   // `#/demo?clip=<id>` is the playback engine's test page (used by e2e); it is not in the nav.
@@ -49,17 +50,37 @@
   let status: Status | null = $state(null);
   let notice = $state('');
   let lockFailed = $state(false);
+  /** key.list failed or hung: say so instead of guessing there is no key. */
+  let keysFailed = $state(false);
 
   const env = createViewEnv();
-  const zone = loadZonePref() ?? browserZone();
+  // The display zone follows the Timeline's zone picker.
+  let zone = $state(loadZonePref() ?? browserZone());
+  const syncZone = () => (zone = loadZonePref() ?? browserZone());
   const hasKey = $derived((keys?.length ?? 0) > 0);
   const showFirstRun = $derived(keys !== null && (keys.length === 0 || holdFirstRun));
 
   async function refreshKeys(result?: KeyListResult) {
+    if (result) {
+      keys = result.keys;
+      keysFailed = false;
+      return;
+    }
+    let hang: ReturnType<typeof setTimeout> | undefined;
     try {
-      keys = (result ?? (await client.call<KeyListResult>({ type: 'key.list' }))).keys;
+      const answer = await Promise.race([
+        client.call<KeyListResult>({ type: 'key.list' }),
+        new Promise<never>((_, reject) => {
+          hang = setTimeout(() => reject(new Error('key.list timed out')), KEYS_HANG_MS);
+        }),
+      ]);
+      keys = answer.keys;
+      keysFailed = false;
     } catch {
-      keys ??= [];
+      // A key that cannot be read is not a missing key: keep what we knew and say so.
+      keysFailed = true;
+    } finally {
+      clearTimeout(hang);
     }
   }
 
@@ -94,7 +115,8 @@
     const idle = acquireIdleLock(client, {
       onLocked: (result) => {
         void refreshKeys(result);
-        notice = lockedNotice(result);
+        // On the Keys page its own notice says it.
+        if (hash !== '#/key') notice = lockedNotice(result);
       },
     });
     void refreshKeys().then(() => {
@@ -103,7 +125,9 @@
     const poll = setInterval(() => {
       if (hasKey) void pollStatus();
     }, STATUS_EVERY_MS);
+    window.addEventListener(ZONE_EVENT, syncZone);
     return () => {
+      window.removeEventListener(ZONE_EVENT, syncZone);
       clearInterval(poll);
       idle.release();
     };
@@ -116,6 +140,7 @@
   onhashchange={() => {
     hash = route();
     clipId = clip();
+    syncZone();
     notice = '';
     lockFailed = false;
     void leaveFirstRun();
@@ -136,6 +161,7 @@
     {/each}
   </nav>
   <div class="ml-auto flex items-center">
+    {#if hash !== '#/key'}
     <button
       type="button"
       aria-label="Lock"
@@ -144,6 +170,7 @@
       class="{tabBase} inline-flex h-11 w-11 items-center justify-center text-ink disabled:opacity-40"
       onclick={() => void lock()}><Icon name="lock" size={22} /></button
     >
+    {/if}
     <StatusPill {status} nowMs={env.wall} {zone} />
   </div>
 </header>
@@ -162,6 +189,15 @@
     <Onboarding />
   {:else if hash === '#/timeline'}
     <TimelinePage {client} />
+  {:else if keys === null && keysFailed}
+    <main class="mx-auto max-w-xl space-y-3 p-4">
+      <p role="alert" class="text-void">Could not read the keys on this device.</p>
+      <button
+        type="button"
+        class="{tabBase} inline-flex min-h-11 items-center rounded border border-rule px-4 text-ink"
+        onclick={() => void refreshKeys()}>Try again</button
+      >
+    </main>
   {:else if keys === null}
     <!-- waiting for the first key.list -->
   {:else if showFirstRun}

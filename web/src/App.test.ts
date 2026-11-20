@@ -11,6 +11,7 @@ vi.mock('./routes/onboarding/Onboarding.svelte', () => import('../test-support/r
 vi.mock('./routes/onboarding/FirstRun.svelte', () => import('../test-support/routes/FirstRun.svelte'));
 
 import App from './App.svelte';
+import { saveZonePref } from './lib/timeline/zonePref';
 
 afterEach(async () => {
   cleanup();
@@ -222,5 +223,98 @@ describe('App-level idle auto-lock', () => {
     setHidden(true);
     await vi.advanceTimersByTimeAsync(3_600_000);
     expect(client.calls.filter((c) => c.type === 'key.lock')).toEqual([]);
+  });
+});
+
+describe('App on the Keys page', () => {
+  const setHidden = (hidden: boolean) => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+    document.dispatchEvent(new Event('visibilitychange'));
+  };
+  afterEach(() => {
+    setHidden(false);
+    localStorage.clear();
+    vi.useRealTimers();
+  });
+
+  it('has no top-bar Lock on #/key', async () => {
+    location.hash = '#/key';
+    render(App, { client: fake() });
+    await settled('key');
+    expect(screen.queryByRole('button', { name: 'Lock' })).toBeNull();
+  });
+
+  it('an idle lock on #/key adds no shell notice (the Keys page says it)', async () => {
+    vi.useFakeTimers();
+    localStorage.setItem('zview.idleLockMinutes', '5');
+    const client = fake();
+    location.hash = '#/key';
+    render(App, { client });
+    setHidden(true);
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    expect(client.calls.filter((c) => c.type === 'key.lock')).toHaveLength(1);
+    expect(screen.queryByText(/^Locked\./)).toBeNull();
+  });
+});
+
+describe('App display zone', () => {
+  afterEach(() => localStorage.clear());
+
+  it('the status pill follows a zone change made on the Timeline', async () => {
+    saveZonePref('UTC');
+    const status = { schema: 'zrec.status/1', relay_id: 'r', version: 'v', updated_at: '2026-11-20T10:00:00Z', key_id: 'k', cameras: [] };
+    const client = {
+      async call<T>(msg: Request): Promise<T> {
+        if (msg.type === 'key.list') return { keys: [KEY] } as T;
+        if (msg.type === 'api.get') return status as T;
+        return undefined as T;
+      },
+    };
+    location.hash = '#/timeline';
+    render(App, { client });
+    await settled('timeline');
+    await waitFor(() => expect(screen.getByTestId('relay-status')).toBeInTheDocument());
+    saveZonePref('Asia/Jakarta');
+    location.hash = '#/';
+    await fireEvent(window, new HashChangeEvent('hashchange'));
+    await fireEvent.click(screen.getByTestId('relay-status'));
+    expect(await screen.findByText(/17:00/)).toBeInTheDocument();
+  });
+});
+
+describe('App when the keys cannot be read', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('a rejected key.list shows an alert and Try again, not FirstRun', async () => {
+    let fail = true;
+    const client = {
+      async call<T>(msg: Request): Promise<T> {
+        if (msg.type === 'key.list') {
+          if (fail) throw new Error('worker down');
+          return { keys: [KEY] } as T;
+        }
+        throw new Error('no status');
+      },
+    };
+    location.hash = '';
+    render(App, { client });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not read the keys on this device.');
+    expect(shown()).toEqual([]);
+    fail = false;
+    await fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await settled('home')).toEqual(['home']);
+    expect(screen.getAllByRole('link', { name: 'Timeline' }).length).toBeGreaterThan(0);
+  });
+
+  it('a key.list that never answers shows the same alert after 5 s', async () => {
+    vi.useFakeTimers();
+    const client = { call: () => new Promise<never>(() => {}) };
+    location.hash = '';
+    render(App, { client });
+    await vi.advanceTimersByTimeAsync(4_900);
+    expect(screen.queryByRole('alert')).toBeNull();
+    await vi.advanceTimersByTimeAsync(200);
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not read the keys on this device.');
+    expect(shown()).toEqual([]);
   });
 });

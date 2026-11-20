@@ -31,7 +31,7 @@
 </script>
 
 {#if available}
-  <div role="status" class="fixed inset-x-3 top-3 z-50 mx-auto flex max-w-md flex-wrap items-center gap-3 rounded-lg border border-line bg-plate text-ink px-4 py-3 text-sm shadow-xl">
+  <div role="status" class="fixed inset-x-3 top-3 z-50 mx-auto flex max-w-md flex-wrap items-center gap-3 border border-rule bg-plate px-4 py-3 text-sm text-ink">
     <span>New version available — reload</span>
     <button
       type="button"
