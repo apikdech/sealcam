@@ -324,11 +324,14 @@ describe('tile truth', () => {
 
   it('destroy removes the playing listener', async () => {
     const video = fakeVideo();
+    const add = vi.spyOn(video, 'addEventListener');
+    const remove = vi.spyOn(video, 'removeEventListener');
     const tile = make(video);
     tile.start();
     await flush();
+    const added = add.mock.calls.find((c) => c[0] === 'playing')![1];
+    expect(remove).not.toHaveBeenCalledWith('playing', added);
     tile.destroy();
-    playing(video);
-    expect(tile.snapshot().state).toBe('connecting');
+    expect(remove).toHaveBeenCalledWith('playing', added);
   });
 });
