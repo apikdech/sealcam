@@ -66,12 +66,9 @@ services:
         mc admin policy create local zrelay-zview /policies/zview.json
         mc admin user add local zrelay "$$(cat /run/secrets/s3_secret_key)"
         mc admin user add local zview "$$(cat /run/secrets/s3_ro_secret_key)"
-        attach() {
-          mc admin policy attach local "$$1" --user "$$2" ||
-            mc admin policy entities local --user "$$2" | grep -q "$$1"
-        }
-        attach zrelay-relay zrelay
-        attach zrelay-zview zview
+        # RustFS answers a repeated attach with success, so this is idempotent.
+        mc admin policy attach local zrelay-relay --user zrelay
+        mc admin policy attach local zrelay-zview --user zview
         echo "s3-init: bucket cctv, users zrelay and zview ready"
 
   zrelay:
