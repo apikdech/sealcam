@@ -3,6 +3,7 @@
 // raw bytes are never persisted. `Keys` holds the in-memory working set.
 import { deriveApiToken, deriveKeyId, deriveWrapKey, importMasterKey, parseMasterKey } from '../lib/zrec/keys';
 import type { Keyring } from '../lib/zrec/reader';
+import { NoKeyError } from './api';
 import type { ImportResult } from './protocol';
 
 const DB_NAME = 'zview-keys';
@@ -123,6 +124,14 @@ export class Keys {
     const stored = new Set((await (await this.#open()).all()).map(([id]) => id));
     const ids = [...new Set([...this.#entries.keys(), ...stored])];
     return { keys: ids.map((keyId) => ({ keyId, remembered: stored.has(keyId) })) };
+  }
+
+  /** Stores an in-memory key's non-extractable base key in IndexedDB (ui-spec §4.1). */
+  async remember(keyId: string): Promise<void> {
+    const entry = this.#entries.get(keyId);
+    if (!entry) throw new NoKeyError();
+    await (await this.#open()).put(keyId, entry.base);
+    entry.remembered = true;
   }
 
   /** Deletes the key from IndexedDB, then locks (ui-spec §4.1). */

@@ -101,6 +101,15 @@ describe('key messages', () => {
     await expect(h.call({ type: 'api.get', path: '/api/v1/status', query: {} })).rejects.toMatchObject({ name: 'ErrNoKey' });
   });
 
+  it('key.remember round-trips and returns the key list', async () => {
+    const idb = new IDBFactory();
+    const a = harness({}, idb);
+    const { keyId } = await importVectorKey(a, false);
+    expect(await a.call({ type: 'key.remember', keyId })).toEqual({ keys: [{ keyId, remembered: true }] });
+    const b = harness({}, idb);
+    expect(await b.call({ type: 'key.list' })).toEqual({ keys: [{ keyId, remembered: true }] });
+  });
+
   it('forget deletes the key from IndexedDB and locks', async () => {
     const idb = new IDBFactory();
     const a = harness({}, idb);

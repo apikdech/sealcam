@@ -31,6 +31,9 @@ export function createWorker(deps: WorkerDeps): Worker {
           return { result: await keys.import(String(req.encoded), req.remember === true) };
         case 'key.list':
           return { result: await keys.list() };
+        case 'key.remember':
+          await keys.remember(String(req.keyId));
+          return { result: await keys.list() };
         case 'key.forget':
           await keys.forget(String(req.keyId));
           authFetch.reset();

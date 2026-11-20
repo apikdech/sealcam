@@ -10,6 +10,7 @@ export type Request =
   | { type: 'key.import'; encoded: string; remember: boolean }
   | { type: 'key.list' }
   | { type: 'key.forget'; keyId: string }
+  | { type: 'key.remember'; keyId: string }
   | { type: 'key.lock' }
   | { type: 'api.get'; path: string; query: Readonly<Record<string, QueryValue>> }
   | { type: 'clip.open'; clipId: string }

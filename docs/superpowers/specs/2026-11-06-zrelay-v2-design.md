@@ -533,6 +533,7 @@ Ordered so the camera core and live view come first. They exercise the real C220
 * §3.3: CORS removed.
 * §3.4: the `video-link` endpoint is removed. `/api/v1/status` adds `storage`. Add the `/live/*` proxy (§7.1 here).
 * §3.6: replaced by §8.2 here.
+* §4.1: "Remember this device" is asked right after a successful import; the worker message key.remember {keyId} stores the in-memory base key.
 * §4.2: add the `live.offer` and `live.close` messages. All requests are same-origin.
 * §4.7: add Home (the live tiles and the day's events) as the default view, and the three-view navigation (§7.2 here).
 * §7: replaced by §10 here.

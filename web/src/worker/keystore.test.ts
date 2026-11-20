@@ -1,7 +1,8 @@
 import { IDBFactory } from 'fake-indexeddb';
 import { describe, expect, it } from 'vitest';
+import { keyText } from '../../test-support/worker-fixtures';
 import { importMasterKey } from '../lib/zrec/keys';
-import { openKeystore } from './keystore';
+import { Keys, openKeystore } from './keystore';
 
 const base = () => importMasterKey(new Uint8Array(32).fill(7));
 
@@ -43,5 +44,31 @@ describe('IndexedDB keystore', () => {
       };
     });
     expect(Object.keys(raw[0] as object).sort()).toEqual(['base', 'keyId']);
+  });
+});
+
+describe('Keys.remember', () => {
+  const text = () => keyText('07'.repeat(32));
+
+  it('remember stores the base key and list reports remembered', async () => {
+    const keys = new Keys(new IDBFactory());
+    const { keyId } = (await keys.import(await text(), false)) as { keyId: string };
+    expect(await keys.list()).toEqual({ keys: [{ keyId, remembered: false }] });
+    await keys.remember(keyId);
+    expect(await keys.list()).toEqual({ keys: [{ keyId, remembered: true }] });
+  });
+
+  it('remember of an unknown key rejects with ErrNoKey', async () => {
+    const keys = new Keys(new IDBFactory());
+    await expect(keys.remember('deadbeef')).rejects.toMatchObject({ name: 'ErrNoKey' });
+  });
+
+  it('after remember and lock, the key reloads', async () => {
+    const keys = new Keys(new IDBFactory());
+    const { keyId } = (await keys.import(await text(), false)) as { keyId: string };
+    await keys.remember(keyId);
+    keys.lock();
+    expect(await keys.tokens()).toHaveLength(1);
+    expect([...(await keys.keyring()).keys()]).toEqual([keyId]);
   });
 });
