@@ -248,6 +248,72 @@ describe('Player', () => {
     expect(dialog).not.toHaveTextContent(/network down/);
   });
 
+  it('says when the recording is too large for this browser', async () => {
+    const client = {
+      call: async (m: { type: string }) => (m.type === 'clip.open' ? { numChunks: 2, plaintextSizeBytes: 1e12 } : {}),
+    };
+    render(Player, props({ client, env: { isIOS: false, download: () => {} } }));
+    const btn = await screen.findByRole('button', { name: 'Export' });
+    await waitFor(() => expect(btn).toBeEnabled());
+    await fireEvent.click(btn);
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('This recording is too large to save in this browser.');
+  });
+
+  it('a cancelled Saved dialog does not close a dialog reopened within 4 s', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const client = {
+      call: async (m: { type: string; chunk?: number }) => {
+        if (m.type === 'clip.open') return { numChunks: 1, plaintextSizeBytes: 4 };
+        if (m.type === 'clip.read') return { plaintext: new Uint8Array(4).buffer, final: true };
+        return {};
+      },
+    };
+    const env = {
+      isIOS: false,
+      showSaveFilePicker: async () => ({ createWritable: async () => ({ write: async () => {}, close: async () => {}, abort: async () => {} }) }),
+      download: () => {},
+    };
+    render(Player, props({ client, env }));
+    const btn = await screen.findByRole('button', { name: 'Export' });
+    await waitFor(() => expect(btn).toBeEnabled());
+    await fireEvent.click(btn);
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByText('Saved.');
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(btn).toBeEnabled());
+    await fireEvent.click(btn);
+    vi.advanceTimersByTime(4500);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.queryByText('Saved.')).toBeNull();
+  });
+
+  it('shows a verifying seal under the video while verifying', async () => {
+    render(Player, props());
+    await waitFor(() => expect(FakePlayer.instances).toHaveLength(1));
+    FakePlayer.instances[0]!.emit({ ...initialState(), clipId: ids.a, integrity: 'verifying' });
+    const row = await screen.findByTestId('integrity');
+    expect(row).toHaveTextContent('Verifying…');
+    expect(row).not.toHaveTextContent('Not checked yet');
+    expect(screen.getByRole('progressbar')).toHaveStyle('color: var(--z-ov-ink)');
+  });
+
+  it.each([
+    ['tampered', {}, 'border-void'],
+    ['mismatch', { header: { cameraId: 'x', startUnixMs: 0 } }, 'border-amber'],
+    ['incomplete', {}, 'border-amber'],
+    ['unknown-key', {}, 'border-muted'],
+    ['verifying', { message: 'ErrNoKey' }, 'border-muted'],
+  ] as const)('banner border for %s is %s', async (integrity, extra, cls) => {
+    render(Player, props());
+    await waitFor(() => expect(FakePlayer.instances).toHaveLength(1));
+    FakePlayer.instances[0]!.emit({ ...initialState(), clipId: ids.a, integrity, ...extra } as PlayerState);
+    const banner = await screen.findByRole(integrity === 'incomplete' ? 'status' : 'alert');
+    expect(banner.className).toContain(cls);
+    expect(banner.className).toContain('border ');
+  });
+
   it('Back to live calls onBack', async () => {
     const onBack = vi.fn();
     render(Player, props({ onBack }));

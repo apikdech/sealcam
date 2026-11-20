@@ -1,13 +1,15 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
-  import { browserExportEnv, canExport, exportClip, exportFilename, type ExportEnv } from '../export';
+  import { browserExportEnv, canExport, ExportTooLargeError, exportClip, exportFilename, type ExportEnv } from '../export';
   import { BLOB_MAX, detectProfile, type Profile } from '../player/buffer';
   import { createPlayer, type Player, type PlayerState } from '../player/engine';
   import { describeIntegrity, initialState } from '../player/status';
   import type { WorkerClient } from '../workerClient';
   import ExportDialog from './ExportDialog.svelte';
   import Icon from './Icon.svelte';
+  import { overVideo } from '../overVideo';
   import Seal from '../seal/Seal.svelte';
+  import type { SealState } from '../seal/rosette';
   import { formatClock } from '../timeline/timezone';
 
   /** Where to play: a clip, and how far into it. A new object (`n`) seeks again even within the same clip. */
@@ -129,10 +131,16 @@
     void player.seek(to);
   }
 
+  // Could not open (message set) is shown as unchecked, not as verifying.
+  const sealState = $derived<SealState>(snap.integrity === 'verifying' ? (snap.message !== null ? 'unchecked' : 'verifying') : snap.integrity);
+  const tone = $derived(
+    view.kind === 'tampered' ? 'border-void' : view.kind === 'mismatch' || view.kind === 'incomplete' ? 'border-amber' : 'border-muted',
+  );
+
   const icon =
-    'inline-flex h-10 w-10 items-center justify-center rounded border border-rule text-ink hover:bg-plate disabled:cursor-not-allowed disabled:opacity-40';
+    'inline-flex h-10 w-10 max-md:h-11 max-md:w-11 items-center justify-center rounded border border-rule text-ink hover:bg-plate disabled:cursor-not-allowed disabled:opacity-40';
   const ghost =
-    'inline-flex items-center gap-2 rounded border border-rule px-3 py-2 text-sm text-ink hover:bg-plate disabled:cursor-not-allowed disabled:opacity-40';
+    'inline-flex items-center gap-2 rounded border border-rule px-3 py-2 max-md:min-h-11 text-sm text-ink hover:bg-plate disabled:cursor-not-allowed disabled:opacity-40';
 
   // ---- export --------------------------------------------------------------
 
@@ -158,6 +166,7 @@
 
   function openExport(): void {
     video?.pause();
+    clearTimeout(savedTimer);
     exportError = '';
     exportBytes = 0;
     saved = false;
@@ -192,9 +201,10 @@
           saved = false;
         }, 4000);
       }
-    } catch {
+    } catch (e) {
       touched = true;
-      exportError = 'Could not save the file. Try again.';
+      exportError =
+        e instanceof ExportTooLargeError ? 'This recording is too large to save in this browser.' : 'Could not save the file. Try again.';
     } finally {
       exportBusy = false;
       // Exporting reopened the clip in the worker, which dropped the player's session: open it again where it was.
@@ -233,7 +243,12 @@
       class="aspect-video w-full bg-black object-contain"
     ></video>
     {#if view.spinner}
-      <div class="absolute inset-0 flex items-center justify-center bg-black/50 text-sm text-ink" role="progressbar" aria-label="Verifying">
+      <div
+        class="absolute inset-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--z-ov-ground)_70%,transparent)] text-sm"
+        style="{overVideo};color: var(--z-ov-ink)"
+        role="progressbar"
+        aria-label="Verifying"
+      >
         <span class="animate-pulse">{view.text}</span>
       </div>
     {/if}
@@ -244,7 +259,7 @@
       {#if snap.clipId === null}
         <span class="text-muted">Select a recording</span>
       {:else}
-        <Seal seed={snap.clipId} state={snap.integrity === 'verifying' ? 'unchecked' : snap.integrity} showLabel />
+        <Seal seed={snap.clipId} state={sealState} showLabel />
       {/if}
     </span>
     {#if header}
@@ -284,9 +299,9 @@
   {#if view.kind !== 'verified' && snap.clipId !== null && !view.spinner}
     <div
       role={view.kind === 'incomplete' ? 'status' : 'alert'}
-      class="mt-2 flex items-start gap-2 rounded border bg-plate px-3 py-2 text-sm text-ink {view.kind === 'tampered' ? 'border-void' : 'border-amber'}"
+      class="mt-2 flex items-start gap-2 rounded border bg-plate px-3 py-2 text-sm text-ink {tone}"
     >
-      <Seal seed={snap.clipId} state={snap.integrity === 'verifying' ? 'unchecked' : snap.integrity} size={20} />
+      <Seal seed={snap.clipId} state={sealState} size={20} />
       <p>
         {view.text}
         {#if view.next}
@@ -311,6 +326,10 @@
     error={exportError}
     {saved}
     onConfirm={() => void confirmExport()}
-    onCancel={() => (exporting = false)}
+    onCancel={() => {
+      clearTimeout(savedTimer);
+      saved = false;
+      exporting = false;
+    }}
   />
 {/if}

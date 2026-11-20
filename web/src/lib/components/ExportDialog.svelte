@@ -53,7 +53,7 @@
         onCancel();
       }
     }}
-    class="w-full max-w-md rounded-lg border border-rule bg-plate text-ink p-5 text-sm shadow-xl"
+    class="w-full max-w-md rounded-lg border border-rule bg-plate text-ink p-5 text-sm"
   >
     <h2 id="export-title" class="mb-2 text-base font-semibold">Export recording</h2>
     <p class="mb-2">This saves an <strong>unencrypted</strong> copy on this device.</p>
@@ -70,8 +70,8 @@
       <p role="alert" class="mb-3 text-void">{error}</p>
     {/if}
     <div class="flex justify-end gap-2">
-      <button type="button" class="rounded border border-rule px-3 py-1.5" disabled={busy} onclick={onCancel}>Cancel</button>
-      <button type="button" class="rounded border border-foil bg-ground px-3 py-1.5 text-foil disabled:opacity-50" disabled={busy} onclick={onConfirm}>
+      <button type="button" class="rounded border border-rule px-3 py-1.5 max-md:min-h-11" disabled={busy} onclick={onCancel}>Cancel</button>
+      <button type="button" class="rounded border border-foil bg-ground px-3 py-1.5 max-md:min-h-11 text-foil disabled:opacity-50" disabled={busy || saved} onclick={onConfirm}>
         {busy ? 'Saving…' : 'Save'}
       </button>
     </div>

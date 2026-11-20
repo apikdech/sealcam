@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import Icon from '../components/Icon.svelte';
   import { formatClock } from '../timeline/timezone';
+  import { overVideo } from '../overVideo';
   import { claimAudio } from './audioFocus';
   import type { WhepClient } from './whep';
   import { createTile, type Tile, type TileSnapshot } from './tile';
@@ -94,8 +95,6 @@
               ? 'Key locked.'
               : 'Camera offline. zview reconnects when it is back.',
   );
-  // Over-video content is always drawn in the dark palette, in light mode too.
-  const overVideo = '--z-ov-ground:#0e1a1f;--z-ov-ink:#e6e2d6;--z-ov-muted:#93a6a4;--z-ov-line:#5fa8a0;--z-ov-rule:#22393f';
 </script>
 
 <div
