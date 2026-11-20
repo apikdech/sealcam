@@ -46,16 +46,16 @@ describe('live page', () => {
     render(LivePage, { client: new PageClient() });
     await waitFor(() => expect(FakePeer.instances).toHaveLength(2));
     FakePeer.instances[0]!.addRemoteTrack('audio');
-    const btn = await screen.findByRole('button', { name: 'Unmute' });
+    const btn = await screen.findByRole('button', { name: 'Turn sound on' });
     await fireEvent.click(btn);
-    expect(await screen.findByRole('button', { name: 'Mute' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Turn sound off' })).toBeInTheDocument();
   });
 
   it('shows the viewer-limit state when the server answers 503', async () => {
     const client = new PageClient();
     client.offerFailures.push({ name: 'LiveBusy', status: 503 });
     render(LivePage, { client });
-    expect(await screen.findByText('Viewer limit reached')).toBeInTheDocument();
+    expect(await screen.findByText(/Too many people are watching/)).toBeInTheDocument();
   });
 
   it('says so when no key is loaded', async () => {

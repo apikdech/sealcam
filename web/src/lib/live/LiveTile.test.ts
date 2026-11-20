@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeClient, FakePeer, FakeStream } from '../../../test-support/live-fakes';
 import LiveTile from './LiveTile.svelte';
+import type { Tile, TileOptions, TileSnapshot } from './tile';
 
 let request: ReturnType<typeof vi.fn>;
 
@@ -15,9 +17,38 @@ function setFullscreenElement(el: Element | null) {
   document.dispatchEvent(new Event('fullscreenchange'));
 }
 
+const ZONE = 'UTC';
+
 function renderTile() {
-  render(LiveTile, { cameraId: 'front', name: 'Front', client: new FakeClient() });
+  render(LiveTile, { cameraId: 'front', name: 'Front', client: new FakeClient(), zone: ZONE });
   return screen.getByTestId('live-tile');
+}
+
+async function goLive(tile: HTMLElement) {
+  await flush();
+  tile.querySelector('video')!.dispatchEvent(new Event('playing'));
+  await tick();
+}
+
+/** A stand-in tile whose state the test drives. */
+function fakeTile() {
+  const f = {
+    opts: null as TileOptions | null,
+    tryNow: vi.fn(),
+    setOffline: vi.fn(),
+    toggleMute: vi.fn(),
+    start: vi.fn(),
+    destroy: vi.fn(),
+    async emit(s: Partial<TileSnapshot>) {
+      f.opts!.onChange({ state: 'connecting', canUnmute: false, muted: true, retryAt: null, ...s });
+      await tick();
+    },
+    make: (o: TileOptions): Tile => {
+      f.opts = o;
+      return f as unknown as Tile;
+    },
+  };
+  return f;
 }
 
 beforeEach(() => {
@@ -37,32 +68,37 @@ afterEach(() => {
 });
 
 describe('LiveTile fullscreen', () => {
-  it('shows a Fullscreen button while the tile is still connecting', () => {
+  it('offers Full screen only once the tile is live', async () => {
     const tile = renderTile();
     expect(tile.dataset.state).toBe('connecting');
-    expect(screen.getByRole('button', { name: 'Fullscreen' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Full screen' })).toBeNull();
+    await goLive(tile);
+    expect(screen.getByRole('button', { name: 'Full screen' })).toBeTruthy();
   });
 
   it('makes the whole tile fullscreen', async () => {
     const tile = renderTile();
-    await fireEvent.click(screen.getByRole('button', { name: 'Fullscreen' }));
+    await goLive(tile);
+    await fireEvent.click(screen.getByRole('button', { name: 'Full screen' }));
     expect(request).toHaveBeenCalledTimes(1);
     expect(request.mock.contexts[0]).toBe(tile);
   });
 
-  it('labels the button Exit fullscreen while fullscreen, and Fullscreen after Esc', async () => {
+  it('labels the button Exit full screen while fullscreen, and Full screen after Esc, with no aria-pressed', async () => {
     const tile = renderTile();
+    await goLive(tile);
     setFullscreenElement(tile);
     await flush();
-    const exit = screen.getByRole('button', { name: 'Exit fullscreen' });
-    expect(exit.getAttribute('aria-pressed')).toBe('true');
+    const exit = screen.getByRole('button', { name: 'Exit full screen' });
+    expect(exit.hasAttribute('aria-pressed')).toBe(false);
     setFullscreenElement(null);
     await flush();
-    expect(screen.getByRole('button', { name: 'Fullscreen' }).getAttribute('aria-pressed')).toBe('false');
+    expect(screen.getByRole('button', { name: 'Full screen' }).hasAttribute('aria-pressed')).toBe(false);
   });
 
   it('toggles fullscreen on a double-click on the video', async () => {
     const tile = renderTile();
+    await goLive(tile);
     await fireEvent.dblClick(tile.querySelector('video')!);
     expect(request).toHaveBeenCalledTimes(1);
     expect(request.mock.contexts[0]).toBe(tile);
@@ -71,22 +107,133 @@ describe('LiveTile fullscreen', () => {
   it('hides the button when the browser cannot go fullscreen', async () => {
     Object.defineProperty(document, 'fullscreenEnabled', { configurable: true, value: false });
     const tile = renderTile();
-    expect(screen.queryByRole('button', { name: 'Fullscreen' })).toBeNull();
+    await goLive(tile);
+    expect(screen.queryByRole('button', { name: 'Full screen' })).toBeNull();
     await fireEvent.dblClick(tile.querySelector('video')!);
     expect(request).not.toHaveBeenCalled();
   });
 
   it('does not reopen the live session when going fullscreen', async () => {
     const tile = renderTile();
-    await flush();
+    await goLive(tile);
     const peers = FakePeer.instances.length;
     expect(peers).toBe(1);
-    await fireEvent.click(screen.getByRole('button', { name: 'Fullscreen' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Full screen' }));
     setFullscreenElement(tile);
     await flush();
     setFullscreenElement(null);
     await flush();
     expect(FakePeer.instances.length).toBe(peers);
     expect(FakePeer.instances[0]!.closed).toBe(false);
+  });
+});
+
+describe('LiveTile states', () => {
+  it('shows the Live badge only when live', async () => {
+    const tile = renderTile();
+    expect(within(tile).queryByText('Live')).toBeNull();
+    await goLive(tile);
+    expect(within(tile).getByText('Live')).toBeTruthy();
+  });
+
+  it('as-of clock uses the display zone and ticks each second only while live', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T12:00:00Z'));
+    try {
+      const f = fakeTile();
+      render(LiveTile, { cameraId: 'front', name: 'Front', client: new FakeClient(), zone: 'Asia/Tokyo', makeTile: f.make });
+      await f.emit({ state: 'reconnecting', retryAt: null });
+      expect(screen.queryByText(/as of/i)).toBeNull();
+      await f.emit({ state: 'live' });
+      expect(screen.getByText('as of 21:00:00')).toBeTruthy();
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(screen.getByText('as of 21:00:02')).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reconnecting shows Try now and calls tryNow', async () => {
+    const f = fakeTile();
+    render(LiveTile, { cameraId: 'front', name: 'Front', client: new FakeClient(), zone: ZONE, makeTile: f.make });
+    await f.emit({ state: 'reconnecting', retryAt: Date.now() + 5000 });
+    await fireEvent.click(screen.getByRole('button', { name: 'Try now' }));
+    expect(f.tryNow).toHaveBeenCalledTimes(1);
+  });
+
+  it('limit says so and offers Try now', async () => {
+    const f = fakeTile();
+    render(LiveTile, { cameraId: 'front', name: 'Front', client: new FakeClient(), zone: ZONE, makeTile: f.make });
+    await f.emit({ state: 'limit', retryAt: Date.now() + 5000 });
+    expect(screen.getByRole('status')).toHaveTextContent('Too many people are watching. zview tries again');
+    expect(screen.getByRole('button', { name: 'Try now' })).toBeTruthy();
+  });
+
+  it('locked shows an Unlock link to #/key', async () => {
+    const f = fakeTile();
+    render(LiveTile, { cameraId: 'front', name: 'Front', client: new FakeClient(), zone: ZONE, makeTile: f.make });
+    await f.emit({ state: 'locked' });
+    expect(screen.getByRole('status')).toHaveTextContent('Key locked.');
+    expect(screen.getByRole('link', { name: 'Unlock' }).getAttribute('href')).toBe('#/key');
+  });
+
+  it('offline state says the camera reconnects by itself', async () => {
+    const f = fakeTile();
+    render(LiveTile, { cameraId: 'front', name: 'Front', client: new FakeClient(), zone: ZONE, makeTile: f.make });
+    await f.emit({ state: 'offline' });
+    expect(screen.getByRole('status')).toHaveTextContent('Camera offline. zview reconnects when it is back.');
+  });
+
+  it('offline prop calls setOffline', async () => {
+    const f = fakeTile();
+    const { rerender } = render(LiveTile, { cameraId: 'front', name: 'Front', client: new FakeClient(), zone: ZONE, offline: true, makeTile: f.make });
+    await tick();
+    expect(f.setOffline).toHaveBeenLastCalledWith(true);
+    await rerender({ offline: false });
+    expect(f.setOffline).toHaveBeenLastCalledWith(false);
+  });
+
+  it('the status element text has no digits while counting down', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T12:00:00Z'));
+    try {
+      const f = fakeTile();
+      render(LiveTile, { cameraId: 'front', name: 'Front', client: new FakeClient(), zone: ZONE, makeTile: f.make });
+      await f.emit({ state: 'reconnecting', retryAt: Date.now() + 5000 });
+      const status = screen.getByRole('status');
+      expect(status.textContent).not.toMatch(/\d/);
+      expect(status.parentElement).toHaveTextContent('in 5 s');
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(status.parentElement).toHaveTextContent('in 3 s');
+      expect(status.textContent).not.toMatch(/\d/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('drops the countdown when the retry time has passed or is unknown', async () => {
+    const f = fakeTile();
+    render(LiveTile, { cameraId: 'front', name: 'Front', client: new FakeClient(), zone: ZONE, makeTile: f.make });
+    await f.emit({ state: 'reconnecting', retryAt: Date.now() - 500 });
+    expect(screen.getByRole('status').parentElement).toHaveTextContent("Can't reach the camera. Trying again…");
+    expect(screen.getByRole('status').parentElement).not.toHaveTextContent(/\d/);
+    await f.emit({ state: 'reconnecting', retryAt: null });
+    expect(screen.getByRole('status').parentElement).not.toHaveTextContent(/\d/);
+  });
+
+  it('turning sound on in one tile turns it off in the other', async () => {
+    render(LiveTile, { cameraId: 'front', name: 'Front', client: new FakeClient(), zone: ZONE });
+    render(LiveTile, { cameraId: 'yard', name: 'Yard', client: new FakeClient(), zone: ZONE });
+    await flush();
+    expect(FakePeer.instances).toHaveLength(2);
+    FakePeer.instances.forEach((p) => p.addRemoteTrack('audio'));
+    await tick();
+    const [a, b] = screen.getAllByTestId('live-tile').map((t) => t.querySelector('video')!);
+    await fireEvent.click(screen.getAllByRole('button', { name: 'Turn sound on' })[0]!);
+    expect(a!.muted).toBe(false);
+    await fireEvent.click(screen.getByRole('button', { name: 'Turn sound on' }));
+    expect(b!.muted).toBe(false);
+    expect(a!.muted).toBe(true);
+    expect(screen.getByRole('button', { name: 'Turn sound off' })).toBeTruthy();
   });
 });

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import LiveTile from '../../lib/live/LiveTile.svelte';
+  import LiveGrid from '../../lib/live/LiveGrid.svelte';
   import { workerClient } from '../../lib/workerClient';
   import type { Request } from '../../worker/protocol';
   import type { Camera } from '../../worker/schemas';
@@ -40,10 +40,6 @@
   {:else if cameras.length === 0}
     <p class="text-sm text-neutral-400">No cameras.</p>
   {:else}
-    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {#each cameras as cam (cam.id)}
-        <LiveTile cameraId={cam.id} name={cam.name} {client} />
-      {/each}
-    </div>
+    <LiveGrid {cameras} {client} zone={Intl.DateTimeFormat().resolvedOptions().timeZone} status={null} />
   {/if}
 </main>
