@@ -165,13 +165,13 @@
     switch (cmd) {
       case 'toggle':
         playerView?.togglePlay();
-        return playerView !== undefined;
+        return !!playerView;
       case 'back10':
         playerView?.skip(-10_000);
-        return playerView !== undefined;
+        return !!playerView;
       case 'fwd10':
         playerView?.skip(10_000);
-        return playerView !== undefined;
+        return !!playerView;
       case 'prev':
       case 'next': {
         const id = adjacentClip(timelineClips, selectedId, cmd);
@@ -182,14 +182,14 @@
       case 'zoomIn':
       case 'zoomOut':
         timeline?.stepZoom(cmd === 'zoomIn' ? 'in' : 'out');
-        return timeline !== undefined;
+        return !!timeline;
       case 'now':
         if (day !== todayDay) {
           setDay(todayDay);
           return true;
         }
         timeline?.jumpToNow();
-        return timeline !== undefined;
+        return !!timeline;
     }
   }
 

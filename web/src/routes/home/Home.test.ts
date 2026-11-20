@@ -208,4 +208,34 @@ describe('Home', () => {
     window.dispatchEvent(e);
     expect(e.defaultPrevented).toBe(false);
   });
+
+  it('after Back to live, Space keeps its default again', async () => {
+    mount(client());
+    await fireEvent.click((await rows())[0]!);
+    await waitFor(() => expect(FakePlayer.instances[0]?.loads.length).toBe(1));
+    await fireEvent.click(screen.getByRole('button', { name: /back to live/i }));
+    const e = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+    window.dispatchEvent(e);
+    expect(e.defaultPrevented).toBe(false);
+  });
+
+  it('while the day loads, [ and ] keep their default', async () => {
+    const c = client();
+    const get = c.call.bind(c);
+    let hold = false;
+    c.call = (async (msg: Parameters<DashClient['call']>[0]) => {
+      if (hold && msg.type === 'api.get' && msg.path === '/api/v1/clips') await new Promise<void>(() => {});
+      return get(msg);
+    }) as DashClient['call'];
+    mount(c);
+    await rows();
+    hold = true;
+    await fireEvent.click(screen.getByRole('button', { name: 'Previous day' }));
+    expect(screen.getByText('Loading…')).toBeInTheDocument();
+    for (const key of ['[', ']']) {
+      const e = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+      window.dispatchEvent(e);
+      expect(e.defaultPrevented, key).toBe(false);
+    }
+  });
 });
