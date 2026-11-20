@@ -1,9 +1,10 @@
 <script lang="ts">
   import { tick } from 'svelte';
+  import { fitWithin } from '../../lib/qr/scale';
   import { createDecoder, type Camera, type Decoder, type Frame } from '../../lib/qr/scan';
   import Seal from '../../lib/seal/Seal.svelte';
   import { workerClient } from '../../lib/workerClient';
-  import type { ImportResult, Request } from '../../worker/protocol';
+  import type { ImportResult, KeyListResult, Request } from '../../worker/protocol';
   import { checkKeyInput, fingerprint } from './keyInput';
   import { keyMismatch, type ClipKeyRef, type Mismatch } from './mismatch';
   import Scanner from './Scanner.svelte';
@@ -89,6 +90,13 @@
       text = ''; // the key text must not linger in the page
       imported = res.keyId;
       choice = '';
+      try {
+        // An already-kept key stays kept: importing never removes it from storage.
+        const list = await client.call<KeyListResult>({ type: 'key.list' });
+        if (list.keys.some((k) => k.keyId === res.keyId && k.remembered)) choice = 'kept';
+      } catch {
+        // unknown: offer the choice
+      }
       panelError = '';
       onImported?.(res.keyId);
       void checkRecordings(res.keyId);
@@ -131,10 +139,17 @@
     void doImport(scanned);
   }
 
+  /** Long-side cap for photo decoding: bounds memory and stays under iOS canvas limits. */
+  const MAX_PHOTO_SIDE = 1600;
+
   async function frameFromFile(file: File): Promise<Frame> {
-    const bitmap = await createImageBitmap(file);
+    const probe = await createImageBitmap(file);
+    const { width, height } = fitWithin(probe.width, probe.height, MAX_PHOTO_SIDE);
+    const scaled = width === probe.width && height === probe.height;
+    const bitmap = scaled ? probe : await createImageBitmap(file, { resizeWidth: width, resizeHeight: height, resizeQuality: 'high' });
+    if (!scaled) probe.close();
+    const canvas = document.createElement('canvas');
     try {
-      const canvas = document.createElement('canvas');
       canvas.width = bitmap.width;
       canvas.height = bitmap.height;
       const ctx = canvas.getContext('2d');
@@ -143,6 +158,7 @@
       return ctx.getImageData(0, 0, bitmap.width, bitmap.height);
     } finally {
       bitmap.close();
+      canvas.width = canvas.height = 0; // release the backing store
     }
   }
 
@@ -231,7 +247,7 @@
     <section role="status" class="space-y-4 border-t border-rule pt-4">
       <h2 bind:this={heading} tabindex="-1" class="text-xl font-semibold">Key added</h2>
       <div class="flex items-center gap-3">
-        <Seal seed={imported} state="verified" size={64} />
+        <Seal seed={imported} state="verified" size={64} decorative />
         <p class="num">Fingerprint {fingerprint(imported)}</p>
       </div>
 
@@ -247,12 +263,12 @@
       <div role="alert" class="space-y-3 border-l-2 border-amber pl-3">
         <p class="font-semibold text-amber">This key doesn't match recent recordings</p>
         <div class="flex items-center gap-3">
-          <Seal seed={mismatch.keyId} state="mismatch" size={40} />
+          <Seal seed={mismatch.keyId} state="mismatch" size={40} decorative />
           <p class="num">This key: {fingerprint(mismatch.keyId)}</p>
         </div>
         {#each mismatch.clipKeyIds as id (id)}
           <div class="flex items-center gap-3">
-            <Seal seed={id} state="unknown-key" size={40} />
+            <Seal seed={id} state="unknown-key" size={40} decorative />
             <p class="num">Recordings use: {fingerprint(id)}</p>
           </div>
         {/each}

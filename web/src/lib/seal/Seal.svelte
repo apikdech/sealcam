@@ -6,9 +6,11 @@
     state: SealState;
     size?: number;
     showLabel?: boolean;
+    /** A pure picture (e.g. a key fingerprint): hidden from assistive tech, no label. */
+    decorative?: boolean;
   }
 
-  let { seed, state, size = 32, showLabel = false }: Props = $props();
+  let { seed, state, size = 32, showLabel = false, decorative = false }: Props = $props();
 
   const uid = $props.id();
   const clipId = `seal-clip-${uid}`;
@@ -24,8 +26,9 @@
 <span class="seal" data-seal-state={state}>
   <svg
     class="shrink-0"
-    role="img"
-    aria-label={label}
+    role={decorative ? undefined : 'img'}
+    aria-label={decorative ? undefined : label}
+    aria-hidden={decorative ? 'true' : undefined}
     width={size}
     height={size}
     viewBox="0 0 {size} {size}"
@@ -64,7 +67,7 @@
       <path data-rosette d={path} stroke="var(--z-line)" />
     {/if}
   </svg>
-  {#if showLabel}<span class="text-sm">{label}</span>{/if}
+  {#if showLabel && !decorative}<span class="text-sm">{label}</span>{/if}
 </span>
 
 <style>

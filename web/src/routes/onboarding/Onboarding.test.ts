@@ -104,6 +104,14 @@ describe('Keys page', () => {
     expect(calls[0]).toEqual({ type: 'key.list' });
   });
 
+  it('keyring seals carry no recording-integrity name', async () => {
+    const { client } = fakeClient();
+    await client.call({ type: 'key.import', encoded: 'x', remember: true });
+    render(Onboarding, { client, now: () => NOW });
+    const ring = await keyring();
+    expect(within(ring).queryByRole('img')).toBeNull();
+  });
+
   it('refreshes the keyring when Keep it on this phone is chosen', async () => {
     const { client } = fakeClient();
     render(Onboarding, { client, now: () => NOW });

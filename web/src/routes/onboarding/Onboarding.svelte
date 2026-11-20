@@ -102,7 +102,7 @@
     <ul aria-label="Keyring" class="divide-y divide-rule border-y border-rule">
       {#each keys as k (k.keyId)}
         <li class="flex flex-wrap items-center gap-3 py-3">
-          <Seal seed={k.keyId} state="verified" size={40} />
+          <Seal seed={k.keyId} state="verified" size={40} decorative />
           <div class="min-w-0 flex-1">
             <p class="num">{fingerprint(k.keyId)}</p>
             <p class="text-sm text-muted">{k.remembered ? 'Kept on this phone' : 'Only for now'}</p>

@@ -36,6 +36,16 @@ describe('Seal', () => {
     expect(container.querySelector('[data-rosette]')).toBeNull();
   });
 
+  it('decorative hides the svg from assistive tech and ignores showLabel', () => {
+    const { container, queryByRole } = render(Seal, { seed: 'c1', state: 'verified', decorative: true, showLabel: true });
+    const svg = container.querySelector('svg')!;
+    expect(svg.getAttribute('aria-hidden')).toBe('true');
+    expect(svg.hasAttribute('role')).toBe(false);
+    expect(svg.hasAttribute('aria-label')).toBe(false);
+    expect(queryByRole('img')).toBeNull();
+    expect(container.textContent).not.toContain('Encrypted recording verified');
+  });
+
   it('rosette states render one', () => {
     const { container } = render(Seal, { seed: 'c1', state: 'verified' });
     expect(container.querySelector('[data-rosette]')).not.toBeNull();

@@ -21,14 +21,16 @@ const clipsAt = (...keyIds: string[]) => ({
   invalid: 0,
 });
 
-function fakeClient(opts: { clips?: unknown; clipsError?: Error } = {}) {
+function fakeClient(opts: { clips?: unknown; clipsError?: Error; stored?: boolean; importResult?: unknown } = {}) {
   const calls: Request[] = [];
   const client = {
     async call<T>(msg: Request): Promise<T> {
       calls.push(msg);
       switch (msg.type) {
         case 'key.import':
-          return { keyId: KEY_ID } as T;
+          return (opts.importResult ?? { keyId: KEY_ID }) as T;
+        case 'key.list':
+          return { keys: [{ keyId: KEY_ID, remembered: opts.stored ?? false }] } as T;
         case 'key.remember':
         case 'key.forget':
           return { keys: [] } as T;
@@ -189,5 +191,61 @@ describe('KeyImport success panel', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Add key' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not import the key. Try again.');
     expect(document.body.textContent).not.toContain('secret');
+  });
+});
+
+describe('KeyImport restored coverage and review fixes', () => {
+  it('never puts the key in the URL, not even after a form submit', async () => {
+    render(KeyImport, { client: fakeClient().client, now: () => NOW });
+    const before = location.href;
+    await typeKey(testKeyText());
+    const form = field().closest('form');
+    expect(form).not.toBeNull();
+    expect(form!.getAttribute('action')).toBeNull();
+    // fireEvent resolves to false when a handler called preventDefault (no native navigation).
+    expect(await fireEvent.submit(form!)).toBe(false);
+    await screen.findByRole('heading', { name: 'Key added' });
+    expect(location.href).toBe(before);
+    expect(location.href).not.toContain('zk1');
+  });
+
+  it('a checksum error from the worker shows the typo alert without leaking the key', async () => {
+    const { client } = fakeClient({ importResult: { error: 'checksum' } });
+    render(KeyImport, { client });
+    await typeKey(testKeyText());
+    await fireEvent.click(screen.getByRole('button', { name: 'Add key' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('typo in key');
+    expect(document.body.textContent).not.toContain(testKeyText().split('-')[1]);
+  });
+
+  it('429 on the check says the server did not accept the key', async () => {
+    const { client } = fakeClient({ clipsError: Object.assign(new Error('x'), { status: 429 }) });
+    await importTyped(client);
+    expect(await screen.findByText('The server did not accept this key.')).toBeInTheDocument();
+  });
+
+  it('says so when recent recordings cannot be checked', async () => {
+    const { client } = fakeClient({ clipsError: new Error('boom') });
+    await importTyped(client);
+    expect(await screen.findByText('Could not check recent recordings.')).toBeInTheDocument();
+  });
+
+  it('re-importing a kept key neither offers nor claims "Only for now"', async () => {
+    const { client } = fakeClient({ stored: true });
+    await importTyped(client);
+    expect(await screen.findByText('Kept on this phone.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Only for now' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Keep it on this phone' })).toBeNull();
+    expect(screen.queryByText(/Only for now/)).toBeNull();
+  });
+
+  it('key seals carry no recording-integrity name', async () => {
+    const { client } = fakeClient({ clips: clipsAt(OTHER_ID) });
+    await importTyped(client);
+    await screen.findByRole('alert');
+    expect(screen.queryByRole('img')).toBeNull();
+    expect(screen.queryByLabelText('Encrypted recording verified')).toBeNull();
+    expect(document.body.innerHTML).not.toContain('Encrypted recording verified');
+    expect(document.body.innerHTML).not.toContain('Metadata mismatch');
   });
 });
