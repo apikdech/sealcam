@@ -39,7 +39,7 @@
 
 <svelte:window onpointerdown={onwindowpointerdown} />
 
-<div bind:this={root} class="relative inline-block" {onkeydown} role="presentation">
+<div bind:this={root} class="relative inline-block shrink-0" {onkeydown} role="presentation">
   <button
     bind:this={trigger}
     type="button"

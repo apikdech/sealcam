@@ -165,9 +165,9 @@
   const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 
   const icon =
-    'inline-flex h-10 w-10 max-md:h-11 max-md:w-11 items-center justify-center rounded border border-rule text-ink hover:bg-plate disabled:cursor-not-allowed disabled:opacity-40';
+    'inline-flex h-10 w-10 max-md:h-11 max-md:w-11 items-center justify-center rounded border border-rule text-ink hover:bg-ground disabled:cursor-not-allowed disabled:opacity-40';
   const ghost =
-    'inline-flex items-center gap-2 rounded border border-rule px-3 py-2 max-md:min-h-11 text-sm text-ink hover:bg-plate disabled:cursor-not-allowed disabled:opacity-40';
+    'inline-flex items-center gap-2 rounded border border-rule px-3 py-2 max-md:min-h-11 text-sm text-ink hover:bg-ground disabled:cursor-not-allowed disabled:opacity-40';
 
   // ---- export --------------------------------------------------------------
 
@@ -254,7 +254,7 @@
 
 <section
   bind:this={frame}
-  class="flex h-full min-h-0 min-w-0 flex-col [&:fullscreen]:bg-ground"
+  class="flex h-full min-h-0 min-w-0 flex-col bg-plate text-ink [&:fullscreen]:bg-ground"
   aria-label="Player"
   data-testid="player-column"
 >
@@ -276,6 +276,16 @@
       <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-sm text-muted">
         <span class="opacity-60"><Seal seed="zview" state="unchecked" size={40} decorative /></span>
         <span>Select a recording</span>
+      </div>
+    {/if}
+    {#if view.spinner}
+      <div
+        class="absolute inset-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--z-ov-ground)_70%,transparent)] text-sm"
+        style="{overVideo};color: var(--z-ov-ink)"
+        role="progressbar"
+        aria-label="Verifying"
+      >
+        <span class="animate-pulse">{view.text}</span>
       </div>
     {/if}
     {#if header}
@@ -307,16 +317,6 @@
       >
         <span aria-hidden="true" class="size-2 rounded-full bg-(--z-ov-line)"></span>Live
       </button>
-    {/if}
-    {#if view.spinner}
-      <div
-        class="absolute inset-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--z-ov-ground)_70%,transparent)] text-sm"
-        style="{overVideo};color: var(--z-ov-ink)"
-        role="progressbar"
-        aria-label="Verifying"
-      >
-        <span class="animate-pulse">{view.text}</span>
-      </div>
     {/if}
   </div>
 
@@ -351,7 +351,7 @@
     </button>
   {/snippet}
 
-  <div role="group" aria-label="Player controls" class="flex items-center py-2 {compact ? 'flex-nowrap gap-1 px-2' : 'flex-wrap gap-x-2 gap-y-1 px-3'}">
+  <div role="group" aria-label="Player controls" class="flex items-center border-t border-rule py-2 {compact ? 'flex-nowrap gap-1 px-2' : 'flex-wrap gap-x-1.5 gap-y-1 px-3'}">
     <button type="button" class={icon} title="Previous clip (J)" aria-label="Previous clip" disabled={!onPrev} onclick={onPrev}>
       <Icon name="prev" />
     </button>
@@ -378,7 +378,7 @@
     <input
       type="range"
       aria-label="Position"
-      class="flex-1 max-md:h-11 {compact ? 'min-w-0' : 'min-w-24'}"
+      class="flex-1 max-md:h-11 {compact ? 'min-w-0' : 'min-w-16'}"
       min="0"
       max={duration}
       step="any"
@@ -437,7 +437,7 @@
   {#if view.kind !== 'verified' && snap.clipId !== null && !view.spinner}
     <div
       role={view.kind === 'incomplete' ? 'status' : 'alert'}
-      class="mt-2 flex items-start gap-2 rounded border bg-plate px-3 py-2 text-sm text-ink {tone}"
+      class="mx-3 mb-2 flex items-start gap-2 rounded border bg-ground px-3 py-2 text-sm text-ink {tone}"
     >
       <Seal seed={snap.clipId} state={sealState} size={20} decorative />
       <p>
@@ -449,10 +449,10 @@
     </div>
   {/if}
   {#if snap.message}
-    <p role="status" class="mt-2 text-sm text-amber">{snap.message}</p>
+    <p role="status" class="px-3 pb-2 text-sm text-amber">{snap.message}</p>
   {/if}
   {#if loadError}
-    <p role="alert" class="mt-2 text-sm text-void">{loadError}</p>
+    <p role="alert" class="px-3 pb-2 text-sm text-void">{loadError}</p>
   {/if}
 </section>
 

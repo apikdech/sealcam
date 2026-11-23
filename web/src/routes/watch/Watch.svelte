@@ -54,7 +54,7 @@
   const now = $derived(nowMs ?? env.wall);
   const todayDay = $derived(localDayOf(now, zone));
 
-  // Short phone screens get thinner lanes so the list keeps three rows.
+  // Short screens: thinner phone lanes so the list keeps three rows, and the one-row player bar.
   let short = $state(false);
   onMount(() => {
     const mq = window.matchMedia?.('(max-height: 700px)');
@@ -182,8 +182,8 @@
 <main data-testid="watch" class="grid h-dvh grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden">
   <h1 class="sr-only">Watch</h1>
 
-  <div class="flex min-w-0 items-center gap-2 border-b border-rule px-2 py-1 md:gap-3 md:px-4">
-    <p class="text-lg font-semibold tracking-wide"><span class="text-ink">z</span><span class="text-line">view</span></p>
+  <div class="bar flex min-w-0 items-center gap-1 border-b border-rule px-2 py-1 md:gap-3 md:px-4">
+    <p class="wordmark shrink-0 text-lg font-semibold tracking-wide"><span class="text-ink">z</span><span class="text-line">view</span></p>
     <DayNav {day} {todayDay} {zone} onDay={setDay}>
       {#snippet menu(close)}
         <DayMenu
@@ -215,7 +215,7 @@
       </span>
     {/if}
     <span class="flex-1"></span>
-    <div class="flex shrink-0 items-center">{@render topRight()}</div>
+    <div class="flex min-w-0 items-center">{@render topRight()}</div>
   </div>
 
   <!-- Notices: one line each, full width; they take their height from the stage. -->
@@ -254,7 +254,7 @@
             {profile}
             {factory}
             env={exportEnv}
-            compact={env.phone}
+            compact={env.phone || short}
             cameraName={data.nameOf}
             {triggersOf}
             onState={onPlayerState}
@@ -279,7 +279,7 @@
         {/if}
       </div>
 
-      <div class="min-w-0 border-t border-rule px-3 pt-1 pb-2 wide:col-start-1 wide:row-start-2">
+      <div class="@container min-w-0 border-t border-rule px-3 pt-1 pb-2 wide:col-start-1 wide:row-start-2">
         {#if data.dayError}
           <LoadProblem kind={data.dayError} text="Could not load recordings." onRetry={data.retry} />
         {:else}
@@ -294,7 +294,7 @@
             <button type="button" class={tool} title="Jump to now (T)" onclick={() => runCommand('now', ctx())}>Now</button>
             <ul
               aria-label="Legend"
-              class="{shortcutsOpen ? 'flex' : 'hidden md:flex'} flex-wrap items-center gap-x-3 gap-y-1 max-md:order-last max-md:w-full md:ml-auto"
+              class="{shortcutsOpen ? 'flex' : 'hidden @min-[60rem]:flex'} flex-wrap items-center gap-x-3 gap-y-1 @max-[60rem]:order-last @max-[60rem]:w-full @min-[60rem]:ml-auto"
             >
               {#each LEGEND_TRIGGERS as t (t)}
                 {@const st = triggerStyle(t)}
@@ -334,7 +334,7 @@
             </ul>
             <button
               type="button"
-              class="{tool} max-md:ml-auto"
+              class="{tool} @max-[60rem]:ml-auto"
               aria-label="Keyboard shortcuts"
               title="Keyboard shortcuts"
               aria-expanded={shortcutsOpen}
@@ -373,9 +373,9 @@
       <section class="flex min-h-0 min-w-0 flex-col border-rule wide:col-start-2 wide:row-span-2 wide:row-start-1 wide:border-l">
         <div class="flex flex-col gap-2 border-y border-rule px-4 pt-3 pb-2 wide:border-t-0">
           {#if data.ready && !data.dayError}
-            <div class="flex items-baseline justify-between gap-3 text-sm text-muted">
-              <h2 class="num font-semibold text-ink">{heading}</h2>
-              {#if summary}<span>{summary}</span>{/if}
+            <div class="flex flex-wrap items-baseline justify-between gap-x-3 text-sm text-muted">
+              <h2 class="num font-semibold whitespace-nowrap text-ink">{heading}</h2>
+              {#if summary}<span class="whitespace-nowrap">{summary}</span>{/if}
             </div>
           {/if}
           <TriggerChips selected={triggers} {available} onChange={(t) => (triggers = t)} />
@@ -392,3 +392,12 @@
     </div>
   {/if}
 </main>
+
+<style>
+  /* A phone row has no room for the wordmark beside the status words, the day title and four 44 px buttons. */
+  @media (max-width: 47.99rem) {
+    .bar:has(:global([data-level]:not([data-level='ok']))) .wordmark {
+      display: none;
+    }
+  }
+</style>

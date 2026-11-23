@@ -203,7 +203,7 @@ describe('LiveTile states', () => {
       await f.emit({ state: 'reconnecting', retryAt: Date.now() + 5000 });
       const status = screen.getByRole('status');
       expect(status.textContent).not.toMatch(/\d/);
-      expect(status.parentElement).toHaveTextContent('in 5 s');
+      expect(status.parentElement).toHaveTextContent("Can't reach the camera. Trying again in 5 s.");
       await vi.advanceTimersByTimeAsync(2000);
       expect(status.parentElement).toHaveTextContent('in 3 s');
       expect(status.textContent).not.toMatch(/\d/);

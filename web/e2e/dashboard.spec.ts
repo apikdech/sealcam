@@ -279,8 +279,12 @@ test.describe('fixed layout', () => {
     expect(apart).toBe(true);
   });
 
-  test('the compact player bar keeps its controls on one row at 390×844', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+  for (const [w, h] of [
+    [390, 844],
+    [844, 390],
+  ] as const)
+  test(`the compact player bar keeps its controls on one row at ${w}×${h}`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
     await page.goto(url());
     await recordings(page).getByRole('option').first().click();
     const bar = page.getByRole('group', { name: 'Player controls' });
@@ -294,7 +298,33 @@ test.describe('fixed layout', () => {
     const lowestTop = Math.max(...boxes.map((r) => r.top));
     const highestBottom = Math.min(...boxes.map((r) => r.bottom));
     expect(lowestTop).toBeLessThan(highestBottom);
-    for (const r of boxes) expect(r.right).toBeLessThanOrEqual(390);
+    for (const r of boxes) expect(r.right).toBeLessThanOrEqual(w);
+    // The picture keeps a usable height (in landscape the bar, the integrity line and the timeline share 390 px).
+    expect((await page.getByTestId('player').boundingBox())!.height).toBeGreaterThanOrEqual(h === 390 ? 110 : 200);
+  });
+
+  test('the Live pill can be pressed while a clip is still verifying', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openShell(page);
+    await recordings(page).getByRole('option').first().click();
+    await expect(page.getByRole('progressbar', { name: 'Verifying' })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to live' }).click({ timeout: 2000 });
+    await expect(page.getByTestId('live-grid')).toBeVisible();
+  });
+
+  test('a phone top bar keeps the day title and 44 px day arrows beside a problem status', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openShell(page);
+    await expect(page.getByTestId('relay-status')).toHaveAttribute('data-level', 'bad');
+    await expect(page.getByTestId('relay-status')).toContainText('Recorder quiet');
+    const title = (await page.getByRole('button', { name: /Fri 6 Nov/ }).boundingBox())!;
+    expect(title.width).toBeGreaterThanOrEqual(60);
+    for (const name of ['Previous day', 'Next day']) expect((await page.getByRole('button', { name }).boundingBox())!.width).toBeGreaterThanOrEqual(44);
+    // Nothing overlaps: the next-day arrow ends before the status starts.
+    const next = (await page.getByRole('button', { name: 'Next day' }).boundingBox())!;
+    expect(next.x + next.width).toBeLessThanOrEqual((await page.getByTestId('relay-status').boundingBox())!.x);
+    const { sw, iw } = await noScroll(page);
+    expect(sw).toBeLessThanOrEqual(iw);
   });
 });
 

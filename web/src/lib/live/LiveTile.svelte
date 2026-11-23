@@ -86,7 +86,7 @@
   const seconds = $derived(snap.retryAt === null ? 0 : Math.max(0, Math.ceil((snap.retryAt - nowMs) / 1000)));
   const live = $derived(snap.state === 'live');
   const icon =
-    'inline-flex h-10 w-10 max-md:h-11 max-md:w-11 items-center justify-center rounded border border-rule text-ink hover:bg-plate';
+    'inline-flex h-10 w-10 max-md:h-11 max-md:w-11 items-center justify-center rounded border border-rule text-ink hover:bg-ground';
   const showFs = $derived((live || fullscreen) && fsMode !== 'none');
 
   // Focus waits a beat so a double-click (fullscreen) can cancel it.
@@ -120,11 +120,11 @@
   bind:this={root}
   role="group"
   aria-label={name}
-  class="relative overflow-hidden rounded-lg border border-rule bg-ground [&:fullscreen_video]:aspect-auto [&:fullscreen_video]:h-full [&:fullscreen>[data-stage]]:h-full {single
+  class="relative overflow-hidden bg-(--z-ov-ground) [&:fullscreen_video]:aspect-auto [&:fullscreen_video]:h-full [&:fullscreen>[data-stage]]:h-full {single
     ? 'flex h-full flex-col'
     : onFocus
-      ? 'cursor-pointer'
-      : ''}"
+      ? 'cursor-pointer rounded-lg border border-rule'
+      : 'rounded-lg border border-rule'}"
   data-testid="live-tile"
   data-camera={cameraId}
   data-state={snap.state}
@@ -142,30 +142,18 @@
         clearTimeout(focusTimer);
         if (live || fullscreen) toggleFs();
       }}
-      class="w-full bg-ground object-contain {single ? 'h-full min-h-0' : 'aspect-video'}"
+      class="aspect-video w-full bg-(--z-ov-ground) object-contain {single ? 'h-full min-h-0' : ''}"
     ></video>
 
-    {#if single}
-      <div class="absolute top-3 left-3 flex items-center gap-2 text-(--z-ov-ink) max-md:top-2 max-md:left-2">
-        {#if live}
-          <span class="rounded bg-(--z-ov-line) px-2 py-0.5 text-xs font-semibold tracking-wider text-(--z-ov-ground)">Live</span>
-        {/if}
-        <span class="truncate font-semibold">{name}</span>
-        {#if live}
-          <span class="num text-sm text-(--z-ov-muted)">as of {formatClock(nowMs, zone, true)}</span>
-        {/if}
-      </div>
-    {/if}
-
     {#if !live}
-      <div class="ov-panel absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center text-(--z-ov-ink)">
+      <div class="ov-panel absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center text-(--z-ov-ink) {single ? 'pt-12' : ''}">
         <p aria-hidden="true">
           {#if snap.state === 'connecting'}
             Connecting…
           {:else if snap.state === 'reconnecting'}
-            Can't reach the camera. Trying again{#if seconds > 0}<span class="num"> in {seconds} s.</span>{:else}…{/if}
+            Can't reach the camera. Trying again{#if seconds > 0}<span class="num">{` in ${seconds} s.`}</span>{:else}…{/if}
           {:else if snap.state === 'limit'}
-            Too many people are watching. zview tries again{#if seconds > 0}<span class="num"> in {seconds} s.</span>{:else}…{/if}
+            Too many people are watching. zview tries again{#if seconds > 0}<span class="num">{` in ${seconds} s.`}</span>{:else}…{/if}
           {:else if snap.state === 'locked'}
             Key locked.
           {:else}
@@ -179,10 +167,22 @@
         {/if}
       </div>
     {/if}
+    <!-- After the panel, so the name stays readable over it. -->
+    {#if single}
+      <div class="absolute top-3 left-3 flex items-center gap-2 text-(--z-ov-ink) max-md:top-2 max-md:left-2">
+        {#if live}
+          <span class="rounded bg-(--z-ov-line) px-2 py-0.5 text-xs font-semibold tracking-wider text-(--z-ov-ground)">Live</span>
+        {/if}
+        <span class="truncate font-semibold">{name}</span>
+        {#if live}
+          <span class="num text-sm text-(--z-ov-muted)">as of {formatClock(nowMs, zone, true)}</span>
+        {/if}
+      </div>
+    {/if}
   </div>
 
   {#if single}
-    <div role="group" aria-label="Live controls" class="flex items-center justify-between gap-x-2 px-3 py-2">
+    <div role="group" aria-label="Live controls" class="flex min-h-14 items-center max-md:min-h-15 justify-between gap-x-2 border-t border-rule bg-plate px-3 py-2">
       <span class="text-sm text-muted">Live now</span>
       <div class="flex items-center gap-2">
         {#if snap.canUnmute}

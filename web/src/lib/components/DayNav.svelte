@@ -34,19 +34,19 @@
   }
 
   const btn =
-    'inline-flex h-11 w-11 items-center justify-center rounded-[10px] text-ink hover:bg-plate disabled:text-muted disabled:opacity-50 md:h-9 md:w-9';
+    'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] text-ink hover:bg-plate disabled:text-muted disabled:opacity-50 md:h-9 md:w-9';
 </script>
 
 <svelte:window onpointerdown={onwindowpointerdown} />
 
-<div bind:this={root} class="relative flex min-w-0 items-center gap-0.5" {onkeydown} role="presentation">
+<div bind:this={root} class="relative flex min-w-0 items-center gap-0.5 max-md:shrink-0" {onkeydown} role="presentation">
   <button type="button" class={btn} aria-label="Previous day" onclick={() => onDay(shiftDay(day, -1))}>
     <Icon name="chevron-left" />
   </button>
   <button
     bind:this={title}
     type="button"
-    class="flex min-h-11 min-w-0 items-baseline gap-1.5 rounded-[10px] px-2 text-ink hover:bg-plate md:min-h-9"
+    class="flex min-h-11 min-w-0 items-center gap-1.5 md:items-baseline rounded-[10px] px-1 max-md:shrink-0 md:px-2 text-ink hover:bg-plate md:min-h-9"
     aria-haspopup="dialog"
     aria-expanded={open}
     aria-controls={open ? menuId : undefined}

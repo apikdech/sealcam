@@ -15,7 +15,7 @@
 
 <button
   type="button"
-  class="inline-flex size-11 items-center justify-center text-muted"
+  class="inline-flex size-11 shrink-0 items-center justify-center text-ink"
   aria-label={`Theme: ${LABEL[choice]}`}
   title={`Theme: ${LABEL[choice]}`}
   onclick={cycle}

@@ -34,7 +34,7 @@
   }
 </script>
 
-<div class="relative inline-block" {onkeydown} role="presentation">
+<div class="relative inline-block min-w-0" {onkeydown} role="presentation">
   <button
     type="button"
     data-testid="relay-status"
@@ -43,7 +43,7 @@
     aria-controls={regionId}
     aria-label={words.short}
     title={words.level === 'ok' ? words.details[0] : undefined}
-    class="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 px-3 text-sm text-ink"
+    class="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 px-3 text-sm text-ink max-md:gap-1.5 max-md:px-1.5 max-md:text-left max-md:text-xs max-md:leading-tight"
     onclick={() => (open = !open)}
   >
     <span aria-hidden="true" class="inline-block h-2.5 w-2.5 shrink-0 rounded-full {dot}"
@@ -54,7 +54,7 @@
   <div
     id={regionId}
     hidden={!open}
-    class="absolute right-0 top-full z-10 w-72 max-w-[90vw] border border-rule bg-plate p-3 text-sm text-ink"
+    class="absolute right-0 top-full z-10 w-64 max-w-[90vw] md:w-72 border border-rule bg-plate p-3 text-sm text-ink"
   >
     {#if open}
       <ul class="space-y-1">

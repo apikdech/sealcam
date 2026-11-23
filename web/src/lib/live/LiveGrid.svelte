@@ -27,6 +27,6 @@
         <LiveTile cameraId={cam.id} name={cam.name} {client} {zone} offline={down.has(cam.id)} onFocus={() => onFocus?.(cam.id)} />
       {/each}
     </div>
-    <p class="px-3 py-2 text-sm text-muted">Live now · tap a camera to see it alone</p>
+    <p class="flex min-h-14 items-center border-t border-rule bg-plate px-3 py-2 text-sm text-muted max-md:min-h-15">Live now · tap a camera to see it alone</p>
   {/if}
 </div>
