@@ -1,6 +1,6 @@
 # zrelay runbook
 
-This runbook tells you how to install and operate zrelay v2. zrelay runs on the Mac mini
+This runbook tells the owner how to install and operate zrelay v2. zrelay runs on the Mac mini
 (OrbStack). MinIO runs on the Synology NAS. The procedures follow design §8.3 and the decisions
 D11 to D19 in `docs/superpowers/specs/2026-11-06-zrelay-v2-design.md`.
 
@@ -16,8 +16,10 @@ Overview of the system:
   camera can be on the home LAN (see section 8).
 
 Do all commands on the Mac mini, from the repository root, unless a step gives a different
-location. `mc` is the MinIO client. `<alias>` is the name that you give to your MinIO server one
-time with `mc alias set`.
+location.
+
+* `mc` is the MinIO client.
+* `<alias>` is the name that you give to your MinIO server one time with `mc alias set`.
 
 ## 1. MinIO: the bucket
 
@@ -25,15 +27,17 @@ Use a bucket that contains only zrelay data. You cannot limit the list permissio
 the `zrelay/` prefix for a request without a prefix (see section 2). Thus, with a dedicated bucket,
 the relay sees only the key names of zrelay objects.
 
+> **Warning:** Keep bucket versioning off. If versioning is on, an expiry rule keeps the old
+> versions, and MinIO never gets the storage space back (design §6.7).
+
 ```sh
 mc alias set <alias> https://nas.<tailnet>.ts.net:9000 <admin-access-key> <admin-secret-key>
 mc mb <alias>/cctv
 mc version info <alias>/cctv        # must report that versioning is not enabled
 ```
 
-**Keep bucket versioning off.** If versioning is on, an expiry rule keeps the old versions, and
-MinIO never gets the storage space back (design §6.7). A new bucket does not have versioning. If
-`mc version info` shows that versioning is on, make a new bucket. Do not use the old bucket.
+A new bucket does not have versioning. If `mc version info` shows that versioning is on, make a
+new bucket. Do not use the old bucket.
 
 `deploy/zrelay.example.yaml` and the two policy files use the names `cctv` (the bucket) and
 `zrelay` (the `storage.root` in `zrelay.yaml`). If you use other names, change the `Resource` ARNs
@@ -65,10 +69,12 @@ installation.
 Why the relay cannot delete the archive (D15): the only `DeleteObject` statement applies to keys
 whose last path element starts with a dot. The names of archive objects (`<name>.zrec`,
 `<name>.json`) never start with a dot. Thus, if an attacker gets control of the relay host, the
-relay credentials cannot delete the recordings. `TestRelayPolicyDeniesArchiveDelete`
-(`go test -tags integration ./deploy/`) checks this on a real MinIO.
-`TestRelayPolicyWorksWithTheS3Driver` checks that the policy still lets the relay do all of its
-work.
+relay credentials cannot delete the recordings.
+
+* `TestRelayPolicyDeniesArchiveDelete` (`go test -tags integration ./deploy/`) checks this on a
+  real MinIO.
+* `TestRelayPolicyWorksWithTheS3Driver` checks that the policy still lets the relay do all of its
+  work.
 
 The policy files go around two MinIO problems. The tests found these problems:
 
@@ -84,7 +90,7 @@ The policy files go around two MinIO problems. The tests found these problems:
 ## 3. MinIO: retention (ILM)
 
 Two lifecycle rules control the retention (design §6.7). Select the number of days `<N>` that
-MinIO keeps the clips.
+MinIO keeps the clips. Then add the rules:
 
 ```sh
 mc ilm rule add <alias>/cctv --prefix "zrelay/clips/"           --expire-days <N>
@@ -94,7 +100,7 @@ mc ilm rule ls <alias>/cctv
 
 Set `index.retention_days` in `zview.yaml` to the same `<N>`.
 
-> **CAUTION:** If you also add a rule that stops incomplete multipart uploads, set it to
+> **Caution:** If you also add a rule that stops incomplete multipart uploads, set it to
 > **7 days or more**. Crash recovery looks only at today and yesterday. A shorter rule can stop an
 > upload before recovery finds it.
 
@@ -109,18 +115,24 @@ Notes:
 
 Make the household master key one time.
 
-> **WARNING:** Keep the master key safe. If you lose it, you cannot decrypt the recordings. There
+> **Warning:** Keep the master key safe. If you lose it, you cannot decrypt the recordings. There
 > is no recovery.
+
+> **Warning:** Do not type or paste the key into a shell command. The shell keeps the command in
+> `~/.zsh_history` or `~/.bash_history`. That is a plain-text copy outside `deploy/secrets`, and
+> `chmod 600` does not protect it. If you typed the key into a command, delete that history entry.
+> Also delete all synchronized copies and backup copies of the history file.
+
+Build the image first: `docker compose -f deploy/compose.yaml build zrelay`. Then run:
 
 ```sh
 docker run --rm --entrypoint /zrelay zrelay:local key generate --qr
 ```
 
-Before you run this command, build the image with
-`docker compose -f deploy/compose.yaml build zrelay`. Or, from a checkout, run
-`go run ./cmd/zrelay key generate --qr`. The command shows the `zk1-...` key and its fingerprint
-(`key_id`). With `--qr`, it also shows a QR code in the terminal. Use this QR code to add the key
-to the phones.
+Or, from a checkout, run `go run ./cmd/zrelay key generate --qr`.
+
+The command shows the `zk1-...` key and its fingerprint (`key_id`). With `--qr`, it also shows a
+QR code in the terminal. Use this QR code to add the key to the phones.
 
 Keep the key in two locations that you control: a password manager and an offline copy. Then make
 the files that zrelay and zview-server need:
@@ -146,20 +158,18 @@ ZR_KEY=$(cat deploy/secrets/zrelay_master) \
 ```
 
 `api-token-hash` shows `hex(SHA-256(K_api))`. zrelay (`live.api_token_sha256`) and zview-server
-read it from the same file. To change the credential, put two hashes in the list
-(`api_token_sha256` accepts two hashes). Keep the two hashes until the family uses the new key.
+read it from the same file.
+
+To change the credential, put two hashes in the list (`api_token_sha256` accepts two hashes).
+Keep the two hashes until the family uses the new key.
 
 Each `--key` flag takes a reference (`ENV:NAME` or `FILE:/path`). It does not take the key itself.
 
-> **WARNING:** Do not type or paste the key into a shell command. The shell keeps the command in
-> `~/.zsh_history` or `~/.bash_history`. That is a plain-text copy outside `deploy/secrets`, and
-> `chmod 600` does not protect it. If you typed the key into a command, delete that history entry.
-> Also delete all synchronized copies and backup copies of the history file.
-
 ## 5. Docker secrets and the environment file
 
-The files that follow are in `deploy/`. Do not commit them. The start of `deploy/compose.yaml`
-gives the same list.
+> **Caution:** Do not commit these files.
+
+The files that follow are in `deploy/`. The start of `deploy/compose.yaml` gives the same list.
 
 | File | Contents | Which container reads it |
 |---|---|---|
@@ -180,13 +190,13 @@ cp deploy/zview.example.yaml  deploy/zview.yaml
 Make these changes in `deploy/zrelay.yaml`:
 
 * Set `relay.http_listen: "0.0.0.0:9464"`. This value applies in the container. Compose publishes
-  the port only on `127.0.0.1` of the host. Thus the network cannot get to the metrics. If you run
-  zrelay outside a container, keep the default `127.0.0.1:9464`. Never make the metrics port
-  public.
+  the port only on `127.0.0.1` of the host. Thus the network cannot get to the metrics.
+* If you run zrelay outside a container, keep the default `127.0.0.1:9464`. Never make the
+  metrics port public.
 * Keep `relay.shutdown_grace_seconds` less than `stop_grace_period` (40 s) in `compose.yaml`.
 * Set the camera block (`host`, credentials, `rtsp.path`) for each camera.
 
-Before you start the system, check the configuration and the memory budget:
+Before you start the system, check the configuration and the memory budget. Run:
 
 ```sh
 TAILSCALE_IP=$(tailscale ip -4 | head -n 1) docker compose -f deploy/compose.yaml run --rm --no-deps \
@@ -202,13 +212,15 @@ curl -fsS http://127.0.0.1:9464/healthz
 ```
 
 `deploy.sh` gets `TAILSCALE_IP` from `tailscale ip -4`. zrelay publishes the RTSP restream
-(8554/tcp) and the WebRTC ICE port (8189/udp) only on the Tailscale IP. zrelay does not publish
-the live signaling port 9465. zview-server connects to it as `http://zrelay:9465` on the compose
-network.
+(8554/tcp) and the WebRTC ICE port (8189/udp) only on the Tailscale IP.
+
+zrelay does not publish the live signaling port 9465. zview-server connects to it as
+`http://zrelay:9465` on the compose network.
 
 ## 7. HTTPS for zview: `tailscale serve`
 
-zview-server listens on `127.0.0.1:8080` of the host. Use Tailscale to put HTTPS in front of it:
+zview-server listens on `127.0.0.1:8080` of the host. Run these commands to put HTTPS in front of
+it with Tailscale:
 
 ```sh
 tailscale serve --bg --https=443 http://127.0.0.1:8080
@@ -222,7 +234,12 @@ The web app, `/api/v1/*`, and `/live/*` all use this one origin (D18). Phones op
 
 The camera is on the home LAN. It is not on the tailnet. On macOS Sequoia and later, an
 application must have the **Local Network** permission to connect to LAN addresses. The traffic of
-the containers goes out through OrbStack. Thus OrbStack must have this permission:
+the containers goes out through OrbStack. Thus OrbStack must have this permission.
+
+> **Note:** A macOS update can remove the permission. After an update, check this permission
+> first.
+
+Do these steps:
 
 1. Open System Settings > Privacy & Security > Local Network.
 2. Turn on **OrbStack**.
@@ -234,15 +251,14 @@ If the permission is missing, the RTSP session and the ONVIF subscription do not
 metrics show `zrelay_camera_rtsp_up 0`, and the logs show `no route to host`. But
 `ping <camera-ip>` from the host shell works.
 
-> **NOTE:** A macOS update can remove the permission. After an update, check this permission
-> first.
-
 ## 9. Family onboarding (QR)
 
 Each family member imports the master key into the web app one time. The key does not go out of
 the browser. The family guide is [`docs/family-onboarding.md`](../docs/family-onboarding.md).
 
-> **WARNING:** Do not send the key in a chat or an email. Show the QR code to the person directly.
+> **Warning:** Do not send the key in a chat or an email. Show the QR code to the person directly.
+
+Do these steps:
 
 1. Run `zrelay key generate --qr` (section 4). It shows the QR code for the new key, in the
    uppercase form that the scanner uses.
@@ -257,8 +273,8 @@ the browser. The family guide is [`docs/family-onboarding.md`](../docs/family-on
 `/healthz` and `/metrics` are on `127.0.0.1:9464`.
 
 * `/healthz` gives 200 when zrelay runs and the storage circuit breaker was not out of the closed
-  state for more than 5 minutes. If not, it gives 503 and the reason. The backlog absorbs a
-  shorter outage. A shorter outage must not restart the container.
+  state for more than 5 minutes. If not, it gives 503 and the reason.
+* The backlog absorbs a shorter outage. A shorter outage must not restart the container.
 * `/metrics` gives Prometheus text. Monitor these metrics:
 
 | Metric | Meaning | Alert if |
@@ -279,10 +295,11 @@ never contain keys, credentials, or frame data.
 ## 11. Outage tolerance: how long can MinIO be down?
 
 zrelay never writes to disk. When storage is not available, finished clips and clips in progress
-stay in memory, in the egress backlog (`relay.egress_backlog_mb`). When the backlog is full, zrelay
-drops the oldest finished clip. Coverage records it as `backlog`. Then zrelay stops the largest
-clip in progress. During this time, the circuit breaker stops the upload attempts. It also checks
-if storage is available again.
+stay in memory, in the egress backlog (`relay.egress_backlog_mb`).
+
+When the backlog is full, zrelay drops the oldest finished clip. Coverage records it as
+`backlog`. Then zrelay stops the largest clip in progress. During this time, the circuit breaker
+stops the upload attempts. It also checks if storage is available again.
 
 The approximate tolerance is:
 
@@ -303,9 +320,10 @@ Event clips come in bursts. Thus the real tolerance is usually much longer than 
 continuous recording. `zrelay_backlog_bytes` shows how full the backlog is.
 
 To increase the tolerance, increase `egress_backlog_mb` and `max_memory_mb` together.
-`zrelay config check` shows the budget, which must be less than `max_memory_mb`. If a clip still
-waits when zrelay stops (SIGTERM), zrelay drops the clip and counts it as `shutdown`. zrelay
-cannot write the coverage object while storage is down.
+`zrelay config check` shows the budget, which must be less than `max_memory_mb`.
+
+If a clip still waits when zrelay stops (SIGTERM), zrelay drops the clip and counts it as
+`shutdown`. zrelay cannot write the coverage object while storage is down.
 
 ## 12. Soak test (72 hours, manual)
 
@@ -313,8 +331,11 @@ Before you use an installation, run it for 72 hours with the real cameras, and r
 size. The container has `read_only: true` and no volumes. Thus an attempt to write a file fails
 and stops the process. Thus **zero restarts** also prove that nothing wrote to disk.
 
-Start the system (section 6). Write down the start time. Then, on the host, record a sample every
-15 minutes:
+Do these steps:
+
+1. Start the system (section 6).
+2. Write down the start time.
+3. On the host, record a sample every 15 minutes:
 
 ```sh
 mkdir -p ~/zrelay-soak
@@ -341,7 +362,7 @@ During the test, make sure that motion occurs:
 * Keep the motion detection of the camera on. Cause motion a few times each day.
 * Keep one live view open on a phone for one hour or more each day.
 
-After 72 hours (288 samples), stop the sampler and do these checks:
+After 72 hours (288 samples), stop the sampler and run these checks:
 
 ```sh
 kill %1 2>/dev/null; pkill -f zrelay-soak/sample.sh

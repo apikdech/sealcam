@@ -1,7 +1,9 @@
 # Playback clip fixtures
 
-A real clip recorded by the relay pipeline (`app.Run`) into MinIO over the S3 multipart path, plus two derived variants, for the
-playback engine tests (`web/e2e/playback.spec.ts`) and later end-to-end tests.
+These fixtures are for the engineers who write playback and end-to-end tests. They are a real
+clip that the relay pipeline (`app.Run`) recorded into MinIO over the S3 multipart path, and two
+variants of that clip. The playback engine tests (`web/e2e/playback.spec.ts`) and later
+end-to-end tests use them.
 
 | Directory | What it is |
 |---|---|
@@ -9,41 +11,63 @@ playback engine tests (`web/e2e/playback.spec.ts`) and later end-to-end tests.
 | `tamper/` | `complete/` with one ciphertext bit flipped in chunk 18 (`manifest.json` `tamper_chunk`). Chunks 0-17 authenticate, chunk 18 fails with `ErrAuth`. |
 | `incomplete/` | `complete/` cut in the middle of its final chunk, with the sidecar of a recovered clip (Contract §7.4): `status: incomplete`, `end_reason: recovered`, null `end_time`, `duration_ms`, `plaintext_size_bytes` and `seek_index`, empty `triggers`. The reader reports `ErrTruncated` on the last chunk. |
 
-All three share one `clip_id`, camera (`front-door`) and key, so each is a separate storage
-tree. The trees are laid out like a `local` driver `base_dir` (the committed S3 objects, copied out with GETs), which is what `zview-server` serves in tests: point `zview-server` at e.g.
-`testdata/clips/complete` with `storage.root: zrelay`. (Copy it first; do not serve the
-checked-in tree directly from a test.)
+All three share one `clip_id`, camera (`front-door`) and key. Each one is a separate storage tree.
 
-`manifest.json` holds the master key (`master_key`, the Contract §4.5 vector key `00..1f`, so
-`k_api_sha256` is `testdata/zrec/v1/vectors.json` `derived.k_api_sha256_hex`), the clip id,
-`tamper_chunk` and `tamper_fail_at_ms` (media time of the last fragment starting at or before the
-tampered chunk). This key protects only these synthetic frames and is public.
+The trees have the layout of a `local` driver `base_dir`. They are the committed S3 objects,
+copied out with GETs. `zview-server` serves this layout in tests. For example, point
+`zview-server` at `testdata/clips/complete` with `storage.root: zrelay`.
 
-The picture is the synthetic `testsrc2` pattern of `testdata/video/h264-640x360-gop2-10s.h264`
-looped, never real footage.
+> **Caution:** Copy the tree first. Do not serve the checked-in tree directly from a test.
+
+`manifest.json` holds these values:
+
+- `master_key`: the Contract §4.5 vector key `00..1f`. Thus `k_api_sha256` is
+  `testdata/zrec/v1/vectors.json` `derived.k_api_sha256_hex`.
+- The clip id.
+- `tamper_chunk`.
+- `tamper_fail_at_ms`: the media time of the last fragment that starts at or before the tampered
+  chunk.
+
+This key protects only these synthetic frames, and it is public.
+
+The picture is the synthetic `testsrc2` pattern of `testdata/video/h264-640x360-gop2-10s.h264`,
+in a loop. It is never real footage.
 
 ## Regenerate
+
+Docker must be running. The generator starts a throwaway MinIO container
+(`storagetest.StartMinIO`).
 
 ```sh
 ZRELAY_FIXTURES_OUT=$PWD/testdata/clips \
   go test -tags fixtures -run TestGenerateClipFixtures -count=1 -timeout 5m ./internal/relay/app
 ```
 
-The generator is `internal/relay/app/fixtures_gen_test.go` (build tag `fixtures`, so it is not part
-of `make test`). It starts the in-process RTSP test server looping the H.264 fixture and the fake
-ONVIF camera and a throwaway MinIO container (`storagetest.StartMinIO`, so **Docker must be
-running**), runs the real `app.Run` with `storage.driver: s3` against it, holds a motion trigger
-for 33 s, then reads the committed video and sidecar objects back with S3 GETs, writes them under
-`<variant>/zrelay/clips/...` (the `local` driver's layout) and derives the two variants from those
-bytes. It takes about 35 s plus the MinIO image pull on a first run. Regenerating changes the clip id and start time, so commit `manifest.json` and all
-three trees together.
+The generator is `internal/relay/app/fixtures_gen_test.go`. It has the build tag `fixtures`, so
+`make test` does not run it. The generator does these things:
 
-Verify a variant with the decryptor (the `ZK` value is `master_key` from `manifest.json`):
+1. It starts the in-process RTSP test server, which loops the H.264 fixture.
+2. It starts the fake ONVIF camera and the MinIO container.
+3. It runs the real `app.Run` with `storage.driver: s3` against them.
+4. It holds a motion trigger for 33 s.
+5. It reads the committed video and sidecar objects back with S3 GETs.
+6. It writes them under `<variant>/zrelay/clips/...` (the layout of the `local` driver).
+7. It derives the two variants from those bytes.
+
+The run takes about 35 s, plus the MinIO image pull on a first run. Regeneration changes the clip
+id and the start time. Thus commit `manifest.json` and all three trees together.
+
+## Verify a variant
+
+Use the decryptor. The `ZK` value is `master_key` from `manifest.json`.
 
 ```sh
 export ZK=zk1-000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f-2418
 go run ./cmd/zdecrypt --key ENV:ZK --in testdata/clips/complete/zrelay/clips/front-door/<day>/<name>.zrec --out clip.mp4
 ```
 
-`tamper/` exits 2 with `chunk authentication failed: chunk 18`; `incomplete/` exits 2 unless
-`--allow-incomplete` is given, then writes the verified prefix.
+Expected results:
+
+- `tamper/` exits 2 with `chunk authentication failed: chunk 18`.
+- `incomplete/` exits 2.
+- If you add `--allow-incomplete`, `incomplete/` writes the verified prefix.
