@@ -337,7 +337,7 @@
     </button>
   {/snippet}
 
-  <div role="group" aria-label="Player controls" class="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2">
+  <div role="group" aria-label="Player controls" class="flex items-center py-2 {compact ? 'flex-nowrap gap-1 px-2' : 'flex-wrap gap-x-2 gap-y-1 px-3'}">
     <button type="button" class={icon} title="Previous clip (J)" aria-label="Previous clip" disabled={!onPrev} onclick={onPrev}>
       <Icon name="prev" />
     </button>
@@ -364,7 +364,7 @@
     <input
       type="range"
       aria-label="Position"
-      class="min-w-24 flex-1 max-md:h-11"
+      class="flex-1 max-md:h-11 {compact ? 'min-w-0' : 'min-w-24'}"
       min="0"
       max={duration}
       step="any"

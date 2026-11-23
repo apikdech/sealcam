@@ -493,6 +493,14 @@ describe('Player', () => {
       expect(screen.getByTestId('integrity')).toHaveTextContent('Encrypted recording verified');
     });
 
+    it('compact: the bar stays on one line and the slider can shrink (jsdom has no layout, so the classes are pinned)', async () => {
+      await mount({ compact: true });
+      const bar = screen.getByRole('group', { name: 'Player controls' });
+      expect(bar).toHaveClass('flex-nowrap');
+      expect(bar).not.toHaveClass('flex-wrap');
+      expect(within(bar).getByRole('slider', { name: 'Position' })).toHaveClass('min-w-0');
+    });
+
     it('has Full screen in both layouts and no sound button', async () => {
       const descriptor = Object.getOwnPropertyDescriptor(document, 'fullscreenEnabled');
       Object.defineProperty(document, 'fullscreenEnabled', { value: true, configurable: true });
