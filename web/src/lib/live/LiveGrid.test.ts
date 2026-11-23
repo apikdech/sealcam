@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeClient, FakePeer, FakeStream } from '../../../test-support/live-fakes';
 import type { Camera, Status } from '../../worker/schemas';
@@ -37,32 +37,34 @@ afterEach(() => {
 });
 
 const grid = () => screen.getByTestId('live-grid');
+const cols = () => screen.getAllByTestId('live-tile')[0]!.parentElement!;
 const props = (cameras: Camera[], status: Status | null = null) => ({ cameras, client: new FakeClient(), zone: 'UTC', status });
 
 describe('LiveGrid', () => {
-  it('one camera gets a single column class', () => {
+  it('one camera renders a single stage tile with no hint line', () => {
     render(LiveGrid, props(cams('a')));
-    expect(grid().className).toContain('grid-cols-1');
-    expect(grid().className).not.toContain('md:grid-cols-2');
+    expect(screen.getByTestId('live-tile').className).toContain('h-full');
+    expect(screen.getByTestId('live-tile').className).toContain('flex-col');
+    expect(screen.queryByText(/tap a camera/)).toBeNull();
+    expect(grid().className).toContain('h-full');
   });
 
-  it('two cameras go side by side from md', () => {
+  it('two cameras go side by side from md, with the hint line', () => {
     render(LiveGrid, props(cams('a', 'b')));
-    expect(grid().className).toContain('md:grid-cols-2');
+    expect(cols().className).toContain('md:grid-cols-2');
+    expect(screen.getByText('Live now · tap a camera to see it alone')).toBeTruthy();
   });
 
-  it('a single camera is capped in height on desktop, keeping 16:9 by width', () => {
-    render(LiveGrid, props(cams('a')));
-    expect(grid().className).toContain('md:w-[min(100%,calc(56vh*16/9))]');
-    expect(grid().className).not.toContain('mx-auto');
-    cleanup();
-    render(LiveGrid, props(cams('a', 'b')));
-    expect(grid().className).not.toContain('56vh');
+  it('a tile click reports the camera id', async () => {
+    const onFocus = vi.fn();
+    render(LiveGrid, { ...props(cams('a', 'b')), onFocus });
+    await fireEvent.click(screen.getAllByTestId('live-tile')[1]!.querySelector('video')!);
+    expect(onFocus).toHaveBeenCalledWith('b');
   });
 
   it('four cameras get two columns from sm', () => {
     render(LiveGrid, props(cams('a', 'b', 'c', 'd')));
-    expect(grid().className).toContain('sm:grid-cols-2');
+    expect(cols().className).toContain('sm:grid-cols-2');
     expect(screen.getAllByTestId('live-tile')).toHaveLength(4);
   });
 

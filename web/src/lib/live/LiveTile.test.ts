@@ -297,3 +297,43 @@ describe('LiveTile states', () => {
     expect(tile.getAttribute('style') ?? '').toMatch(/--z-ov-ground/);
   });
 });
+
+describe('LiveTile focus and single mode', () => {
+  it('single: shows the bar with Live now, sound and Full screen, and no overlay scrim', async () => {
+    const f = fakeTile();
+    render(LiveTile, { cameraId: 'front', name: 'Front', client: new FakeClient(), zone: ZONE, makeTile: f.make, single: true });
+    await f.emit({ state: 'live', canUnmute: true });
+    const tile = screen.getByTestId('live-tile');
+    expect(within(tile).getByText('Live now')).toBeTruthy();
+    expect(within(tile).getByRole('button', { name: 'Turn sound on' })).toBeTruthy();
+    expect(within(tile).getByRole('button', { name: 'Full screen' })).toBeTruthy();
+    expect(tile.querySelector('.scrim')).toBeNull();
+    expect(within(tile).getByText(/as of /)).toBeTruthy();
+  });
+
+  it('single: no sound button without canUnmute', async () => {
+    const f = fakeTile();
+    render(LiveTile, { cameraId: 'front', client: new FakeClient(), zone: ZONE, makeTile: f.make, single: true });
+    await f.emit({ state: 'live' });
+    expect(screen.queryByRole('button', { name: /Turn sound/ })).toBeNull();
+  });
+
+  it('grid: clicking the video calls onFocus, clicking Try now does not', async () => {
+    const f = fakeTile();
+    const onFocus = vi.fn();
+    render(LiveTile, { cameraId: 'cam1', client: new FakeClient(), zone: ZONE, makeTile: f.make, onFocus });
+    await f.emit({ state: 'reconnecting', retryAt: Date.now() + 5000 });
+    await fireEvent.click(screen.getByRole('button', { name: 'Try now' }));
+    expect(onFocus).not.toHaveBeenCalled();
+    await fireEvent.click(screen.getByTestId('live-tile').querySelector('video')!);
+    expect(onFocus).toHaveBeenCalledTimes(1);
+  });
+
+  it('single: clicking the video does not call onFocus', async () => {
+    const f = fakeTile();
+    const onFocus = vi.fn();
+    render(LiveTile, { cameraId: 'cam1', client: new FakeClient(), zone: ZONE, makeTile: f.make, onFocus, single: true });
+    await fireEvent.click(screen.getByTestId('live-tile').querySelector('video')!);
+    expect(onFocus).not.toHaveBeenCalled();
+  });
+});
