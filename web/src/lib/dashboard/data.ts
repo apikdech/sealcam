@@ -1,7 +1,7 @@
 // Loading one local day of clips and coverage for the timeline page, and the
 // mapping from API shapes to the timeline model.
 import type { EventRow } from '../components/EventList.svelte';
-import type { Request } from '../../worker/protocol';
+import type { QueryValue, Request } from '../../worker/protocol';
 import type { Coverage as ApiCoverage, Sidecar } from '../../worker/schemas';
 import type { Coverage, TimelineClip } from '../timeline/model';
 import { localDayOf, localDayRange } from '../timeline/timezone';
@@ -44,8 +44,8 @@ export interface DayQuery {
   zone: string;
   /** '' for all cameras. */
   camera: string;
-  /** '' for all triggers. */
-  trigger: string;
+  /** Empty for all triggers. */
+  triggers: readonly string[];
   /** Every known camera id; coverage is read per camera. */
   cameras: readonly string[];
 }
@@ -62,9 +62,9 @@ type Caller = { call<T = unknown>(msg: Request): Promise<T> };
 export async function loadDay(client: Caller, q: DayQuery): Promise<DayData> {
   const [from, to] = localDayRange(q.day, q.zone);
   const range = { from: new Date(from).toISOString(), to: new Date(to).toISOString() };
-  const clipQuery: Record<string, string> = { ...range };
+  const clipQuery: Record<string, QueryValue> = { ...range };
   if (q.camera) clipQuery.camera = q.camera;
-  if (q.trigger) clipQuery.trigger = q.trigger;
+  if (q.triggers.length > 0) clipQuery.trigger = q.triggers;
 
   const covCameras = q.camera ? [q.camera] : [...q.cameras];
   const [list, perCamera] = await Promise.all([

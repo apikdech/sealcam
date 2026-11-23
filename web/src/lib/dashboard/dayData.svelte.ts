@@ -14,7 +14,7 @@ export interface DayQueryInput {
   day: string;
   zone: string;
   camera?: string;
-  trigger?: string;
+  triggers?: readonly string[];
 }
 
 const noKey = (e: unknown): boolean => e instanceof Error && e.name === 'ErrNoKey';
@@ -31,7 +31,7 @@ export function createDayData(client: Caller, query: () => DayQueryInput) {
   let loadedKey = $state('');
   let attempt = $state(0);
 
-  const keyOf = (q: DayQueryInput) => JSON.stringify([q.day, q.zone, q.camera ?? '', q.trigger ?? '']);
+  const keyOf = (q: DayQueryInput) => JSON.stringify([q.day, q.zone, q.camera ?? '', [...(q.triggers ?? [])].sort()]);
   const ready = $derived(loadedKey === keyOf(query()));
 
   // Cameras load again on every retry.
@@ -58,7 +58,7 @@ export function createDayData(client: Caller, query: () => DayQueryInput) {
     const q = query();
     const gen = ++loadGen;
     dayError = '';
-    loadDay(client, { day: q.day, zone: q.zone, camera: q.camera ?? '', trigger: q.trigger ?? '', cameras: cameras.map((c) => c.id) })
+    loadDay(client, { day: q.day, zone: q.zone, camera: q.camera ?? '', triggers: q.triggers ?? [], cameras: cameras.map((c) => c.id) })
       .then((d) => {
         if (gen !== loadGen) return;
         clips = d.clips;

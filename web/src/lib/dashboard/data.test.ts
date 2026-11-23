@@ -63,14 +63,14 @@ describe('loadDay', () => {
       day: '2026-11-06',
       zone: 'Asia/Jakarta',
       camera: 'front-door',
-      trigger: 'person',
+      triggers: ['person', 'pet'],
       cameras: ['front-door', 'yard'],
     });
     expect(gets(calls, '/api/v1/clips')[0]!.query).toEqual({
       from: '2026-11-05T17:00:00.000Z',
       to: '2026-11-06T17:00:00.000Z',
       camera: 'front-door',
-      trigger: 'person',
+      trigger: ['person', 'pet'],
     });
   });
 
@@ -80,7 +80,7 @@ describe('loadDay', () => {
       day: '2026-11-06',
       zone: 'Asia/Jakarta',
       camera: '',
-      trigger: '',
+      triggers: [],
       cameras: ['front-door', 'yard'],
     });
     expect(gets(calls, '/api/v1/clips')[0]!.query).toEqual({
@@ -95,7 +95,7 @@ describe('loadDay', () => {
 
   it('fetches coverage only for the filtered camera', async () => {
     const calls: Request[] = [];
-    await loadDay(client(calls), { day: '2026-11-06', zone: 'UTC', camera: 'yard', trigger: '', cameras: ['front-door', 'yard'] });
+    await loadDay(client(calls), { day: '2026-11-06', zone: 'UTC', camera: 'yard', triggers: [], cameras: ['front-door', 'yard'] });
     expect(gets(calls, '/api/v1/coverage').map((c) => c.query.camera)).toEqual(['yard']);
   });
 
@@ -106,7 +106,7 @@ describe('loadDay', () => {
         throw Object.assign(new Error('boom'), { name: 'ApiError' });
       },
     };
-    const out = await loadDay(c, { day: '2026-11-06', zone: 'UTC', camera: '', trigger: '', cameras: ['a'] });
+    const out = await loadDay(c, { day: '2026-11-06', zone: 'UTC', camera: '', triggers: [], cameras: ['a'] });
     expect(out.coverage).toEqual([]);
   });
 });

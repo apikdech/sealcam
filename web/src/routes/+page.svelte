@@ -47,7 +47,7 @@
   let trigger = $state('');
   let day = $state(untrack(() => localDayOf(nowMs ?? Date.now(), zone)));
 
-  const data = createDayData(untrack(() => client), () => ({ day, zone, camera, trigger }));
+  const data = createDayData(untrack(() => client), () => ({ day, zone, camera, triggers: trigger ? [trigger] : [] }));
 
   let selectedId = $state<string | null>(null);
   let cue = $state<Target | null>(null);

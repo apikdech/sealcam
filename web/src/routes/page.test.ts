@@ -227,7 +227,7 @@ describe('timeline dashboard', () => {
     await fireEvent.change(screen.getByLabelText('Trigger'), { target: { value: 'person' } });
     await waitFor(() => {
       const last = getsFor(c, '/api/v1/clips').at(-1)!;
-      expect(last.query).toMatchObject({ camera: 'yard', trigger: 'person' });
+      expect(last.query).toMatchObject({ camera: 'yard', trigger: ['person'] });
     });
   });
 

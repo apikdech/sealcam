@@ -17,7 +17,7 @@ const settle = async () => {
   }
 };
 
-function setup(client: DashClient, initial: { day: string; camera?: string; trigger?: string } = { day: '2026-11-06' }) {
+function setup(client: DashClient, initial: { day: string; camera?: string; triggers?: string[] } = { day: '2026-11-06' }) {
   const q = $state({ ...initial });
   let data!: ReturnType<typeof createDayData>;
   cleanups.push(
