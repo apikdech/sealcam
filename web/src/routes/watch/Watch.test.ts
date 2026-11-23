@@ -195,6 +195,14 @@ describe('Watch', () => {
     await waitFor(() => expect(within(screen.getByTestId('badge')).getByRole('img', { name: 'Vehicle' })).toHaveTextContent('V'));
   });
 
+  it('the bar shows the recorded length of the playing clip before the browser knows it', async () => {
+    const c = client();
+    c.clips[2] = sidecar(ids.c, '2026-11-06T12:00:00Z', { duration_ms: 28_000 });
+    mount(c);
+    await fireEvent.click((await listRows())[0]!); // c
+    await waitFor(() => expect(screen.getByTestId('clock')).toHaveTextContent('0:00 / 0:28'));
+  });
+
   it('a past day with a recording playing shows the prompt and no Player; today again shows live', async () => {
     mount(client());
     await fireEvent.click((await listRows())[0]!);

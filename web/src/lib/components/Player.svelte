@@ -40,6 +40,8 @@
     compact?: boolean;
     /** The trigger types of a clip, drawn as glyph chips in the Recording badge. */
     triggersOf?: (clipId: string) => readonly string[];
+    /** The recorded length of a clip in milliseconds (sidecar `duration_ms`), or null when unknown. */
+    durationOf?: (clipId: string) => number | null;
     onPrev?: () => void;
     onNext?: () => void;
   }
@@ -56,6 +58,7 @@
     onLive,
     compact = false,
     triggersOf,
+    durationOf,
     onPrev,
     onNext,
   }: Props = $props();
@@ -65,16 +68,38 @@
   let fsMode: FullscreenMode = $state('none');
   let fullscreen = $state(false);
   let pos = $state(0);
-  let duration = $state(0);
+  /** What the browser knows; 0 while a streamed clip has no duration yet (NaN or Infinity until endOfStream). */
+  let mediaDuration = $state(0);
 
   /** Reads what the video element knows after a media event: duration and position. */
   function sync(v: HTMLVideoElement): void {
     pos = v.currentTime;
-    duration = Number.isFinite(v.duration) ? v.duration : 0;
+    mediaDuration = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 0;
+  }
+
+  const SPEEDS = [0.25, 0.5, 1, 1.5, 2, 4] as const;
+  /** Playback speed; kept across clips, not stored. */
+  let rate = $state(1);
+  let speedOpen = $state(false);
+  let speedBox: HTMLElement | undefined = $state();
+  /** Engines and source swaps can reset the rate, so it is applied again after each load and play. */
+  const applyRate = (v: HTMLVideoElement) => {
+    if (v.playbackRate !== rate) v.playbackRate = rate;
+  };
+  $effect(() => {
+    if (video) applyRate(video);
+  });
+  function pickSpeed(s: number): void {
+    rate = s;
+    speedOpen = false;
   }
 
   let player: Player | undefined = $state();
   let snap: PlayerState = $state(initialState());
+  /** The browser's duration once known, else the clip's recorded length, else 0. */
+  const duration = $derived(
+    mediaDuration > 0 ? mediaDuration : ((snap.clipId !== null ? durationOf?.(snap.clipId) : null) ?? 0) / 1000,
+  );
   let loadError = $state('');
   let autoAdvance = $state(true);
   let playing = $state(false);
@@ -252,6 +277,12 @@
   }
 </script>
 
+<svelte:window
+  onclick={(e) => {
+    if (speedOpen && speedBox && !speedBox.contains(e.target as Node)) speedOpen = false;
+  }}
+/>
+
 <section
   bind:this={frame}
   class="flex h-full min-h-0 min-w-0 flex-col bg-plate text-ink [&:fullscreen]:bg-ground"
@@ -265,10 +296,16 @@
       data-clip-player
       muted
       playsinline
-      onplay={() => (playing = true)}
+      onplay={(e) => {
+        playing = true;
+        applyRate(e.currentTarget);
+      }}
       onpause={() => (playing = false)}
       ontimeupdate={(e) => sync(e.currentTarget)}
-      onloadedmetadata={(e) => sync(e.currentTarget)}
+      onloadedmetadata={(e) => {
+        sync(e.currentTarget);
+        applyRate(e.currentTarget);
+      }}
       ondurationchange={(e) => sync(e.currentTarget)}
       class="aspect-video h-full w-full object-contain {snap.clipId === null ? '' : 'bg-black'}"
     ></video>
@@ -350,6 +387,18 @@
       {#if compact}<span>Export</span>{/if}
     </button>
   {/snippet}
+  {#snippet speedChoices(label: string)}
+    <div role="group" aria-label={label} class="flex {compact ? 'flex-wrap' : 'flex-col'} gap-1">
+      {#each SPEEDS as s (s)}
+        <button
+          type="button"
+          class="rounded px-2 py-1 text-sm num max-md:min-h-11 max-md:min-w-11 hover:bg-ground {s === rate ? 'bg-ground font-semibold text-ink' : 'text-muted'}"
+          aria-pressed={s === rate}
+          onclick={() => pickSpeed(s)}>{s}×</button
+        >
+      {/each}
+    </div>
+  {/snippet}
 
   <div role="group" aria-label="Player controls" class="flex items-center border-t border-rule py-2 {compact ? 'flex-nowrap gap-1 px-2' : 'flex-wrap gap-x-1.5 gap-y-1 px-3'}">
     <button type="button" class={icon} title="Previous clip (J)" aria-label="Previous clip" disabled={!onPrev} onclick={onPrev}>
@@ -390,6 +439,21 @@
       }}
     />
     {#if !compact}
+      <div bind:this={speedBox} class="relative" role="presentation" onkeydown={(e) => e.key === 'Escape' && (speedOpen = false)}>
+        <button
+          type="button"
+          class="{ghost} num"
+          aria-label="Playback speed"
+          title="Playback speed"
+          aria-expanded={speedOpen}
+          onclick={() => (speedOpen = !speedOpen)}>{rate}×</button
+        >
+        {#if speedOpen}
+          <div class="absolute bottom-full left-0 z-10 mb-1 rounded border border-rule bg-plate p-1">
+            {@render speedChoices('Speeds')}
+          </div>
+        {/if}
+      </div>
       {@render autoplay()}
       {@render integrityRow()}
       {@render exportButton()}
@@ -427,6 +491,7 @@
           <button type="button" class={ghost} aria-label="Forward 10 seconds" onclick={() => skip(10_000)}>
             <Icon name="fwd10" size={16} /><span>Forward 10 s</span>
           </button>
+          {@render speedChoices('Playback speed')}
           {@render autoplay()}
           {@render exportButton()}
         </div>

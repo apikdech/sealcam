@@ -109,6 +109,7 @@
   const filtered = $derived((data.cameras ?? []).filter((c) => !camera || c.id === camera));
   const available = $derived([...new Set([...data.rows.flatMap((r) => r.triggers), ...triggers])]);
   const triggersOf = (id: string) => data.rows.find((r) => r.id === id)?.triggers ?? [];
+  const durationOf = (id: string) => data.rows.find((r) => r.id === id)?.durationMs ?? null;
   // A phone in landscape is a short screen too.
   const laneHeight = $derived(env.phone ? (short ? 32 : 48) : handheld ? 32 : 40);
 
@@ -276,6 +277,7 @@
             compact={phoneControls}
             cameraName={data.nameOf}
             {triggersOf}
+            {durationOf}
             onState={onPlayerState}
             onLive={goLive}
             onPrev={() => runCommand('prev', ctx())}

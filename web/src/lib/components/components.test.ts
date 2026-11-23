@@ -536,6 +536,94 @@ describe('Player', () => {
       await mount();
       expect(screen.getByTestId('integrity')).toHaveTextContent('Encrypted recording verified');
     });
+
+    describe('length while the clip streams', () => {
+      it('uses the recorded length while the browser does not know the duration', async () => {
+        await mount({ durationOf: (id: string) => (id === ids.a ? 28_000 : null) });
+        const v = screen.getByTestId('player');
+        stubTime(v, NaN, 2);
+        await fireEvent(v, new Event('timeupdate'));
+        expect(screen.getByTestId('clock')).toHaveTextContent('0:02 / 0:28');
+        const range = screen.getByRole('slider', { name: 'Position' }) as HTMLInputElement;
+        expect(range).toBeEnabled();
+        expect(range.max).toBe('28');
+      });
+
+      it('an incomplete clip with no recorded length keeps 0:00 and a disabled slider', async () => {
+        await mount({ durationOf: () => null });
+        const v = screen.getByTestId('player');
+        stubTime(v, NaN, 2);
+        await fireEvent(v, new Event('timeupdate'));
+        expect(screen.getByTestId('clock')).toHaveTextContent('0:02 / 0:00');
+        expect(screen.getByRole('slider', { name: 'Position' })).toBeDisabled();
+      });
+
+      it('the browser duration wins once it is known', async () => {
+        await mount({ durationOf: () => 28_000 });
+        const v = screen.getByTestId('player');
+        stubTime(v, 27.4, 2);
+        await fireEvent(v, new Event('durationchange'));
+        expect(screen.getByTestId('clock')).toHaveTextContent('0:02 / 0:27');
+      });
+    });
+
+    describe('playback speed', () => {
+      it('a Playback speed button shows 1× and its menu sets the rate and marks the choice', async () => {
+        await mount();
+        const v = screen.getByTestId('player') as HTMLVideoElement;
+        const bar = screen.getByRole('group', { name: 'Player controls' });
+        const btn = within(bar).getByRole('button', { name: 'Playback speed' });
+        expect(btn).toHaveTextContent('1×');
+        await fireEvent.click(btn);
+        const menu = screen.getByRole('group', { name: 'Speeds' });
+        const items = within(menu).getAllByRole('button');
+        expect(items.map((b) => b.textContent?.trim())).toEqual(['0.25×', '0.5×', '1×', '1.5×', '2×', '4×']);
+        expect(within(menu).getByRole('button', { name: '1×' })).toHaveAttribute('aria-pressed', 'true');
+        await fireEvent.click(within(menu).getByRole('button', { name: '2×' }));
+        expect(v.playbackRate).toBe(2);
+        expect(btn).toHaveTextContent('2×');
+        expect(screen.queryByRole('group', { name: 'Speeds' })).toBeNull();
+        await fireEvent.click(btn);
+        expect(within(screen.getByRole('group', { name: 'Speeds' })).getByRole('button', { name: '2×' })).toHaveAttribute('aria-pressed', 'true');
+        expect(within(screen.getByRole('group', { name: 'Speeds' })).getByRole('button', { name: '1×' })).toHaveAttribute('aria-pressed', 'false');
+      });
+
+      it('the menu closes on Escape and on a click outside', async () => {
+        await mount();
+        const btn = screen.getByRole('button', { name: 'Playback speed' });
+        await fireEvent.click(btn);
+        await fireEvent.keyDown(screen.getByRole('group', { name: 'Speeds' }), { key: 'Escape' });
+        expect(screen.queryByRole('group', { name: 'Speeds' })).toBeNull();
+        await fireEvent.click(btn);
+        await fireEvent.click(document.body);
+        expect(screen.queryByRole('group', { name: 'Speeds' })).toBeNull();
+      });
+
+      it('the speed stays when the player moves to another clip', async () => {
+        await mount();
+        const v = screen.getByTestId('player') as HTMLVideoElement;
+        await fireEvent.click(screen.getByRole('button', { name: 'Playback speed' }));
+        await fireEvent.click(screen.getByRole('button', { name: '2×' }));
+        emit(ids.b, start + 60_000);
+        v.playbackRate = 1;
+        await fireEvent(v, new Event('loadedmetadata'));
+        expect(v.playbackRate).toBe(2);
+      });
+
+      it('compact: the speeds are in the More menu, not in the bar', async () => {
+        await mount({ compact: true });
+        const v = screen.getByTestId('player') as HTMLVideoElement;
+        const bar = screen.getByRole('group', { name: 'Player controls' });
+        expect(within(bar).queryByRole('button', { name: 'Playback speed' })).toBeNull();
+        await fireEvent.click(screen.getByRole('button', { name: 'More' }));
+        const menu = screen.getByRole('group', { name: 'More controls' });
+        const speeds = within(menu).getByRole('group', { name: 'Playback speed' });
+        expect(within(speeds).getByRole('button', { name: '1×' })).toHaveAttribute('aria-pressed', 'true');
+        await fireEvent.click(within(speeds).getByRole('button', { name: '0.5×' }));
+        expect(v.playbackRate).toBe(0.5);
+        expect(within(speeds).getByRole('button', { name: '0.5×' })).toHaveAttribute('aria-pressed', 'true');
+      });
+    });
   });
 
   it('play button label follows the state', async () => {
