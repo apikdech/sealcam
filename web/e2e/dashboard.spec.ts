@@ -156,12 +156,46 @@ test.describe('desktop', () => {
   });
 });
 
+/**
+ * Everything is on screen and nothing is clipped: `main` (h-dvh, overflow hidden) has no hidden
+ * overflow, the stage, the timeline and the player bar sit inside the viewport, and the rows area
+ * keeps three rows (64 px on phones, 56 px side by side).
+ */
+async function expectFits(page: Page, rowPx: number) {
+  const g = await page.evaluate(() => {
+    const box = (el: Element | null) => {
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom, width: r.width, height: r.height };
+    };
+    const main = document.querySelector('[data-testid=watch]')!;
+    return {
+      ih: innerHeight,
+      main: { sh: main.scrollHeight, ch: main.clientHeight },
+      stage: box(document.querySelector('[data-testid=stage]')),
+      timeline: box(document.querySelector('canvas')),
+      bar: box(document.querySelector('[aria-label="Player controls"], [aria-label="Live controls"]')),
+      rows: box(document.querySelector('[role=listbox]')?.parentElement ?? null),
+    };
+  });
+  expect(g.main.sh).toBeLessThanOrEqual(g.main.ch);
+  expect(g.stage!.width).toBeGreaterThan(0);
+  expect(g.stage!.height).toBeGreaterThanOrEqual(60);
+  expect(g.stage!.top).toBeGreaterThanOrEqual(0);
+  expect(g.stage!.bottom).toBeLessThanOrEqual(g.ih + 1);
+  expect(g.timeline!.height).toBeGreaterThan(0);
+  expect(g.timeline!.bottom).toBeLessThanOrEqual(g.ih + 1);
+  if (g.bar) expect(g.bar.bottom).toBeLessThanOrEqual(g.ih + 1);
+  expect(g.rows!.height).toBeGreaterThanOrEqual(3 * rowPx - 1);
+  expect(g.rows!.bottom).toBeLessThanOrEqual(g.ih + 1);
+}
+
 test.describe('fixed layout', () => {
-  for (const [w, h] of [
-    [1440, 900],
-    [1280, 720],
-    [390, 844],
-    [844, 390],
+  for (const [w, h, rowPx] of [
+    [1440, 900, 56],
+    [1280, 720, 56],
+    [390, 844, 64],
+    [844, 390, 56],
   ] as const) {
     test(`the page does not scroll at ${w}×${h}`, async ({ page }) => {
       await page.setViewportSize({ width: w, height: h });
@@ -170,50 +204,68 @@ test.describe('fixed layout', () => {
       const { sh, ih, sw, iw } = await noScroll(page);
       expect(sh).toBeLessThanOrEqual(ih);
       expect(sw).toBeLessThanOrEqual(iw);
+      await expectFits(page, rowPx);
     });
   }
 
-  for (const [w, h] of [
-    [390, 844],
-    [375, 667],
+  for (const [w, h, rowPx] of [
+    [390, 844, 64],
+    [375, 667, 64],
+    [844, 390, 56],
   ] as const) {
-    test(`a past day and a playing clip do not scroll the page at ${w}×${h}, and the list keeps three rows`, async ({ page }) => {
+    test(`live, a playing clip and a past day fit without clipping at ${w}×${h}`, async ({ page }) => {
       await page.setViewportSize({ width: w, height: h });
-      await page.goto(url());
+      // The real shell, so the real top bar takes its height.
+      await openShell(page);
       const rows = recordings(page).getByRole('option');
       await expect(rows.first()).toBeVisible();
-      const check = async () => {
-        const { sh, ih } = await noScroll(page);
-        expect(sh).toBeLessThanOrEqual(ih);
-        const scroller = (await recordings(page).locator('xpath=..').boundingBox())!;
-        expect(scroller.height).toBeGreaterThanOrEqual(3 * 64 - 1);
-        expect(scroller.y + scroller.height).toBeLessThanOrEqual(h + 1);
-      };
-      // Live (today), then a playing clip, then the past-day prompt.
-      await check();
+      await expectFits(page, rowPx);
+      // The shell plays through the real engine (the canned API has no video): the player still mounts.
       await rows.first().click();
-      await expect(page.getByTestId('badge')).toBeVisible();
-      await check();
+      await expect(page.getByRole('group', { name: 'Player controls' })).toBeVisible();
+      await expectFits(page, rowPx);
       await page.getByRole('button', { name: 'Previous day' }).click();
       await expect(page.getByText('Pick an event or a time on the timeline')).toBeVisible();
-      await check();
+      await expectFits(page, rowPx);
     });
   }
 
-  test('on a phone the video stays in view after scrolling the list', async ({ page }) => {
+  test('on a phone the video stays in view after scrolling the list, live and playing', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await openShell(page);
+    await page.goto(url());
     const list = recordings(page);
     await expect(list.getByRole('option').first()).toBeVisible();
-    const scroller = list.locator('xpath=..');
-    await scroller.hover();
-    for (let i = 0; i < 10; i++) await page.mouse.wheel(0, 2000);
-    await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
-    await expect(page.getByRole('button', { name: 'Show 50 more' })).toBeInViewport();
-    expect(await page.evaluate(() => scrollY)).toBe(0);
+    const scrollToEnd = async () => {
+      const scroller = list.locator('xpath=..');
+      await scroller.hover();
+      for (let i = 0; i < 10; i++) await page.mouse.wheel(0, 2000);
+      await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+      await expect(page.getByRole('button', { name: 'Show 50 more' })).toBeInViewport();
+      expect(await scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+    };
+    const videoInView = async () => {
+      expect(await page.evaluate(() => scrollY)).toBe(0);
+      const s = (await page.getByTestId('stage').boundingBox())!;
+      expect(s.y).toBeGreaterThanOrEqual(0);
+      expect(s.y).toBeLessThan(100);
+      // The picture itself, not only the stage's top edge: 16:9 at full width, wholly on screen.
+      const v = (await page.getByTestId('stage').locator('video').first().boundingBox())!;
+      expect(v.width).toBeGreaterThanOrEqual(389);
+      expect(v.height).toBeGreaterThanOrEqual(200);
+      expect(v.y + v.height).toBeLessThanOrEqual(844);
+    };
+    // Live: the tile has no stream here, so only the stage box is checked for the live picture.
+    await scrollToEnd();
     const s = (await page.getByTestId('stage').boundingBox())!;
     expect(s.y).toBeGreaterThanOrEqual(0);
     expect(s.y).toBeLessThan(100);
+    expect(s.height).toBeGreaterThanOrEqual(100);
+    expect(s.y + s.height).toBeLessThanOrEqual(844);
+    // Playing a clip near the end of the list.
+    await list.getByRole('option').last().click();
+    await expect(page.getByTestId('badge')).toBeVisible();
+    await scrollToEnd();
+    await videoInView();
   });
 
   test('a long camera name does not run under the Live pill on a phone', async ({ page }) => {
