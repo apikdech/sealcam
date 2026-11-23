@@ -101,11 +101,11 @@ test('a live tile reaches the live state and plays 640 px wide video', async ({ 
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
 
-  // Import the throwaway key through the real Keys form; Home starts the live view by itself.
+  // Import the throwaway key through the real Keys form; the Watch screen starts live by itself.
   await page.goto(`${origin}/#/key`);
   await page.getByLabel('Family key').fill(fixture.key);
   await page.getByRole('button', { name: 'Add key' }).click();
-  await page.getByRole('link', { name: 'Home' }).click();
+  await page.getByRole('link', { name: 'Open Home' }).click();
 
   const tile = page.getByTestId('live-tile');
   await expect(tile).toHaveAttribute('data-camera', 'front');

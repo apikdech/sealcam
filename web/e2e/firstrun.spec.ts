@@ -242,10 +242,10 @@ async function importKeyAndOpenDay(page: Page) {
   await page.getByRole('button', { name: 'Add key' }).click();
   await expect(page.getByLabel('Family key')).toHaveValue(''); // cleared once the worker holds it
   await page.getByRole('link', { name: 'Open Home' }).click();
-  await page.getByRole('link', { name: 'Timeline' }).click();
-  // Home's own day row is still on screen for a tick: wait for the Timeline page before picking the day.
-  await expect(page.getByTestId('timeline-page')).toBeVisible();
-  await page.getByLabel('Choose a date').fill(CLIP_DAY);
+  // The date picker sits in the day title's menu on the Watch screen.
+  await expect(page.getByTestId('watch')).toBeVisible();
+  await page.locator('button[aria-haspopup="dialog"]').click();
+  await page.getByRole('dialog', { name: 'Day and time zone' }).getByLabel('Choose a date').fill(CLIP_DAY);
 }
 
 const rawKey = Array.from({ length: 32 }, (_, i) => i);
@@ -301,8 +301,8 @@ test('a fresh profile imports the key, plays, seeks, exports and sees live video
     expect((await download).suggestedFilename()).toBe(EXPORT_NAME);
   }
 
-  // Live: Home's tile reaches the live state and plays video.
-  await page.getByRole('link', { name: 'Home' }).click();
+  // Live: the Live pill on the stage goes back to live; the tile reaches the live state and plays video.
+  await page.getByRole('button', { name: 'Back to live' }).click();
   const tile = page.getByTestId('live-tile');
   await expect(tile).toHaveAttribute('data-camera', manifest.camera);
   if (browserName === 'chromium') {
@@ -372,6 +372,8 @@ test('after playback Cache Storage holds the hashed shell and no data', async ({
 });
 
 test('the app is installable: manifest, icons and theme are served', async ({ page, request }) => {
+  // The dark ground is the shipped theme colour; a light System preference repaints it at run time.
+  await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto(origin);
   const href = await page.locator('link[rel="manifest"]').getAttribute('href');
   expect(href).toBe('/manifest.webmanifest');
