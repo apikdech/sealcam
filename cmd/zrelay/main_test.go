@@ -75,7 +75,7 @@ func TestConfigCheckExitCodes(t *testing.T) {
 		if !strings.Contains(out, "TOTAL") {
 			t.Errorf("stdout has no TOTAL row:\n%s", out)
 		}
-		if !strings.Contains(out, "tapo-c220") {
+		if !strings.Contains(out, "front-door") {
 			t.Errorf("stdout has no camera row:\n%s", out)
 		}
 	})

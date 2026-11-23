@@ -1,7 +1,7 @@
 version: 2
 
 relay:
-  id: "home-mini"
+  id: "home"
   max_memory_mb: 768
   egress_backlog_mb: 512
   upload_workers: 2
@@ -53,8 +53,8 @@ defaults:
   viewer_queue_frames: 64
 
 cameras:
-  - id: "tapo-c220"
-    name: "Tapo C220"
+  - id: "front-door"
+    name: "Front door"
     brand: "tapo"                     # tapo without rules: zrelay uses the built-in rules (design §4.3)
     tags: ["interior"]
     host: "ENV:CAMERA_IP"

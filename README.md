@@ -1,212 +1,217 @@
 # Sealcam
 
-Sealcam is a private home camera system. It is for people who run their cameras on their own
-hardware. Each clip is encrypted and sealed, and only your household holds the key.
+Sealcam is a private camera recorder for your home. It records a short clip when your camera sees
+motion or a person, encrypts the clip, and lets your household watch it on a phone.
 
-Sealcam has two parts: zrelay records the clips, and zview shows them. zrelay records event clips
-from RTSP and ONVIF cameras.
+Sealcam is for people who want to keep their camera video on their own hardware, not in a vendor
+cloud. Only the people who hold your key can watch the recordings.
 
-- zrelay encrypts each clip with the `zrec` format.
-- zrelay sends the clip to S3-compatible storage (MinIO).
-- zrelay gives live video (WebRTC/WHEP) and an RTSP restream to devices on your tailnet.
-- zview is the web viewer. It decrypts and plays the clips in the browser.
+## What you get
 
-## Components
+- **Event clips.** A clip starts a few seconds before the event and stops a few seconds after it.
+- **End-to-end encryption.** Each clip is encrypted before it leaves the recorder. The storage
+  and the web server never see the video or the key.
+- **Proof that a clip is genuine.** zview checks each clip while it plays. A seal next to the clip
+  shows if the recording is verified, cut short, or changed.
+- **Live view.** Watch the cameras now, in the same screen as the recordings.
+- **A phone app for the family.** zview installs on the home screen of a phone. Family members
+  import the key once with a QR code.
+- **Your own network only.** All access goes through Tailscale. Nothing is open to the internet.
 
-| Component | Function | Location |
-|---|---|---|
-| `zrelay` | The recorder. It keeps one RTSP session and one ONVIF event subscription for each camera. When a camera reports motion or a person, zrelay records a clip that starts before the event (pre-roll). It changes the clip to fMP4, encrypts it with the master key, and sends it to MinIO. If MinIO is not available, zrelay keeps the clips in memory and tries again later. zrelay never writes to disk. It also gives live video (WHEP) and an RTSP restream. | `cmd/zrelay`, `internal/relay/` |
-| `zview-server` | The viewer server. It reads MinIO with read-only credentials and makes an index of the clips for each day. It serves the web app and the `/api/v1/*` data API. It sends live-video requests to zrelay. It never sees decrypted video or keys. | `cmd/zview-server`, `internal/zview/` |
-| Web app (zview) | A Svelte PWA that zview-server serves. Use it to import the key (paste or QR code), see the timeline, play and export clips, and watch live video. A Web Worker in the browser decrypts all video. | `web/` |
-| `zdecrypt` | A command-line tool. It checks a `.zrec` clip and decrypts it to MP4. It can also change the key of a clip (rewrap). | `cmd/zdecrypt` |
-| MinIO | The S3 storage on the NAS. It is not in this repository. zrelay can write objects, but it cannot delete archive objects. A MinIO lifecycle rule removes old clips. | `deploy/minio-*-policy.json` |
+## How it works
+
+Sealcam has two parts:
+
+- **zrelay** is the recorder. It connects to your cameras, records clips, encrypts them, and
+  stores them in S3-compatible storage. It also gives live video.
+- **zview** is the viewer. It is a web app. Your browser decrypts and plays the clips.
 
 ```
-Camera ──RTSP + ONVIF──► zrelay ──encrypted clips (S3)──► MinIO
-                           │  └─ live video (WebRTC), RTSP restream :8554
-                           ▼
-Browser ◄──HTTPS (tailscale serve)── zview-server ◄──read-only S3── MinIO
+Camera ──video + events──► zrelay ──encrypted clips──► S3 storage (for example MinIO)
+                             │
+                             └── live video
+                                     │
+Phone or computer ◄──HTTPS (Tailscale)── zview-server ◄──read-only── S3 storage
 ```
 
-In production, the two services run as read-only Docker containers on one host (a Mac mini
-with OrbStack). MinIO runs on the NAS. All connections go through Tailscale.
+zrelay never writes video to disk. If the storage is not available, zrelay keeps the clips in
+memory and sends them later.
 
-For the full design, see
-[`docs/superpowers/specs/2026-11-06-zrelay-v2-design.md`](docs/superpowers/specs/2026-11-06-zrelay-v2-design.md).
+## What you need
 
-## Where to put your settings
+- A camera that supports RTSP video and ONVIF events. Sealcam is tested with a Tapo C220.
+- An always-on computer (the host) that runs Docker. zrelay and zview-server run on it.
+- S3-compatible storage, for example MinIO on a NAS.
+- A Tailscale network (tailnet) for the host and the phones.
 
-The configuration files do not contain secrets. Each value is one of these three types:
+To try Sealcam without a camera, you need only Go and Node.js (see the next section).
 
-- A plain value.
-- An `ENV:NAME` reference. The service reads the value from `deploy/.env`.
-- A `FILE:/path` reference. The service reads the value from a file in `deploy/secrets/`. In the
-  container, these files are in `/run/secrets/`.
+## Try it without a camera
 
-zrelay and zview-server do not accept a secret as plain text in a configuration file.
+The demo starts a simulated camera on your computer. The camera sends a test video in a loop and
+reports motion and a person every 60 seconds.
 
-| Setting | Where to put it | Which configuration reads it |
-|---|---|---|
-| Camera IP, user name, password | `deploy/.env`: `CAMERA_IP`, `CAMERA_USERNAME`, `CAMERA_PASSWORD` | `deploy/zrelay.yaml` → `cameras[].host`, `cameras[].credentials` |
-| Camera RTSP port and path, ONVIF port, name, brand | `deploy/zrelay.yaml` → `cameras[].rtsp`, `cameras[].events` | For a Tapo C220: port 554, path `/stream1`, ONVIF port 2020 |
-| More cameras | One more entry under `cameras:` in `zrelay.yaml` for each camera. Give each camera its own `ENV:` names in `.env`. | |
-| S3 endpoint (MinIO URL) | `deploy/.env`: `S3_ENDPOINT` | `zrelay.yaml` and `zview.yaml` → `storage.s3.endpoint` |
-| S3 bucket, region, root prefix | `zrelay.yaml` and `zview.yaml` → `storage.s3.bucket`, `storage.s3.region`, `storage.root` | The values must be the same in the two files and in the MinIO policy files. |
-| Relay S3 access key and secret key | Access key: `.env` → `S3_ACCESS_KEY`. Secret key: the file `deploy/secrets/s3_secret_key`. | `zrelay.yaml` → `storage.s3` |
-| zview read-only S3 access key and secret key | Access key: `.env` → `S3_RO_ACCESS_KEY`. Secret key: the file `deploy/secrets/s3_ro_secret_key`. | `zview.yaml` → `storage.s3` |
-| Master key (`zk1-…`) | The file `deploy/secrets/zrelay_master`. `zrelay key generate` makes the key. | `zrelay.yaml` → `encryption.master_key` |
-| API token hash (for live video and the API) | The file `deploy/secrets/api_token_sha256`. `zrelay key api-token-hash` makes the hash. | `zrelay.yaml` → `live.api_token_sha256`, `zview.yaml` → `server.api_token_sha256` |
-| RTSP restream user name and password | `.env`: `RESTREAM_USER`, `RESTREAM_PASS` | `zrelay.yaml` → `restream` |
-| Tailscale IP | You do not set it. `deploy/deploy.sh` gets it from `tailscale ip -4`. | `zrelay.yaml` → `live.advertise_ip`, the ports in `compose.yaml` |
-| Pre-roll, post-roll, maximum clip length, memory limits | `zrelay.yaml` → `defaults` and `relay`. Each camera can have its own values. | |
-| Retention days | A MinIO lifecycle rule (runbook section 3) and `zview.yaml` → `index.retention_days` | |
+**Prerequisites:** Go 1.27, Node.js 26, and pnpm 12.
 
-Use these files as a start: [`deploy/.env.example`](deploy/.env.example),
-[`deploy/zrelay.example.yaml`](deploy/zrelay.example.yaml) and
-[`deploy/zview.example.yaml`](deploy/zview.example.yaml). Copy each file and remove `.example`
-from the name.
-
-Git ignores `deploy/.env`, `deploy/zrelay.yaml`, `deploy/zview.yaml`, and `deploy/secrets/`. Thus
-you cannot commit them by mistake.
-
-## Try it on your computer (no camera, no NAS)
-
-`make demo` starts a simulated Tapo camera. The camera sends a test video in a loop. Every 60
-seconds, it reports motion and a person.
-
-The demo also writes a full installation into `.demo/`: configuration files for the local storage
-driver, a `.env` file, and a temporary master key. Then it shows the commands that start zrelay
-and zview-server.
-
-Do these steps:
-
-1. In terminal 1, start the simulated camera: `make demo`
+1. In terminal 1, start the simulated camera:
+   ```bash
+   make demo
+   ```
+   The demo writes its files to `.demo/` and shows a temporary key.
 2. In terminal 2, start the recorder:
-   `go run ./cmd/zrelay --env-file .demo/.env run --config .demo/zrelay.yaml`
-3. Build the web app one time: `(cd web && pnpm install && pnpm build)`
-4. In terminal 3, start the viewer: `go run ./cmd/zview-server --config .demo/zview.yaml`
+   ```bash
+   go run ./cmd/zrelay --env-file .demo/.env run --config .demo/zrelay.yaml
+   ```
+3. Build the web app one time:
+   ```bash
+   (cd web && pnpm install && pnpm build)
+   ```
+4. In terminal 3, start the viewer:
+   ```bash
+   go run ./cmd/zview-server --config .demo/zview.yaml
+   ```
 5. Open <http://127.0.0.1:8080>.
-6. Import the demo key. Terminal 1 shows the key.
+6. Paste the key from terminal 1.
 
-The first event occurs one minute after the demo starts. Its clip has 5 s of pre-roll, the 8 s
-event, and 5 s of post-roll. The clip shows on the Timeline a few seconds after the event stops.
+The first event comes one minute after the demo starts. Its clip shows in the event list a few
+seconds after the event stops.
 
-You can also do these things:
+> **Note:** For the first minute, the recorder status can show that the camera is offline. The
+> status updates every 60 seconds.
 
-- Open the **Live** tab to see the camera.
-- Play the restream in VLC: `rtsp://demo:demo@127.0.0.1:8554/demo-cam`
-- Decrypt a clip with the command below. The clips are in `.demo/archive/`.
-  `go run ./cmd/zdecrypt --key FILE:.demo/secrets/zrelay_master --in <clip>.zrec --sidecar <clip>.json --out clip.mp4`
+You can also play the live restream in VLC: `rtsp://demo:demo@127.0.0.1:8554/demo-cam`.
 
-> **Note:** The relay status updates every 60 seconds. For the first minute, the status can show
-> that the camera is down.
+The demo stores clips on the local disk and uses only `127.0.0.1`. A real installation uses S3
+storage and Tailscale.
 
-The demo is different from production in two ways:
+## Install Sealcam at home
 
-- The demo uses the local storage driver. Production uses MinIO through S3. `make integration`
-  tests the S3 path with MinIO in Docker.
-- The demo uses only `127.0.0.1`. It does not use Tailscale or HTTPS.
+[`deploy/runbook.md`](deploy/runbook.md) has the full procedure. These are the main steps:
 
-## Run the full stack on your Mac
+1. Prepare the S3 storage: a bucket, a user for zrelay, a read-only user for zview, and a
+   retention rule.
+2. Make the master key and the API token hash.
 
-This section is for people who want to test all features with the real camera before they use
-the NAS. It starts the production containers on your Mac with a local S3 server (RustFS) in
-place of the NAS.
+   > **Warning:** Keep a copy of the master key in a password manager. If you lose the key, you
+   > cannot decrypt the recordings.
 
-`make local-up` starts four services:
+3. Copy the example files and add your values (see "Configure Sealcam").
+4. Check the configuration:
+   ```bash
+   TAILSCALE_IP=$(tailscale ip -4 | head -n 1) docker compose -f deploy/compose.yaml run --rm --no-deps \
+     --entrypoint /zrelay zrelay config check --config /etc/zrelay/zrelay.yaml
+   ```
+   The command shows the memory budget and the key fingerprint.
+5. Start the containers:
+   ```bash
+   deploy/deploy.sh
+   ```
+6. Give zview an HTTPS address on your tailnet with `tailscale serve`.
+7. Give the key to the family phones with a QR code. See
+   [`docs/family-onboarding.md`](docs/family-onboarding.md).
 
-- `rustfs`: the local S3 server. Its data stays in the Docker volume `zrelay_rustfs-data`.
-- `s3-init`: a setup job. It makes the `cctv` bucket, the two policies, and the `zrelay` and
-  `zview` users. It uses the secret keys in `deploy/secrets/`, so the keys always agree.
-- `zrelay` and `zview-server`: the same containers as in production.
+> **Note:** If the host runs macOS, give the Docker app (for example OrbStack or Docker Desktop)
+> the Local Network permission. Without it, zrelay cannot connect to the camera.
 
-> **Note:** The local stack and the production stack use the same containers. `make local-up`
-> replaces the production containers, and zview-server moves from port 8080 to port 8081.
+To check which events your camera sends, run `zrelay onvif discover`.
 
-**Prerequisites:**
+### Test everything on one computer first
 
-- Docker with OrbStack, with the Local Network permission (runbook section 8).
-- Tailscale on the Mac. `deploy/deploy.sh` finds the CLI of the macOS app.
-- The production files in `deploy/` (see "Install the production system", steps 2 to 5).
+`make local-up` starts the real containers together with a local S3 server (RustFS). Use it to
+test with your camera before you connect your own storage.
 
-Do these steps:
+**Prerequisites:** Docker, Tailscale, and the files in `deploy/` from steps 2 and 3 above.
 
-1. Write the production files in `deploy/`. In `deploy/.env`, set `S3_ENDPOINT=http://rustfs:9000`.
+1. In `deploy/.env`, set `S3_ENDPOINT=http://rustfs:9000`.
 2. In `deploy/zrelay.yaml`, set `relay.http_listen` to `"0.0.0.0:9464"`.
-3. Write a random secret key for the RustFS root user into `deploy/secrets/rustfs_root_secret`:
-   `(umask 077; openssl rand -hex 20 > deploy/secrets/rustfs_root_secret)`
-4. Start the stack: `make local-up`
+3. Make a secret key for the RustFS root user:
+   ```bash
+   (umask 077; openssl rand -hex 20 > deploy/secrets/rustfs_root_secret)
+   ```
+4. Start the stack:
+   ```bash
+   make local-up
+   ```
 5. Open <http://127.0.0.1:8081> and import your master key.
 
 > **Warning:** `docker volume rm zrelay_rustfs-data` deletes all recordings in RustFS.
 
-Use these commands to operate the stack:
+- `make local-logs` shows the logs.
+- `make local-down` stops the stack. The recordings stay in the RustFS volume.
 
-- `make local-logs` shows the logs of all services.
-- `make local-down` stops all services. The recordings stay in the RustFS volume.
-- The RustFS console is at <http://127.0.0.1:9001>. The user is `rustfsadmin`. The password is
-  in `deploy/secrets/rustfs_root_secret`.
-
-To move to the NAS, do these steps:
+To move to the NAS or other S3 storage, do these steps:
 1. Stop the local stack with `make local-down`.
 2. Change `S3_ENDPOINT` in `deploy/.env`.
 3. Change the S3 secret keys in `deploy/secrets/`.
 4. Start the stack with `deploy/deploy.sh`.
 
-## Install the production system
+## Configure Sealcam
 
-For the full procedure, see [`deploy/runbook.md`](deploy/runbook.md). These are the main steps:
+Start from the example files. Copy each file and remove `.example` from the name:
 
-1. Prepare MinIO on the NAS (runbook sections 1 to 3). Make the bucket, the `zrelay` and `zview`
-   users with their policy files, and the retention rules.
-2. Make the master key and the API token hash in `deploy/secrets/` (section 4).
+- [`deploy/.env.example`](deploy/.env.example)
+- [`deploy/zrelay.example.yaml`](deploy/zrelay.example.yaml)
+- [`deploy/zview.example.yaml`](deploy/zview.example.yaml)
 
-   > **Warning:** Keep a copy of the master key in a password manager. If you lose the key, you
-   > cannot decrypt the recordings.
+The configuration files never hold a secret as plain text. A secret value is a reference:
 
-3. Write `deploy/.env` from `deploy/.env.example` (section 5).
-4. Write the two S3 secret-key files in `deploy/secrets/`.
-5. Write `deploy/zrelay.yaml` and `deploy/zview.yaml` from the example files.
-6. Check the configuration with `zrelay config check`. The command shows the memory budget and
-   the key fingerprint.
-7. Start the two containers with `deploy/deploy.sh` (section 6).
-8. Give zview an HTTPS address with `tailscale serve` (section 7).
-9. On macOS, give OrbStack the Local Network permission (section 8). Without this permission,
-   zrelay cannot connect to the camera.
-10. Give the key to the family phones with the QR code (see
-    [`docs/family-onboarding.md`](docs/family-onboarding.md)).
+- `ENV:NAME` reads the value from `deploy/.env`.
+- `FILE:/path` reads the value from a file in `deploy/secrets/`.
 
-Before you use the system, do the checks in [`docs/LIVE-CHECKS.md`](docs/LIVE-CHECKS.md). These
-checks need the real camera, the NAS, and the phones.
+Git ignores `deploy/.env`, `deploy/zrelay.yaml`, `deploy/zview.yaml`, and `deploy/secrets/`, so
+you cannot commit them by mistake.
 
-First, run `zrelay onvif discover` on your camera. The command shows if the built-in Tapo rules
-agree with the events that your camera sends.
+| Setting | Where to put it |
+|---|---|
+| Camera address, user name, password | `deploy/.env`: `CAMERA_IP`, `CAMERA_USERNAME`, `CAMERA_PASSWORD` |
+| Camera RTSP port and path, ONVIF port | `deploy/zrelay.yaml` → `cameras[].rtsp`, `cameras[].events`. For example, a Tapo C220 uses port 554, path `/stream1`, and ONVIF port 2020. |
+| More cameras | One more entry under `cameras:` in `zrelay.yaml`, with its own `ENV:` names in `.env`. |
+| S3 address | `deploy/.env`: `S3_ENDPOINT` |
+| S3 bucket, region, root prefix | `zrelay.yaml` and `zview.yaml` → `storage`. Use the same values in the two files. |
+| zrelay S3 keys | Access key: `.env` → `S3_ACCESS_KEY`. Secret key: `deploy/secrets/s3_secret_key`. |
+| zview read-only S3 keys | Access key: `.env` → `S3_RO_ACCESS_KEY`. Secret key: `deploy/secrets/s3_ro_secret_key`. |
+| Master key (`zk1-…`) | `deploy/secrets/zrelay_master`. `zrelay key generate` makes it. |
+| API token hash | `deploy/secrets/api_token_sha256`. `zrelay key api-token-hash` makes it. |
+| RTSP restream user name and password | `.env`: `RESTREAM_USER`, `RESTREAM_PASS` |
+| Tailscale IP | Do not set it. `deploy/deploy.sh` reads it from `tailscale ip -4`. |
+| Pre-roll, post-roll, maximum clip length | `zrelay.yaml` → `defaults`. Each camera can have its own values. |
+| How long to keep clips | The storage retention rule and `zview.yaml` → `index.retention_days`. |
 
-## Development
+## Develop Sealcam
 
-You need Go 1.27 and Docker. For `web/`, you also need Node 26 and pnpm 12.
+**Prerequisites:** Go 1.27 and Docker. For `web/`, also Node.js 26 and pnpm 12.
 
 | Command | What it does |
 |---|---|
-| `make vet` | Runs `go vet ./...` and staticcheck. `go.mod` pins staticcheck, and `go tool staticcheck` runs it. |
-| `make test` | Runs `go test -race ./...`. |
-| `make integration` | Runs `go test -race -tags integration ./...`. These tests start MinIO and other fixtures in Docker. |
-| `make chaos` | Simulates a 10-minute storage outage with three test cameras. It takes about 15 minutes. CI does not run it. |
-| `make vectors` | Makes the cross-language `zrec` test vectors in `testdata/zrec/v1` again. |
-| `make web` | Installs, lints, type-checks, and tests the web app in `web/`. |
-| `make web-e2e` | Runs the Playwright browser tests (Chromium and WebKit). |
-| `make demo` | Starts the local demo (see "Try it on your computer"). |
-| `make local-up` | Builds and starts the full stack with a local S3 server (see "Run the full stack on your Mac"). |
-| `make local-down` | Stops the full stack. The recordings stay. |
-| `make local-logs` | Shows the logs of the full stack. |
+| `make test` | Runs the Go tests (`go test -race ./...`). |
+| `make vet` | Runs `go vet` and staticcheck. |
+| `make integration` | Runs the integration tests. They start MinIO and other test services in Docker. |
+| `make web` | Installs, lints, type-checks, and tests the web app. |
+| `make web-e2e` | Runs the browser tests (Chromium and WebKit). |
+| `make chaos` | Simulates a 10-minute storage outage with three test cameras (about 15 minutes). |
+| `make vectors` | Makes the `zrec` test files in `testdata/zrec/v1` again. |
+| `make demo` | Starts the demo (see "Try it without a camera"). |
+| `make local-up`, `make local-down`, `make local-logs` | Start, stop, and show the logs of the full local stack. |
 
-Run `ffmpeg` and `ffprobe` only from a pinned Docker image. Never run them on the host.
+Run `ffmpeg` and `ffprobe` only from a pinned Docker image. Do not install them on the host.
 
-## Documentation
+| Folder | Content |
+|---|---|
+| `cmd/zrelay`, `internal/relay/` | The recorder. |
+| `cmd/zview-server`, `internal/zview/` | The viewer server and its API. |
+| `web/` | The zview web app (Svelte). A Web Worker in the browser decrypts the video. |
+| `cmd/zdecrypt` | A command-line tool. It checks a `.zrec` clip and decrypts it to MP4. |
+| `deploy/` | The Docker files, the example configuration, and the runbook. |
 
-- Specifications: [`docs/specs/`](docs/specs/). The
-  [v2 design](docs/superpowers/specs/2026-11-06-zrelay-v2-design.md) changes them. If the two do
-  not agree, the design is correct.
-- Operation: [`deploy/runbook.md`](deploy/runbook.md). Manual checks:
-  [`docs/LIVE-CHECKS.md`](docs/LIVE-CHECKS.md).
-- Rules for engineers and agents: [`AGENTS.md`](AGENTS.md).
+## Learn more
+
+- Install and operate: [`deploy/runbook.md`](deploy/runbook.md)
+- Family guide: [`docs/family-onboarding.md`](docs/family-onboarding.md)
+- Specifications: [`docs/specs/`](docs/specs/) and the
+  [v2 design](docs/superpowers/specs/2026-11-06-zrelay-v2-design.md). If the two do not agree,
+  the design is correct.
+- Rules for contributors and coding agents: [`AGENTS.md`](AGENTS.md)
+
+## License
+
+MIT. See [`LICENSE`](LICENSE).

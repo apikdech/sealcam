@@ -73,8 +73,8 @@ func TestLoadExampleConfig(t *testing.T) {
 	if cfg.Live.MaxViewers != 4 {
 		t.Errorf("Live.MaxViewers = %d, want 4", cfg.Live.MaxViewers)
 	}
-	if len(cfg.Cameras) != 1 || cfg.Cameras[0].ID != "tapo-c220" {
-		t.Fatalf("Cameras = %+v, want one camera tapo-c220", cfg.Cameras)
+	if len(cfg.Cameras) != 1 || cfg.Cameras[0].ID != "front-door" {
+		t.Fatalf("Cameras = %+v, want one camera front-door", cfg.Cameras)
 	}
 	cam := cfg.Cameras[0]
 	if cam.EventsPort != 2020 {
@@ -92,7 +92,7 @@ func TestLoadExampleConfigResolvesEveryField(t *testing.T) {
 		name      string
 		got, want any
 	}{
-		{"Relay.ID", cfg.Relay.ID, "home-mini"},
+		{"Relay.ID", cfg.Relay.ID, "home"},
 		{"Relay.MaxMemoryMB", cfg.Relay.MaxMemoryMB, 768},
 		{"Relay.EgressBacklogMB", cfg.Relay.EgressBacklogMB, 512},
 		{"Relay.UploadWorkers", cfg.Relay.UploadWorkers, 2},
@@ -134,7 +134,7 @@ func TestLoadExampleConfigResolvesEveryField(t *testing.T) {
 		name      string
 		got, want any
 	}{
-		{"Name", cam.Name, "Tapo C220"},
+		{"Name", cam.Name, "Front door"},
 		{"Brand", cam.Brand, "tapo"},
 		{"Tags", strings.Join(cam.Tags, ","), "interior"},
 		{"Host", cam.Host, "192.0.2.20"},

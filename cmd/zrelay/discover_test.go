@@ -9,7 +9,7 @@ import (
 	"github.com/apikdech/zrelay-v2/internal/testutil"
 )
 
-// discoverConfig returns an example config whose tapo-c220 events port is
+// discoverConfig returns an example config whose front-door events port is
 // the fake camera's, with the camera environment pointing at the fake.
 func discoverConfig(t *testing.T, f *testutil.FakeONVIF) string {
 	t.Helper()
@@ -33,7 +33,7 @@ func TestOnvifDiscover(t *testing.T) {
 	f.Queue("tns1:RuleEngine/CellMotionDetector/Motion", "Initialized", events.Item{Name: "IsMotion", Value: "false"})
 	path := discoverConfig(t, f)
 
-	code, out, errOut := runCLI("onvif", "discover", "--config", path, "--camera", "tapo-c220", "--listen", "1500ms")
+	code, out, errOut := runCLI("onvif", "discover", "--config", path, "--camera", "front-door", "--listen", "1500ms")
 	if code != 0 {
 		t.Fatalf("exit %d, want 0; stderr:\n%s", code, errOut)
 	}
@@ -53,11 +53,11 @@ func TestOnvifDiscoverUsageErrors(t *testing.T) {
 	f := testutil.StartFakeONVIF(t, testutil.FakeONVIFOpts{})
 	path := discoverConfig(t, f)
 	for name, args := range map[string][]string{
-		"missing --config":    {"onvif", "discover", "--camera", "tapo-c220"},
+		"missing --config":    {"onvif", "discover", "--camera", "front-door"},
 		"missing --camera":    {"onvif", "discover", "--config", path},
 		"unknown camera":      {"onvif", "discover", "--config", path, "--camera", "nope"},
-		"bad --listen":        {"onvif", "discover", "--config", path, "--camera", "tapo-c220", "--listen", "soon"},
-		"non-positive listen": {"onvif", "discover", "--config", path, "--camera", "tapo-c220", "--listen", "0s"},
+		"bad --listen":        {"onvif", "discover", "--config", path, "--camera", "front-door", "--listen", "soon"},
+		"non-positive listen": {"onvif", "discover", "--config", path, "--camera", "front-door", "--listen", "0s"},
 		"missing subcommand":  {"onvif"},
 	} {
 		t.Run(name, func(t *testing.T) {
