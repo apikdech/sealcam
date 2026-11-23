@@ -166,7 +166,7 @@ describe('LiveTile states', () => {
     const f = fakeTile();
     render(LiveTile, { cameraId: 'front', name: 'Front', client: new FakeClient(), zone: ZONE, makeTile: f.make });
     await f.emit({ state: 'limit', retryAt: Date.now() + 5000 });
-    expect(screen.getByRole('status')).toHaveTextContent('Too many people are watching. zview tries again');
+    expect(screen.getByRole('status')).toHaveTextContent('Too many people are watching. Sealcam tries again');
     expect(screen.getByRole('button', { name: 'Try now' })).toBeTruthy();
   });
 
@@ -182,7 +182,7 @@ describe('LiveTile states', () => {
     const f = fakeTile();
     render(LiveTile, { cameraId: 'front', name: 'Front', client: new FakeClient(), zone: ZONE, makeTile: f.make });
     await f.emit({ state: 'offline' });
-    expect(screen.getByRole('status')).toHaveTextContent('Camera offline. zview reconnects when it is back.');
+    expect(screen.getByRole('status')).toHaveTextContent('Camera offline. Sealcam reconnects when it is back.');
   });
 
   it('offline prop calls setOffline', async () => {

@@ -64,7 +64,8 @@ export async function loadDay(client: Caller, q: DayQuery): Promise<DayData> {
   const range = { from: new Date(from).toISOString(), to: new Date(to).toISOString() };
   const clipQuery: Record<string, QueryValue> = { ...range };
   if (q.camera) clipQuery.camera = q.camera;
-  if (q.triggers.length > 0) clipQuery.trigger = q.triggers;
+  // A plain copy: the caller's array may be a reactive proxy, which postMessage cannot clone.
+  if (q.triggers.length > 0) clipQuery.trigger = [...q.triggers];
 
   const covCameras = q.camera ? [q.camera] : [...q.cameras];
   const [list, perCamera] = await Promise.all([

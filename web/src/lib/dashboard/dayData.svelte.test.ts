@@ -119,4 +119,44 @@ describe('createDayData', () => {
     await settle();
     expect(data.invalid).toBe(2);
   });
+
+  it('refresh reloads the current day in the background and picks up new clips', async () => {
+    const c = seeded();
+    const { data } = setup(c);
+    await settle();
+    c.clips = [...c.clips, sidecar(ids.c, '2026-11-06T12:00:00Z')];
+    data.refresh();
+    flushSync();
+    expect(data.ready).toBe(true); // the old list stays while it reloads
+    await settle();
+    expect(data.rows.map((r) => r.id)).toEqual([ids.c, ids.b, ids.a]);
+  });
+
+  it('a failed refresh keeps the last list and shows no error', async () => {
+    const c = seeded();
+    const { data } = setup(c);
+    await settle();
+    c.call = (async () => {
+      throw new Error('offline');
+    }) as never;
+    data.refresh();
+    flushSync();
+    await settle();
+    expect(data.dayError).toBe('');
+    expect(data.rows).toHaveLength(2);
+  });
+
+  it('sends a reactive trigger filter in a form postMessage can clone', async () => {
+    const c = seeded();
+    const call = c.call.bind(c);
+    // The real client posts every request to the worker, which structured-clones it.
+    c.call = ((m: Request) => call(structuredClone(m))) as never;
+    const { q, data } = setup(c);
+    await settle();
+    q.triggers = ['person'];
+    flushSync();
+    await settle();
+    expect(data.dayError).toBe('');
+    expect(data.ready).toBe(true);
+  });
 });

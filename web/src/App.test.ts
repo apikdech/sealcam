@@ -122,6 +122,13 @@ describe('App routing', () => {
     expect(screen.getByRole('button', { name: /theme/i })).toBeInTheDocument();
   });
 
+  it('the Sealcam wordmark off Watch links Home', async () => {
+    location.hash = '#/key';
+    render(App, { client: fake() });
+    await settled('key');
+    expect(screen.getByRole('link', { name: 'Sealcam' })).toHaveAttribute('href', '#/');
+  });
+
   it('Manage keys in the key menu goes to #/key', async () => {
     location.hash = '';
     render(App, { client: fake() });

@@ -222,7 +222,7 @@ describe('forget', () => {
 });
 
 describe('idle auto-lock setting', () => {
-  const LABEL = /lock when zview is in the background/i;
+  const LABEL = /lock when Sealcam is in the background/i;
   function setVisibility(hidden: boolean) {
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
     document.dispatchEvent(new Event('visibilitychange'));

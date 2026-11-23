@@ -1,6 +1,6 @@
 // What the Watch screen draws from: the cameras, one day's clips and coverage, how loading
 // them went, and the views drawn from them. Call it while a component initialises.
-import { onMount } from 'svelte';
+import { onMount, untrack } from 'svelte';
 import type { Request } from '../../worker/protocol';
 import type { Camera, Sidecar } from '../../worker/schemas';
 import type { Coverage } from '../timeline/model';
@@ -30,6 +30,8 @@ export function createDayData(client: Caller, query: () => DayQueryInput) {
   /** The query `clips` and `coverage` belong to; the views wait for it to match the current one. */
   let loadedKey = $state('');
   let attempt = $state(0);
+  /** Bumped by refresh(): reloads the day only, not the cameras. */
+  let tick = $state(0);
 
   const keyOf = (q: DayQueryInput) => JSON.stringify([q.day, q.zone, q.camera ?? '', [...(q.triggers ?? [])].sort()]);
   const ready = $derived(loadedKey === keyOf(query()));
@@ -55,9 +57,12 @@ export function createDayData(client: Caller, query: () => DayQueryInput) {
   $effect(() => {
     if (cameras === null) return;
     void attempt;
+    void tick;
     const q = query();
     const gen = ++loadGen;
-    dayError = '';
+    // Reloading the query already on screen is a background refresh: a failure keeps the last list.
+    const quiet = untrack(() => loadedKey) === keyOf(q);
+    if (!quiet) dayError = '';
     loadDay(client, { day: q.day, zone: q.zone, camera: q.camera ?? '', triggers: q.triggers ?? [], cameras: cameras.map((c) => c.id) })
       .then((d) => {
         if (gen !== loadGen) return;
@@ -67,7 +72,7 @@ export function createDayData(client: Caller, query: () => DayQueryInput) {
         loadedKey = keyOf(q);
       })
       .catch((e: unknown) => {
-        if (gen === loadGen) dayError = noKey(e) ? 'key' : 'failed';
+        if (gen === loadGen && !quiet) dayError = noKey(e) ? 'key' : 'failed';
       });
   });
 
@@ -102,6 +107,10 @@ export function createDayData(client: Caller, query: () => DayQueryInput) {
     },
     get nameOf() {
       return nameOf;
+    },
+    /** Reloads the current day in the background, keeping the list on screen. */
+    refresh(): void {
+      tick++;
     },
     retry(): void {
       error = '';

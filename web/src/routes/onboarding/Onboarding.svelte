@@ -132,7 +132,7 @@
       <p role="alert" class="text-void">{actionError}</p>
     {/if}
     <label class="flex flex-wrap items-center gap-3">
-      <span>Lock when zview is in the background</span>
+      <span>Lock when Sealcam is in the background</span>
       <select class="min-h-11 rounded border border-rule bg-plate px-2 text-base text-ink" value={String(idleMinutes)} onchange={setIdle}>
         {#each IDLE_CHOICES as m (m)}
           <option value={String(m)}>{m === 0 ? 'Never' : `After ${m} min`}</option>

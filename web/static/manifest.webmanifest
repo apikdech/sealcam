@@ -1,7 +1,7 @@
 {
-  "name": "zview",
-  "short_name": "zview",
-  "description": "Private viewer for zrelay recordings and live cameras",
+  "name": "Sealcam",
+  "short_name": "Sealcam",
+  "description": "Private viewer for Sealcam recordings and live cameras",
   "id": "/",
   "start_url": "/",
   "scope": "/",

@@ -112,10 +112,10 @@
         : snap.state === 'reconnecting'
           ? "Can't reach the camera. Trying again."
           : snap.state === 'limit'
-            ? 'Too many people are watching. zview tries again.'
+            ? 'Too many people are watching. Sealcam tries again.'
             : snap.state === 'locked'
               ? 'Key locked.'
-              : 'Camera offline. zview reconnects when it is back.',
+              : 'Camera offline. Sealcam reconnects when it is back.',
   );
 </script>
 
@@ -164,11 +164,11 @@
           {:else if snap.state === 'reconnecting'}
             Can't reach the camera. Trying again{#if seconds > 0}<span class="num">{` in ${seconds} s.`}</span>{:else}…{/if}
           {:else if snap.state === 'limit'}
-            Too many people are watching. zview tries again{#if seconds > 0}<span class="num">{` in ${seconds} s.`}</span>{:else}…{/if}
+            Too many people are watching. Sealcam tries again{#if seconds > 0}<span class="num">{` in ${seconds} s.`}</span>{:else}…{/if}
           {:else if snap.state === 'locked'}
             Key locked.
           {:else}
-            Camera offline. zview reconnects when it is back.
+            Camera offline. Sealcam reconnects when it is back.
           {/if}
         </p>
         {#if snap.state === 'reconnecting' || snap.state === 'limit'}

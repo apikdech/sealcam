@@ -104,6 +104,24 @@
     });
   });
 
+  // Today's list picks up new events: reload on each clock tick, and when a hidden tab is shown again.
+  const refreshToday = () => {
+    if (day === todayDay && document.visibilityState === 'visible') data.refresh();
+  };
+  let prevNow = untrack(() => now);
+  $effect(() => {
+    const n = now;
+    untrack(() => {
+      if (n !== prevNow) refreshToday();
+      prevNow = n;
+    });
+  });
+  onMount(() => {
+    const onVisible = () => untrack(refreshToday);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  });
+
   // ---- derived views -----------------------------------------------------------
 
   const filtered = $derived((data.cameras ?? []).filter((c) => !camera || c.id === camera));
@@ -141,6 +159,12 @@
     selectedId = null;
     cue = null;
     day = todayDay;
+  }
+
+  function goHome(): void {
+    goLive();
+    camera = '';
+    triggers = [];
   }
 
   /** Pick the display zone; the view moves to "today" there, which can be another date. */
@@ -196,7 +220,15 @@
   <h1 class="sr-only">Watch</h1>
 
   <div class="bar flex min-w-0 items-center gap-1 border-b border-rule px-2 py-1 md:gap-3 md:px-4">
-    <p class="wordmark shrink-0 text-lg font-semibold tracking-wide"><span class="text-ink">z</span><span class="text-line">view</span></p>
+    <a
+      href="#/"
+      class="wordmark shrink-0 rounded text-lg font-semibold tracking-wide focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line"
+      onclick={(e) => {
+        // Watch is Home already: the link resets it to how it opens.
+        e.preventDefault();
+        goHome();
+      }}><span class="text-ink">Seal</span><span class="text-line">cam</span></a
+    >
     <DayNav {day} {todayDay} {zone} onDay={setDay}>
       {#snippet menu(close)}
         <DayMenu

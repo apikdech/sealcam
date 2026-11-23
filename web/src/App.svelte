@@ -164,7 +164,9 @@
 
 {#if !watching}
   <header class="flex items-center gap-4 border-b border-rule bg-ground px-4">
-    <p class="py-2 text-xl font-semibold tracking-wide"><span class="text-ink">z</span><span class="text-line">view</span></p>
+    <a href="#/" class="{focusRing} my-2 rounded text-xl font-semibold tracking-wide"
+      ><span class="text-ink">Seal</span><span class="text-line">cam</span></a
+    >
     <div class="ml-auto flex items-center">{@render barEnd()}</div>
   </header>
   {@render notices()}

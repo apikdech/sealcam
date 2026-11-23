@@ -39,8 +39,8 @@
           // Only the error name: browsers' messages are not user-facing text.
           error =
             (e as Error).name === 'NotAllowedError'
-              ? "zview can't use the camera. Allow camera access in your browser settings, or use a photo of the QR code."
-              : "zview can't open the camera. Use a photo of the QR code instead.";
+              ? "Sealcam can't use the camera. Allow camera access in your browser settings, or use a photo of the QR code."
+              : "Sealcam can't open the camera. Use a photo of the QR code instead.";
         }
       } finally {
         camera?.stop();

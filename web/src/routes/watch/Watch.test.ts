@@ -28,6 +28,7 @@ const NOW = Date.UTC(2026, 10, 6, 15, 0, 0);
 const HOUR = 3_600_000;
 const MIN = 60_000;
 const [FROM, TO] = localDayRange('2026-11-06', 'Asia/Jakarta');
+const FROM_ISO = new Date(FROM).toISOString();
 const iso = (ms: number) => new Date(ms).toISOString().replace('.000Z', 'Z');
 
 class FakeResizeObserver {
@@ -227,6 +228,58 @@ describe('Watch', () => {
     expect(await screen.findByRole('heading', { name: /^Today · \d+ events$/ })).toBeInTheDocument();
     expect(dayButton()).toHaveTextContent('Saturday, 7 November');
     await waitFor(() => expect(lastClips(c)).toMatchObject({ from: '2026-11-06T17:00:00.000Z', to: '2026-11-07T17:00:00.000Z' }));
+  });
+
+  it('today picks up new events on each clock tick, without a reload', async () => {
+    const c = client();
+    const r = mount(c);
+    expect(await listRows()).toHaveLength(3);
+    c.clips = [...c.clips, sidecar('01M6RXRJAQRJY105FSDF0QRBH4', '2026-11-06T14:00:00Z')];
+    await r.rerender({ nowMs: NOW + 30_000 });
+    await waitFor(() => expect(list().getAllByRole('option')).toHaveLength(4));
+  });
+
+  it('a past day is not reloaded on a clock tick', async () => {
+    const c = client();
+    const r = mount(c);
+    await listRows();
+    await fireEvent.click(screen.getByRole('button', { name: 'Previous day' }));
+    await waitFor(() => expect(lastClips(c)).toMatchObject({ from: '2026-11-04T17:00:00.000Z' }));
+    const before = getsFor(c, '/api/v1/clips').length;
+    await r.rerender({ nowMs: NOW + 30_000 });
+    await Promise.resolve();
+    expect(getsFor(c, '/api/v1/clips')).toHaveLength(before);
+  });
+
+  it('a hidden tab skips the tick and reloads today when it is shown again', async () => {
+    const c = client();
+    const r = mount(c);
+    await listRows();
+    const before = getsFor(c, '/api/v1/clips').length;
+    const vis = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    await r.rerender({ nowMs: NOW + 30_000 });
+    await Promise.resolve();
+    expect(getsFor(c, '/api/v1/clips')).toHaveLength(before);
+    vis.mockReturnValue('visible');
+    document.dispatchEvent(new Event('visibilitychange'));
+    await waitFor(() => expect(getsFor(c, '/api/v1/clips')).toHaveLength(before + 1));
+    vis.mockRestore();
+  });
+
+  it('the Sealcam wordmark goes Home: live today, nothing picked, no filters', async () => {
+    const c = filtersTriggers(client());
+    mount(c);
+    await listRows();
+    await fireEvent.click(chip('Vehicle'));
+    await fireEvent.click(screen.getByRole('button', { name: 'Previous day' }));
+    await waitFor(() => expect(lastClips(c)).toMatchObject({ from: '2026-11-04T17:00:00.000Z' }));
+    const home = screen.getByRole('link', { name: 'Sealcam' });
+    expect(home).toHaveAttribute('href', '#/');
+    await fireEvent.click(home);
+    expect(dayButton()).toHaveTextContent('Friday, 6 November');
+    expect(await screen.findByTestId('live-grid')).toBeInTheDocument();
+    await waitFor(() => expect(lastClips(c).trigger).toBeUndefined());
+    expect(lastClips(c)).toMatchObject({ from: FROM_ISO });
   });
 
   it('a past day stays put over midnight', async () => {
