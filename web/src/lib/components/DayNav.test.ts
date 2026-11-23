@@ -19,9 +19,17 @@ const props = { day: '2026-11-20', todayDay: '2026-11-20', zone: 'Asia/Jakarta' 
 describe('DayNav', () => {
   it('shows the title and subtitle', () => {
     render(DayNav, { ...props, onDay: () => {}, menu });
-    expect(screen.getByText('Friday 20 November')).toBeTruthy();
-    expect(screen.getByText('Fri 20 Nov')).toBeTruthy();
+    expect(screen.getByText('Friday, 20 November')).toBeTruthy();
+    expect(screen.getByText('Fri, 20 Nov')).toBeTruthy();
     expect(screen.getByText('Jakarta time · today')).toBeTruthy();
+  });
+
+  it('stacks the subtitle under the title, centred, not inline', () => {
+    render(DayNav, { ...props, onDay: () => {}, menu });
+    const button = screen.getByRole('button', { name: /Friday, 20 November/ });
+    expect(button.className).toContain('flex-col');
+    expect(button.className).not.toContain('items-baseline');
+    expect(button.className).toContain('justify-center');
   });
 
   it('next is disabled on today', () => {
@@ -45,7 +53,7 @@ describe('DayNav', () => {
 
   it('the title opens the day menu and toggles it shut', async () => {
     render(DayNav, { ...props, onDay: () => {}, menu });
-    const title = screen.getByRole('button', { name: /Friday 20 November/ });
+    const title = screen.getByRole('button', { name: /Friday, 20 November/ });
     expect(title).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId('menu-body')).toBeNull();
     await fireEvent.click(title);
@@ -59,7 +67,7 @@ describe('DayNav', () => {
 
   it('Escape closes the menu and gives focus back to the title', async () => {
     render(DayNav, { ...props, onDay: () => {}, menu });
-    const title = screen.getByRole('button', { name: /Friday 20 November/ });
+    const title = screen.getByRole('button', { name: /Friday, 20 November/ });
     await fireEvent.click(title);
     await fireEvent.keyDown(screen.getByTestId('menu-body'), { key: 'Escape' });
     expect(screen.queryByTestId('menu-body')).toBeNull();
@@ -68,14 +76,14 @@ describe('DayNav', () => {
 
   it('a press outside closes the menu', async () => {
     render(DayNav, { ...props, onDay: () => {}, menu });
-    await fireEvent.click(screen.getByRole('button', { name: /Friday 20 November/ }));
+    await fireEvent.click(screen.getByRole('button', { name: /Friday, 20 November/ }));
     await fireEvent.pointerDown(document.body);
     expect(screen.queryByTestId('menu-body')).toBeNull();
   });
 
   it('the menu can close itself', async () => {
     render(DayNav, { ...props, onDay: () => {}, menu });
-    await fireEvent.click(screen.getByRole('button', { name: /Friday 20 November/ }));
+    await fireEvent.click(screen.getByRole('button', { name: /Friday, 20 November/ }));
     await fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(screen.queryByTestId('menu-body')).toBeNull();
   });

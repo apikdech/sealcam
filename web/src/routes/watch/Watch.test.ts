@@ -112,8 +112,8 @@ const getsFor = (c: DashClient, path: string) =>
   c.calls.filter((m): m is Extract<Request, { type: 'api.get' }> => m.type === 'api.get' && m.path === path);
 const lastClips = (c: DashClient) => getsFor(c, '/api/v1/clips').at(-1)!.query;
 
-/** The day title button ("Friday 6 November Jakarta time · today"). */
-const dayButton = () => screen.getByRole('button', { name: /day \d+ \w+.*time/ });
+/** The day title button ("Friday, 6 November Jakarta time · today"). */
+const dayButton = () => screen.getByRole('button', { name: /day, \d+ \w+.*time/ });
 async function openDayMenu() {
   if (dayButton().getAttribute('aria-expanded') !== 'true') await fireEvent.click(dayButton());
   return within(screen.getByRole('dialog', { name: 'Day and time zone' }));
@@ -217,7 +217,7 @@ describe('Watch', () => {
     expect(screen.getByTestId('live-grid')).toBeInTheDocument();
     expect(screen.queryByText('Pick an event or a time on the timeline')).toBeNull();
     expect(await screen.findByRole('heading', { name: /^Today · \d+ events$/ })).toBeInTheDocument();
-    expect(dayButton()).toHaveTextContent('Saturday 7 November');
+    expect(dayButton()).toHaveTextContent('Saturday, 7 November');
     await waitFor(() => expect(lastClips(c)).toMatchObject({ from: '2026-11-06T17:00:00.000Z', to: '2026-11-07T17:00:00.000Z' }));
   });
 
@@ -226,7 +226,7 @@ describe('Watch', () => {
     await listRows();
     await fireEvent.click(screen.getByRole('button', { name: 'Previous day' }));
     await r.rerender({ nowMs: Date.UTC(2026, 10, 6, 17, 0, 30) });
-    expect(dayButton()).toHaveTextContent('Thursday 5 November');
+    expect(dayButton()).toHaveTextContent('Thursday, 5 November');
   });
 
   it('Go to today on a past day returns to live today', async () => {
@@ -235,7 +235,7 @@ describe('Watch', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Previous day' }));
     await fireEvent.click(screen.getByRole('button', { name: 'Go to today' }));
     expect(screen.getByTestId('live-grid')).toBeInTheDocument();
-    expect(dayButton()).toHaveTextContent('Friday 6 November');
+    expect(dayButton()).toHaveTextContent('Friday, 6 November');
   });
 
   it('picking an event on a past day plays it', async () => {
@@ -343,7 +343,7 @@ describe('Watch', () => {
     await listRows();
     await fireEvent.click(screen.getByRole('button', { name: 'Previous day' }));
     await waitFor(() => expect(lastClips(c)).toMatchObject({ from: '2026-11-04T17:00:00.000Z', to: '2026-11-05T17:00:00.000Z' }));
-    expect(await screen.findByRole('heading', { name: /^Thursday 5 November · \d+ events$/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /^Thursday, 5 November · \d+ events$/ })).toBeInTheDocument();
   });
 
   it('re-queries for a day picked in the day menu', async () => {
@@ -373,7 +373,7 @@ describe('Watch', () => {
     expect(screen.getByText('Loading…')).toBeInTheDocument();
     hold = false;
     release();
-    expect(await screen.findByRole('heading', { name: /^Thursday 5 November · 3 events$/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /^Thursday, 5 November · 3 events$/ })).toBeInTheDocument();
     expect((await listRows()).length).toBe(3);
   });
 
@@ -726,7 +726,7 @@ describe('shortcuts and transport', () => {
       keys(']');
       expect(view().spanMs).toBe(6 * HOUR);
       keys('T');
-      await waitFor(() => expect(dayButton()).toHaveTextContent('Friday 6 November'));
+      await waitFor(() => expect(dayButton()).toHaveTextContent('Friday, 6 November'));
       await waitFor(() => expect(view().startMs).toBe(FROM));
       expect(lastClips(c)).toMatchObject({
         from: '2026-11-05T17:00:00.000Z',
@@ -801,7 +801,7 @@ describe('shortcuts and transport', () => {
       await pickDate('2026-11-04');
       await waitFor(() => expect(view().startMs).toBe(FROM - 2 * 24 * HOUR));
       await press('Now');
-      await waitFor(() => expect(dayButton()).toHaveTextContent('Friday 6 November'));
+      await waitFor(() => expect(dayButton()).toHaveTextContent('Friday, 6 November'));
       await waitFor(() => expect(view().startMs).toBe(FROM));
     });
   });

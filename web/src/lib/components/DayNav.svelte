@@ -46,15 +46,15 @@
   <button
     bind:this={title}
     type="button"
-    class="flex min-h-11 min-w-0 items-center gap-1.5 md:items-baseline rounded-[10px] px-1 max-md:shrink-0 md:px-2 text-ink hover:bg-plate md:min-h-9"
+    class="flex min-h-11 min-w-0 flex-col items-center justify-center rounded-[10px] px-1 max-md:shrink-0 md:items-start md:px-2 text-ink hover:bg-plate md:min-h-9"
     aria-haspopup="dialog"
     aria-expanded={open}
     aria-controls={open ? menuId : undefined}
     onclick={() => (open = !open)}
   >
-    <span class="truncate text-[15px] font-semibold md:hidden">{dayTitleShort(day, todayDay)}</span>
-    <span class="truncate text-[15px] font-semibold max-md:hidden">{dayTitle(day, todayDay)}</span>
-    <span class="truncate text-xs text-muted max-md:hidden">{daySubtitle(day, todayDay, zone)}</span>
+    <span class="truncate text-[15px] font-semibold leading-tight md:hidden">{dayTitleShort(day, todayDay)}</span>
+    <span class="truncate text-[15px] font-semibold leading-tight max-md:hidden">{dayTitle(day, todayDay)}</span>
+    <span class="truncate text-xs leading-tight text-muted max-md:hidden">{daySubtitle(day, todayDay, zone)}</span>
   </button>
   <button
     type="button"

@@ -22,9 +22,9 @@ const TITLE = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'UTC',
 });
 
-/** "Friday 20 November"; the year is added when `day` is not in `todayDay`'s year. */
+/** "Friday, 20 November"; the year is added when `day` is not in `todayDay`'s year. */
 export function dayTitle(day: string, todayDay: string): string {
-  const text = TITLE.format(noon(day));
+  const text = TITLE.format(noon(day)).replace(' ', ', ');
   return day.slice(0, 4) === todayDay.slice(0, 4) ? text : `${text} ${day.slice(0, 4)}`;
 }
 
@@ -35,9 +35,9 @@ const TITLE_SHORT = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'UTC',
 });
 
-/** "Fri 20 Nov", for the phone top bar; the year is added as in `dayTitle`. */
+/** "Fri, 20 Nov", for the phone top bar; the year is added as in `dayTitle`. */
 export function dayTitleShort(day: string, todayDay: string): string {
-  const text = TITLE_SHORT.format(noon(day));
+  const text = TITLE_SHORT.format(noon(day)).replace(' ', ', ');
   return day.slice(0, 4) === todayDay.slice(0, 4) ? text : `${text} ${day.slice(0, 4)}`;
 }
 

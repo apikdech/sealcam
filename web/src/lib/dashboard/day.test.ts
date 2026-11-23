@@ -19,19 +19,19 @@ describe('zoneCity', () => {
 
 describe('dayTitle', () => {
   it('omits the year in the current year', () => {
-    expect(dayTitle('2026-11-20', '2026-11-20')).toBe('Friday 20 November');
+    expect(dayTitle('2026-11-20', '2026-11-20')).toBe('Friday, 20 November');
   });
   it('appends the year otherwise', () => {
-    expect(dayTitle('2025-11-20', '2026-11-20')).toBe('Thursday 20 November 2025');
+    expect(dayTitle('2025-11-20', '2026-11-20')).toBe('Thursday, 20 November 2025');
   });
 });
 
 describe('dayTitleShort', () => {
   it('abbreviates weekday and month', () => {
-    expect(dayTitleShort('2026-11-23', '2026-11-23')).toBe('Mon 23 Nov');
+    expect(dayTitleShort('2026-11-23', '2026-11-23')).toBe('Mon, 23 Nov');
   });
   it('appends the year otherwise', () => {
-    expect(dayTitleShort('2025-11-20', '2026-11-20')).toBe('Thu 20 Nov 2025');
+    expect(dayTitleShort('2025-11-20', '2026-11-20')).toBe('Thu, 20 Nov 2025');
   });
 });
 

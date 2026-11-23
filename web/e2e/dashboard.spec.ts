@@ -371,7 +371,7 @@ test.describe('fixed layout', () => {
     await openShell(page);
     await expect(page.getByTestId('relay-status')).toHaveAttribute('data-level', 'bad');
     await expect(page.getByTestId('relay-status')).toContainText('Recorder quiet');
-    const title = (await page.getByRole('button', { name: /Fri 6 Nov/ }).boundingBox())!;
+    const title = (await page.getByRole('button', { name: /Fri, 6 Nov/ }).boundingBox())!;
     expect(title.width).toBeGreaterThanOrEqual(60);
     for (const name of ['Previous day', 'Next day']) expect((await page.getByRole('button', { name }).boundingBox())!.width).toBeGreaterThanOrEqual(44);
     // Nothing overlaps: the next-day arrow ends before the status starts.
