@@ -207,6 +207,27 @@ describe('Watch', () => {
     expect(screen.queryByText('Pick an event or a time on the timeline')).toBeNull();
   });
 
+  it('a live view follows the day over midnight and stays live', async () => {
+    const c = client();
+    const r = mount(c);
+    await listRows();
+    // 17:00Z on the 6th is midnight in Jakarta: the 7th starts.
+    await r.rerender({ nowMs: Date.UTC(2026, 10, 6, 17, 0, 30) });
+    expect(screen.getByTestId('live-grid')).toBeInTheDocument();
+    expect(screen.queryByText('Pick an event or a time on the timeline')).toBeNull();
+    expect(await screen.findByRole('heading', { name: /^Today · \d+ events$/ })).toBeInTheDocument();
+    expect(dayButton()).toHaveTextContent('Saturday 7 November');
+    await waitFor(() => expect(lastClips(c)).toMatchObject({ from: '2026-11-06T17:00:00.000Z', to: '2026-11-07T17:00:00.000Z' }));
+  });
+
+  it('a past day stays put over midnight', async () => {
+    const r = mount(client());
+    await listRows();
+    await fireEvent.click(screen.getByRole('button', { name: 'Previous day' }));
+    await r.rerender({ nowMs: Date.UTC(2026, 10, 6, 17, 0, 30) });
+    expect(dayButton()).toHaveTextContent('Thursday 5 November');
+  });
+
   it('Go to today on a past day returns to live today', async () => {
     mount(client());
     await listRows();
