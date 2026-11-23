@@ -17,11 +17,35 @@ const status: Status = {
 afterEach(cleanup);
 
 describe('StatusPill', () => {
-  it('shows short text and level', () => {
+  const dotOf = (b: HTMLElement) => b.querySelector('span[aria-hidden="true"]') as HTMLElement;
+
+  it('is a bare dot when all is well', () => {
     render(StatusPill, { status, nowMs: NOW, zone: 'Asia/Jakarta' });
     const b = screen.getByTestId('relay-status');
-    expect(b.textContent).toContain('Recorder OK');
+    expect(b.textContent?.trim()).toBe('');
+    expect(b.getAttribute('aria-label')).toBe('Recorder OK');
+    expect(b.getAttribute('title')).toBe('The recorder checked in at 21:46.');
     expect(b.getAttribute('data-level')).toBe('ok');
+    expect(dotOf(b).className).toContain('h-2.5');
+    expect(dotOf(b).style.boxShadow).toContain('3px');
+  });
+
+  it('says what is wrong when the recorder is quiet', () => {
+    const stale = { ...status, updated_at: '2026-11-20T14:43:00Z' };
+    render(StatusPill, { status: stale, nowMs: NOW, zone: 'Asia/Jakarta' });
+    const b = screen.getByTestId('relay-status');
+    expect(b.textContent?.trim()).toBe('Recorder quiet 4 min');
+    expect(b.getAttribute('aria-label')).toBe('Recorder quiet 4 min');
+    expect(b.getAttribute('data-level')).toBe('bad');
+    expect(dotOf(b).style.boxShadow).toContain('3px');
+  });
+
+  it('says when status is unavailable', () => {
+    render(StatusPill, { status: null, nowMs: NOW, zone: 'Asia/Jakarta' });
+    const b = screen.getByTestId('relay-status');
+    expect(b.textContent?.trim()).toBe('Status unavailable');
+    expect(b.getAttribute('data-level')).toBe('unknown');
+    expect(dotOf(b).style.boxShadow).toContain('3px');
   });
 
   it('toggles details with aria-expanded', async () => {
