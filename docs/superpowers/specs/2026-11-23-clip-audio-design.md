@@ -81,6 +81,11 @@ Anti-goals
   `rtcp`, otherwise arrival time of the first audio packet plus audio media time since. The
   audio RTP timestamp is unwrapped to 64 bits like the video one.
 * Packets are forwarded to the recorder only after video has started (as for viewers today).
+* Checked on 2026-11-23: the home camera (`tapo-c220`) sends PCMA 8 kHz mono (ffprobe of the
+  restream) and its clips record `time_source: arrival` (no RTCP sender reports). So its audio
+  and video are each anchored by arrival time, and sync depends on the camera's audio and video
+  latency being close. If the clap test (§6) shows an offset, add a per-camera
+  `audio_offset_ms` then; it is not built up front.
 
 ### 5.3 Relay: hub, ring and pre-roll
 
