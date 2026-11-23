@@ -1,6 +1,6 @@
-# zrelay runbook
+# Sealcam runbook
 
-This runbook tells the owner how to install and operate zrelay v2. zrelay runs on the Mac mini
+This runbook tells the owner how to install and operate Sealcam (zrelay and zview). zrelay runs on the Mac mini
 (OrbStack). MinIO runs on the Synology NAS. The procedures follow design §8.3 and the decisions
 D11 to D19 in `docs/superpowers/specs/2026-11-06-zrelay-v2-design.md`.
 

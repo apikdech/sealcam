@@ -1,7 +1,10 @@
-# zrelay v2
+# Sealcam
 
-zrelay records event clips from RTSP and ONVIF cameras. It is for people who run a home camera
-system on their own hardware.
+Sealcam is a private home camera system. It is for people who run their cameras on their own
+hardware. Each clip is encrypted and sealed, and only your household holds the key.
+
+Sealcam has two parts: zrelay records the clips, and zview shows them. zrelay records event clips
+from RTSP and ONVIF cameras.
 
 - zrelay encrypts each clip with the `zrec` format.
 - zrelay sends the clip to S3-compatible storage (MinIO).

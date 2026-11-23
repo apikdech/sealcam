@@ -64,7 +64,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
-# Engineering Guidelines (zrelay v2)
+# Engineering Guidelines (Sealcam: zrelay and zview)
 
 - **Normative Specs:** The normative specs are in `docs/specs/` (`contract.md`, `relay-spec.md`, `ui-spec.md`), as amended by the v2 design (`docs/superpowers/specs/2026-11-06-zrelay-v2-design.md`, §11). The design wins on conflict. All formats, crypto envelopes and sidecar schemas are defined there. Do not redefine them.
 - **Workflow:** Use Superpowers skills.
