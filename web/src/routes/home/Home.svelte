@@ -136,7 +136,7 @@
             env={exportEnv}
             cameraName={data.nameOf}
             onState={onPlayerState}
-            onBack={backToLive}
+            onLive={backToLive}
             onPrev={() => runCommand('prev', ctx())}
             onNext={() => runCommand('next', ctx())}
           />

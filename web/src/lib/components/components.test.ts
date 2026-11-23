@@ -154,15 +154,18 @@ describe('Player', () => {
     expect(within(video.parentElement!).queryByText('Select a recording')).toBeNull();
   });
 
-  it('caps its height on desktop in one column: video, integrity row and Export share the right edge', () => {
+  it('fills its parent: no width cap, a stage above one bar with the integrity text and Export', () => {
     render(Player, props());
     const column = screen.getByTestId('player-column');
-    expect(column.className).toContain('md:w-[min(100%,calc(56vh*16/9))]');
-    expect(screen.getByTestId('player').parentElement!.className).not.toContain('calc(56vh');
-    expect(column).toContainElement(screen.getByRole('button', { name: 'Export' }));
-    expect(column).toContainElement(screen.getByTestId('integrity'));
-    // Left-aligned with the rest of the page.
-    expect(column.className).not.toContain('mx-auto');
+    expect(column.className).toContain('h-full');
+    expect(column.className).toContain('flex-col');
+    expect(column.className).not.toContain('calc(56vh');
+    expect(screen.getByTestId('player').parentElement!.className).toContain('flex-1');
+    const bar = screen.getByRole('group', { name: 'Player controls' });
+    expect(bar).toContainElement(screen.getByRole('button', { name: 'Export' }));
+    expect(bar).toContainElement(screen.getByTestId('integrity'));
+    expect(bar).toContainElement(screen.getByRole('slider', { name: 'Position' }));
+    expect(bar).toContainElement(screen.getByText('Autoplay next'));
   });
 
   it('the integrity banner seal is decorative: the alert already says it in words', async () => {
@@ -224,8 +227,7 @@ describe('Player', () => {
       Object.defineProperty(document, 'fullscreenEnabled', { value: true, configurable: true });
       try {
         render(Player, props());
-        const v = screen.getByTestId('player');
-        v.parentElement!.requestFullscreen = spy;
+        screen.getByTestId('player-column').requestFullscreen = spy;
         await fireEvent.click(await screen.findByRole('button', { name: 'Full screen' }));
         expect(spy).toHaveBeenCalled();
       } finally {
@@ -421,16 +423,97 @@ describe('Player', () => {
     expect(banner.className).toContain('border ');
   });
 
-  it('Back to live calls onBack', async () => {
-    const onBack = vi.fn();
-    render(Player, props({ onBack }));
-    await fireEvent.click(screen.getByRole('button', { name: 'Back to live' }));
-    expect(onBack).toHaveBeenCalledOnce();
+  it('Back to live sits on the stage and calls onLive', async () => {
+    const onLive = vi.fn();
+    render(Player, props({ onLive }));
+    const btn = screen.getByRole('button', { name: 'Back to live' });
+    expect(screen.getByTestId('player').parentElement).toContainElement(btn);
+    await fireEvent.click(btn);
+    expect(onLive).toHaveBeenCalledOnce();
   });
 
-  it('has no Back to live button without onBack', () => {
+  it('has no Back to live button without onLive', () => {
     render(Player, props());
     expect(screen.queryByRole('button', { name: 'Back to live' })).toBeNull();
+  });
+
+  describe('wall clock and layouts', () => {
+    // 11:17:12 in Asia/Jakarta.
+    const start = Date.UTC(2026, 10, 23, 4, 17, 12);
+    const emit = (clipId: string, startUnixMs: number) =>
+      FakePlayer.instances[0]!.emit({ ...initialState(), clipId, integrity: 'verified', header: { cameraId: 'front-door', startUnixMs } });
+    const mount = async (over: Record<string, unknown> = {}) => {
+      const r = render(Player, props({ cue: null, ...over }));
+      await waitFor(() => expect(FakePlayer.instances).toHaveLength(1));
+      emit(ids.a, start);
+      return r;
+    };
+    const stubTime = (v: HTMLElement, duration: number, currentTime: number) => {
+      Object.defineProperty(v, 'duration', { value: duration, configurable: true });
+      Object.defineProperty(v, 'currentTime', { value: currentTime, configurable: true });
+    };
+
+    it('shows the wall time of the current frame and the clip position', async () => {
+      await mount({ cameraName: () => 'Front door' });
+      const v = screen.getByTestId('player');
+      stubTime(v, 27, 12);
+      await fireEvent(v, new Event('loadedmetadata'));
+      const clock = await screen.findByTestId('clock');
+      expect(clock).toHaveTextContent('11:17:24');
+      expect(clock).toHaveTextContent('0:12 / 0:27');
+      expect(screen.getByTestId('badge')).toHaveTextContent('Recording · Front door 11:17:12');
+    });
+
+    it('updates the badge and the clock when auto-advance opens another clip', async () => {
+      await mount();
+      const v = screen.getByTestId('player');
+      stubTime(v, 27, 0);
+      await fireEvent(v, new Event('loadedmetadata'));
+      expect(screen.getByTestId('clock')).toHaveTextContent('11:17:12');
+      emit(ids.b, start + 60_000);
+      stubTime(v, 30, 0);
+      await fireEvent(v, new Event('durationchange'));
+      expect(screen.getByTestId('clock')).toHaveTextContent('11:18:12');
+      expect(screen.getByTestId('clock')).toHaveTextContent('0:00 / 0:30');
+      expect(screen.getByTestId('badge')).toHaveTextContent('11:18:12');
+    });
+
+    it('compact: Back 10 seconds, Forward 10 seconds, Autoplay and Export live in the More menu', async () => {
+      await mount({ compact: true });
+      const bar = screen.getByRole('group', { name: 'Player controls' });
+      for (const name of ['Previous clip', 'Play', 'Next clip']) expect(within(bar).getByRole('button', { name })).toBeInTheDocument();
+      expect(within(bar).getByRole('slider', { name: 'Position' })).toBeInTheDocument();
+      expect(within(bar).queryByRole('button', { name: 'Back 10 seconds' })).toBeNull();
+      expect(within(bar).queryByRole('button', { name: 'Export' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Back 10 seconds' })).toBeNull();
+      await fireEvent.click(screen.getByRole('button', { name: 'More' }));
+      const menu = screen.getByRole('group', { name: 'More controls' });
+      for (const name of ['Back 10 seconds', 'Forward 10 seconds', 'Export']) expect(within(menu).getByRole('button', { name })).toBeInTheDocument();
+      expect(within(menu).getByText('Autoplay next')).toBeInTheDocument();
+      expect(screen.getByTestId('integrity')).toHaveTextContent('Encrypted recording verified');
+    });
+
+    it('has Full screen in both layouts and no sound button', async () => {
+      const descriptor = Object.getOwnPropertyDescriptor(document, 'fullscreenEnabled');
+      Object.defineProperty(document, 'fullscreenEnabled', { value: true, configurable: true });
+      try {
+        for (const compact of [false, true]) {
+          const { unmount } = await mount({ compact });
+          expect(screen.getByRole('button', { name: 'Full screen' })).toBeInTheDocument();
+          expect(screen.queryByRole('button', { name: /sound|mute/i })).toBeNull();
+          unmount();
+          FakePlayer.instances = [];
+        }
+      } finally {
+        if (descriptor) Object.defineProperty(document, 'fullscreenEnabled', descriptor);
+        else delete (document as unknown as Record<string, unknown>).fullscreenEnabled;
+      }
+    });
+
+    it('still says "Encrypted recording verified" for a verified clip', async () => {
+      await mount();
+      expect(screen.getByTestId('integrity')).toHaveTextContent('Encrypted recording verified');
+    });
   });
 
   it('play button label follows the state', async () => {

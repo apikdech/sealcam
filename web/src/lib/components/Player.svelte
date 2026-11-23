@@ -33,8 +33,10 @@
     onState?: (s: PlayerState) => void;
     /** Display name of a camera, for the plain integrity messages. */
     cameraName?: (id: string) => string;
-    /** When set, a "Back to live" button is shown. */
-    onBack?: () => void;
+    /** When set, a "Live" pill on the stage goes back to live. */
+    onLive?: () => void;
+    /** The phone bar: fewer buttons, the rest under a More menu. */
+    compact?: boolean;
     onPrev?: () => void;
     onNext?: () => void;
   }
@@ -48,13 +50,14 @@
     env,
     onState,
     cameraName = (id: string) => id,
-    onBack,
+    onLive,
+    compact = false,
     onPrev,
     onNext,
   }: Props = $props();
 
   let video: HTMLVideoElement | undefined = $state();
-  let frame: HTMLDivElement | undefined = $state();
+  let frame: HTMLElement | undefined = $state();
   let fsMode: FullscreenMode = $state('none');
   let fullscreen = $state(false);
   let pos = $state(0);
@@ -154,6 +157,9 @@
     view.kind === 'tampered' ? 'border-void' : view.kind === 'mismatch' || view.kind === 'incomplete' ? 'border-amber' : 'border-muted',
   );
 
+  let moreOpen = $state(false);
+  const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+
   const icon =
     'inline-flex h-10 w-10 max-md:h-11 max-md:w-11 items-center justify-center rounded border border-rule text-ink hover:bg-plate disabled:cursor-not-allowed disabled:opacity-40';
   const ghost =
@@ -169,6 +175,8 @@
   let savedTimer: ReturnType<typeof setTimeout> | undefined;
 
   const header = $derived(snap.header);
+  /** Wall time of the frame on screen. */
+  const wall = $derived(header ? formatClock(header.startUnixMs + pos * 1000, zone, true) : '');
   const exportName = $derived(
     header ? exportFilename(header.cameraId, header.startUnixMs, zone, snap.integrity === 'incomplete') : '',
   );
@@ -240,19 +248,13 @@
   }
 </script>
 
-<section class="min-w-0 md:w-[min(100%,calc(56vh*16/9))]" aria-label="Player" data-testid="player-column">
-  {#if onBack}
-    <button type="button" class="{ghost} mb-2" onclick={onBack}>
-      <Icon name="home" size={16} />
-      <span>Back to live</span>
-    </button>
-  {/if}
-  <div
-    bind:this={frame}
-    class="relative overflow-hidden rounded-lg border border-rule [&:fullscreen]:w-full [&:fullscreen_video]:aspect-auto [&:fullscreen_video]:h-full {snap.clipId === null
-      ? 'bg-plate'
-      : 'bg-black'}"
-  >
+<section
+  bind:this={frame}
+  class="flex h-full min-h-0 min-w-0 flex-col [&:fullscreen]:bg-ground"
+  aria-label="Player"
+  data-testid="player-column"
+>
+  <div class="relative min-h-0 flex-1 overflow-hidden {snap.clipId === null ? 'bg-plate' : 'bg-black'}">
     <video
       bind:this={video}
       data-testid="player"
@@ -264,7 +266,7 @@
       ontimeupdate={(e) => sync(e.currentTarget)}
       onloadedmetadata={(e) => sync(e.currentTarget)}
       ondurationchange={(e) => sync(e.currentTarget)}
-      class="aspect-video w-full object-contain {snap.clipId === null ? '' : 'bg-black'}"
+      class="aspect-video h-full w-full object-contain {snap.clipId === null ? '' : 'bg-black'}"
     ></video>
     {#if snap.clipId === null}
       <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-sm text-muted">
@@ -272,32 +274,25 @@
         <span>Select a recording</span>
       </div>
     {/if}
-    {#if snap.clipId !== null}
-      <div class="scrim absolute inset-x-0 bottom-0 flex items-center gap-2 px-3 py-2 text-(--z-ov-ink)" style={overVideo}>
-        <input
-          type="range"
-          aria-label="Position"
-          class="min-w-0 flex-1 max-md:h-11"
-          min="0"
-          max={duration}
-          step="any"
-          value={pos}
-          disabled={duration === 0}
-          oninput={(e) => {
-            pos = Number(e.currentTarget.value);
-            void player?.seek(pos * 1000);
-          }}
-        />
-        {#if fsMode !== 'none'}
-          <button
-            type="button"
-            class="ov-btn inline-flex size-11 shrink-0 items-center justify-center"
-            aria-label={fullscreen ? 'Exit full screen' : 'Full screen'}
-            onclick={() => frame && video && toggleFullscreen(frame, video)}
-            ><Icon name={fullscreen ? 'fullscreen-exit' : 'fullscreen'} /></button
-          >
-        {/if}
+    {#if header}
+      <div
+        data-testid="badge"
+        class="ov-btn absolute top-3 left-3 rounded-lg max-w-[calc(100%-6rem)] truncate px-2.5 py-1.5 text-[13px] max-md:top-2 max-md:left-2"
+        style={overVideo}
+      >
+        Recording · {cameraName(header.cameraId)} <span class="num">{formatClock(header.startUnixMs, zone, true)}</span>
       </div>
+    {/if}
+    {#if onLive}
+      <button
+        type="button"
+        class="ov-btn absolute top-3 right-3 rounded-full inline-flex h-9 items-center gap-2 px-3 text-sm max-md:top-2 max-md:right-2 max-md:h-11"
+        style={overVideo}
+        aria-label="Back to live"
+        onclick={onLive}
+      >
+        <span aria-hidden="true" class="size-2 rounded-full bg-(--z-ov-line)"></span>Live
+      </button>
     {/if}
     {#if view.spinner}
       <div
@@ -311,45 +306,119 @@
     {/if}
   </div>
 
-  <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-    <span data-testid="integrity" data-kind={view.kind} class="flex items-center gap-2" title={view.title}>
+  {#snippet integrityRow()}
+    <span data-testid="integrity" data-kind={view.kind} class="flex items-center gap-2 text-sm" title={view.title}>
       {#if snap.clipId !== null}
         <Seal seed={snap.clipId} state={sealState} showLabel />
       {/if}
     </span>
-    {#if header}
-      <span class="num text-muted">{cameraName(header.cameraId)}, {formatClock(header.startUnixMs, zone, true)}</span>
-    {/if}
-    <label class="ml-auto flex items-center gap-1 text-muted max-md:min-h-11">
+  {/snippet}
+  {#snippet autoplay()}
+    <label class="flex items-center gap-1 text-sm text-muted max-md:min-h-11">
       <input type="checkbox" bind:checked={autoAdvance} />
       <span>Autoplay next</span>
     </label>
-  </div>
+  {/snippet}
+  <!-- Export saves plaintext: it is labelled and kept apart from the routine controls. -->
+  {#snippet exportButton()}
+    <button
+      type="button"
+      class={ghost}
+      aria-label="Export"
+      disabled={!exportable}
+      title={exportHint}
+      onclick={() => {
+        moreOpen = false;
+        openExport();
+      }}
+    >
+      <Icon name="download" size={16} />
+      {#if compact}<span>Export</span>{/if}
+    </button>
+  {/snippet}
 
-  <div class="mt-2 flex items-center gap-2">
-    <div class="flex items-center gap-1" role="group" aria-label="Transport">
-      <button type="button" class={icon} title="Previous clip (J)" aria-label="Previous clip" disabled={!onPrev} onclick={onPrev}>
-        <Icon name="prev" />
-      </button>
+  <div role="group" aria-label="Player controls" class="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2">
+    <button type="button" class={icon} title="Previous clip (J)" aria-label="Previous clip" disabled={!onPrev} onclick={onPrev}>
+      <Icon name="prev" />
+    </button>
+    {#if !compact}
       <button type="button" class={icon} title="Back 10 seconds (Left)" aria-label="Back 10 seconds" onclick={() => skip(-10_000)}>
         <Icon name="back10" />
       </button>
-      <button type="button" class={icon} title="Play or pause (Space)" aria-label={playing ? 'Pause' : 'Play'} onclick={togglePlay}>
-        <Icon name={playing ? 'pause' : 'play'} />
-      </button>
+    {/if}
+    <button type="button" class={icon} title="Play or pause (Space)" aria-label={playing ? 'Pause' : 'Play'} onclick={togglePlay}>
+      <Icon name={playing ? 'pause' : 'play'} />
+    </button>
+    {#if !compact}
       <button type="button" class={icon} title="Forward 10 seconds (Right)" aria-label="Forward 10 seconds" onclick={() => skip(10_000)}>
         <Icon name="fwd10" />
       </button>
-      <button type="button" class={icon} title="Next clip (K)" aria-label="Next clip" disabled={!onNext} onclick={onNext}>
-        <Icon name="next" />
-      </button>
-    </div>
-    <!-- Export saves plaintext: it sits apart from the routine controls. -->
-    <button type="button" class="{ghost} ml-auto" disabled={!exportable} title={exportHint} onclick={openExport}>
-      <Icon name="download" size={16} />
-      <span>Export</span>
+    {/if}
+    <button type="button" class={icon} title="Next clip (K)" aria-label="Next clip" disabled={!onNext} onclick={onNext}>
+      <Icon name="next" />
     </button>
+    <span data-testid="clock" class="flex {compact ? 'flex-col leading-tight' : 'items-baseline gap-1.5'} whitespace-nowrap px-1">
+      <span class="num text-[15px] font-semibold">{wall}</span>
+      <span class="num text-xs text-muted">{mmss(pos)} / {mmss(duration)}</span>
+    </span>
+    <input
+      type="range"
+      aria-label="Position"
+      class="min-w-24 flex-1 max-md:h-11"
+      min="0"
+      max={duration}
+      step="any"
+      value={pos}
+      disabled={duration === 0}
+      oninput={(e) => {
+        pos = Number(e.currentTarget.value);
+        void player?.seek(pos * 1000);
+      }}
+    />
+    {#if !compact}
+      {@render autoplay()}
+      {@render integrityRow()}
+      {@render exportButton()}
+    {/if}
+    {#if fsMode !== 'none'}
+      <button
+        type="button"
+        class={icon}
+        aria-label={fullscreen ? 'Exit full screen' : 'Full screen'}
+        onclick={() => frame && video && toggleFullscreen(frame, video)}
+        ><Icon name={fullscreen ? 'fullscreen-exit' : 'fullscreen'} /></button
+      >
+    {/if}
   </div>
+  {#if compact}
+    <div class="relative flex items-center justify-between gap-2 px-3 pb-2">
+      {@render integrityRow()}
+      <button
+        type="button"
+        class={icon}
+        aria-label="More"
+        aria-expanded={moreOpen}
+        onclick={() => (moreOpen = !moreOpen)}
+        onkeydown={(e) => e.key === 'Escape' && (moreOpen = false)}>⋯</button
+      >
+      {#if moreOpen}
+        <div
+          role="group"
+          aria-label="More controls"
+          class="absolute right-3 bottom-full z-10 flex flex-col items-stretch gap-1 rounded border border-rule bg-plate p-2"
+        >
+          <button type="button" class={ghost} aria-label="Back 10 seconds" onclick={() => skip(-10_000)}>
+            <Icon name="back10" size={16} /><span>Back 10 s</span>
+          </button>
+          <button type="button" class={ghost} aria-label="Forward 10 seconds" onclick={() => skip(10_000)}>
+            <Icon name="fwd10" size={16} /><span>Forward 10 s</span>
+          </button>
+          {@render autoplay()}
+          {@render exportButton()}
+        </div>
+      {/if}
+    </div>
+  {/if}
 
   {#if view.kind !== 'verified' && snap.clipId !== null && !view.spinner}
     <div
@@ -390,18 +459,13 @@
 {/if}
 
 <style>
-  /* The one gradient allowed: it keeps the bottom bar legible over any picture. */
-  .scrim {
-    background: linear-gradient(transparent, color-mix(in srgb, var(--z-ov-ground) 85%, transparent));
-  }
   .ov-btn {
     border: 1px solid var(--z-ov-rule);
-    border-radius: 10px;
     background: color-mix(in srgb, var(--z-ov-ground) 70%, transparent);
     color: var(--z-ov-ink);
   }
   input[type='range'] {
-    accent-color: var(--z-ov-line);
+    accent-color: var(--z-line);
   }
   /* Phones: a 44 px hit area around a thin drawn track. */
   @media (max-width: 767px) {
@@ -412,12 +476,12 @@
     input[type='range']::-webkit-slider-runnable-track {
       height: 4px;
       border-radius: 2px;
-      background: color-mix(in srgb, var(--z-ov-ink) 40%, transparent);
+      background: color-mix(in srgb, var(--z-muted) 60%, transparent);
     }
     input[type='range']::-moz-range-track {
       height: 4px;
       border-radius: 2px;
-      background: color-mix(in srgb, var(--z-ov-ink) 40%, transparent);
+      background: color-mix(in srgb, var(--z-muted) 60%, transparent);
     }
     input[type='range']::-webkit-slider-thumb {
       appearance: none;
@@ -426,14 +490,14 @@
       margin-top: -8px;
       border-radius: 50%;
       border: 0;
-      background: var(--z-ov-line);
+      background: var(--z-line);
     }
     input[type='range']::-moz-range-thumb {
       width: 20px;
       height: 20px;
       border-radius: 50%;
       border: 0;
-      background: var(--z-ov-line);
+      background: var(--z-line);
     }
   }
 </style>
