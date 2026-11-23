@@ -120,7 +120,7 @@
   bind:this={root}
   role="group"
   aria-label={name}
-  class="relative overflow-hidden rounded-lg border border-rule bg-ground [&:fullscreen_video]:aspect-auto [&:fullscreen_video]:h-full [&:fullscreen>div:not([role])]:h-full {single
+  class="relative overflow-hidden rounded-lg border border-rule bg-ground [&:fullscreen_video]:aspect-auto [&:fullscreen_video]:h-full [&:fullscreen>[data-stage]]:h-full {single
     ? 'flex h-full flex-col'
     : onFocus
       ? 'cursor-pointer'
@@ -132,7 +132,7 @@
   onclick={onRootClick}
 >
   <span role="status" class="sr-only">{sentence}</span>
-  <div class="relative {single ? 'min-h-0 flex-1' : ''}">
+  <div data-stage class="relative {single ? 'min-h-0 flex-1' : ''}">
     <video
       bind:this={video}
       muted

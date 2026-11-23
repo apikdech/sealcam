@@ -378,11 +378,12 @@ describe('LiveTile focus and single mode', () => {
     }
   });
 
-  it('the video wrapper fills the tile in fullscreen so the picture does too', () => {
-    renderTile();
-    const wrap = screen.getByTestId('live-tile').querySelector('video')!.parentElement!;
-    expect(screen.getByTestId('live-tile').className).toContain('[&:fullscreen>div:not([role])]:h-full');
-    expect(wrap.hasAttribute('role')).toBe(false);
+  it('only the video wrapper is marked to fill the tile in fullscreen, not the scrim', () => {
+    const tile = renderTile();
+    expect(tile.className).toContain('[&:fullscreen>[data-stage]]:h-full');
+    expect(tile.querySelector('video')!.parentElement!.hasAttribute('data-stage')).toBe(true);
+    expect(tile.querySelectorAll('[data-stage]')).toHaveLength(1);
+    expect(tile.querySelector('.scrim')!.hasAttribute('data-stage')).toBe(false);
   });
 
   it('single: clicking the video does not call onFocus', async () => {
