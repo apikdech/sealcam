@@ -1,8 +1,7 @@
 <script lang="ts">
   import Onboarding from './routes/onboarding/Onboarding.svelte';
   import FirstRun from './routes/onboarding/FirstRun.svelte';
-  import HomePage from './routes/home/Home.svelte';
-  import TimelinePage from './routes/+page.svelte';
+  import Watch from './routes/watch/Watch.svelte';
   import DemoPage from './routes/demo/+page.svelte';
   import Icon, { type IconName } from './lib/components/Icon.svelte';
   import StatusPill from './lib/components/StatusPill.svelte';
@@ -59,6 +58,8 @@
   const syncZone = () => (zone = loadZonePref() ?? browserZone());
   const hasKey = $derived((keys?.length ?? 0) > 0);
   const showFirstRun = $derived(keys !== null && (keys.length === 0 || holdFirstRun));
+  /** The Watch screen owns its top bar: the Lock and the status move into it. */
+  const watching = $derived(hash === '#/timeline' || (hash === '#/' && keys !== null && !showFirstRun));
 
   async function refreshKeys(result?: KeyListResult) {
     if (result) {
@@ -165,20 +166,24 @@
       >
     {/each}
   </nav>
-  <div class="ml-auto flex items-center">
-    {#if hash !== '#/key'}
-    <button
-      type="button"
-      aria-label="Lock"
-      title="Lock"
-      disabled={!hasKey}
-      class="{tabBase} inline-flex h-11 w-11 items-center justify-center text-ink disabled:opacity-40"
-      onclick={() => void lock()}><Icon name="lock" size={22} /></button
-    >
-    {/if}
-    <StatusPill {status} nowMs={env.wall} {zone} />
-  </div>
+  {#if !watching}
+    <div class="ml-auto flex items-center">{@render barEnd()}</div>
+  {/if}
 </header>
+
+{#snippet barEnd()}
+  {#if hash !== '#/key'}
+  <button
+    type="button"
+    aria-label="Lock"
+    title="Lock"
+    disabled={!hasKey}
+    class="{tabBase} inline-flex h-11 w-11 items-center justify-center text-ink disabled:opacity-40"
+    onclick={() => void lock()}><Icon name="lock" size={22} /></button
+  >
+  {/if}
+  <StatusPill {status} nowMs={env.wall} {zone} />
+{/snippet}
 
 {#if notice}
   <p role="status" class="border-b border-rule bg-plate px-4 py-2 text-sm">{notice}</p>
@@ -193,7 +198,7 @@
   {:else if hash === '#/key'}
     <Onboarding />
   {:else if hash === '#/timeline'}
-    <TimelinePage {client} />
+    <Watch {client} {status} topRight={barEnd} />
   {:else if keys === null && keysFailed}
     <main class="mx-auto max-w-xl space-y-3 p-4">
       <p role="alert" class="text-void">Could not read the keys on this device.</p>
@@ -222,7 +227,7 @@
       />
     </div>
   {:else}
-    <HomePage {client} {status} />
+    <Watch {client} {status} topRight={barEnd} />
   {/if}
 </div>
 

@@ -4,8 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Request } from './worker/protocol';
 
 // The pages need the worker and the browser APIs; only the shell is under test.
-vi.mock('./routes/+page.svelte', () => import('../test-support/routes/Timeline.svelte'));
-vi.mock('./routes/home/Home.svelte', () => import('../test-support/routes/Home.svelte'));
+vi.mock('./routes/watch/Watch.svelte', () => import('../test-support/routes/Watch.svelte'));
 vi.mock('./routes/demo/+page.svelte', () => import('../test-support/routes/Demo.svelte'));
 vi.mock('./routes/onboarding/Onboarding.svelte', () => import('../test-support/routes/Key.svelte'));
 vi.mock('./routes/onboarding/FirstRun.svelte', () => import('../test-support/routes/FirstRun.svelte'));
@@ -42,7 +41,7 @@ function fake(keys: Keys = [KEY], afterLock: Keys = keys) {
 }
 
 const shown = () =>
-  ['home', 'timeline', 'demo', 'key', 'firstrun'].filter((r) => screen.queryByTestId(`route-${r}`) !== null);
+  ['watch', 'demo', 'key', 'firstrun'].filter((r) => screen.queryByTestId(`route-${r}`) !== null);
 const settled = async (route: string) => {
   await screen.findByTestId(`route-${route}`);
   return shown();
@@ -52,32 +51,32 @@ describe('App routing', () => {
   it('a route change scrolls to the top', async () => {
     location.hash = '';
     render(App, { client: fake() });
-    await settled('home');
+    await settled('watch');
     scrollTo.mockClear();
     location.hash = '#/timeline';
     await fireEvent(window, new HashChangeEvent('hashchange'));
-    await waitFor(() => expect(shown()).toEqual(['timeline']));
+    await waitFor(() => expect(shown()).toEqual(['watch']));
     expect(scrollTo).toHaveBeenCalledWith(0, 0);
   });
 
   it('default route renders Home', async () => {
     location.hash = '';
     render(App, { client: fake() });
-    expect(await settled('home')).toEqual(['home']);
+    expect(await settled('watch')).toEqual(['watch']);
   });
 
   for (const h of ['#/', '#/live', '#/nowhere']) {
     it(`${h} renders Home`, async () => {
       location.hash = h;
       render(App, { client: fake() });
-      expect(await settled('home')).toEqual(['home']);
+      expect(await settled('watch')).toEqual(['watch']);
     });
   }
 
   it('shows the timeline for #/timeline', async () => {
     location.hash = '#/timeline';
     render(App, { client: fake() });
-    expect(await settled('timeline')).toEqual(['timeline']);
+    expect(await settled('watch')).toEqual(['watch']);
   });
 
   it('shows the keys page for #/key', async () => {
@@ -96,7 +95,7 @@ describe('App routing', () => {
   it('the active tab has aria-current, in the top bar and the bottom bar', async () => {
     location.hash = '#/timeline';
     render(App, { client: fake() });
-    await settled('timeline');
+    await settled('watch');
     const navs = screen.getAllByRole('navigation', { name: 'Views' });
     expect(navs).toHaveLength(2);
     for (const nav of navs) {
@@ -116,13 +115,13 @@ describe('App routing', () => {
   it('follows hash changes', async () => {
     location.hash = '';
     render(App, { client: fake() });
-    expect(await settled('home')).toEqual(['home']);
+    expect(await settled('watch')).toEqual(['watch']);
     location.hash = '#/key';
     await fireEvent(window, new HashChangeEvent('hashchange'));
     await waitFor(() => expect(shown()).toEqual(['key']));
     location.hash = '#/bogus';
     await fireEvent(window, new HashChangeEvent('hashchange'));
-    await waitFor(() => expect(shown()).toEqual(['home']));
+    await waitFor(() => expect(shown()).toEqual(['watch']));
   });
 });
 
@@ -133,7 +132,7 @@ describe('App first run and Lock', () => {
     expect(await settled('firstrun')).toEqual(['firstrun']);
     location.hash = '#/timeline';
     await fireEvent(window, new HashChangeEvent('hashchange'));
-    await waitFor(() => expect(shown()).toEqual(['timeline']));
+    await waitFor(() => expect(shown()).toEqual(['watch']));
   });
 
   it('importing on FirstRun shows Home once the user leaves it; the remember choice stays reachable until then', async () => {
@@ -153,7 +152,7 @@ describe('App first run and Lock', () => {
     expect(shown()).toEqual(['firstrun']);
     expect(screen.getByText(/Keep it on this phone/)).toBeInTheDocument();
     await fireEvent.click(screen.getByRole('link', { name: 'Open Home' }));
-    await waitFor(() => expect(shown()).toEqual(['home']));
+    await waitFor(() => expect(shown()).toEqual(['watch']));
   });
 
   it('marks no tab current during first run, in either bar', async () => {
@@ -181,20 +180,20 @@ describe('App first run and Lock', () => {
     await new Promise((r) => setTimeout(r, 20));
     scrollTo.mockClear();
     await fireEvent.click(screen.getByRole('link', { name: 'Open Home' }));
-    await waitFor(() => expect(shown()).toEqual(['home']));
+    await waitFor(() => expect(shown()).toEqual(['watch']));
     expect(scrollTo).toHaveBeenCalledWith(0, 0);
   });
 
   it('Lock shows the result text for a remembered key', async () => {
     render(App, { client: fake([KEY], [KEY]) });
-    await settled('home');
+    await settled('watch');
     await fireEvent.click(screen.getByRole('button', { name: 'Lock' }));
     expect(await screen.findByText('Locked. Opening a recording unlocks it again on this device.')).toBeInTheDocument();
   });
 
   it('Lock shows the session-only text when no key is kept', async () => {
     render(App, { client: fake([{ keyId: 'a', remembered: false }], []) });
-    await settled('home');
+    await settled('watch');
     await fireEvent.click(screen.getByRole('button', { name: 'Lock' }));
     expect(await screen.findByText('Locked. Add the key again to watch.')).toBeInTheDocument();
   });
@@ -225,7 +224,7 @@ describe('App recorder status', () => {
     await vi.advanceTimersByTimeAsync(0);
     const polls = () => calls.filter((c) => c.type === 'api.get' && c.path === '/api/v1/status').length;
     expect(polls()).toBe(1);
-    expect(screen.getByTestId('route-home')).toHaveAttribute('data-status', '2026-11-20T10:00:00Z');
+    expect(screen.getByTestId('route-watch')).toHaveAttribute('data-status', '2026-11-20T10:00:00Z');
     expect(screen.getByTestId('relay-status')).toBeInTheDocument();
     await vi.advanceTimersByTimeAsync(60_000);
     expect(polls()).toBe(2);
@@ -315,7 +314,7 @@ describe('App display zone', () => {
     };
     location.hash = '#/timeline';
     render(App, { client });
-    await settled('timeline');
+    await settled('watch');
     await waitFor(() => expect(screen.getByTestId('relay-status')).toBeInTheDocument());
     saveZonePref('Asia/Jakarta');
     location.hash = '#/';
@@ -345,7 +344,7 @@ describe('App when the keys cannot be read', () => {
     expect(shown()).toEqual([]);
     fail = false;
     await fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
-    expect(await settled('home')).toEqual(['home']);
+    expect(await settled('watch')).toEqual(['watch']);
     expect(screen.getAllByRole('link', { name: 'Timeline' }).length).toBeGreaterThan(0);
   });
 

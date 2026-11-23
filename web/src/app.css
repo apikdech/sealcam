@@ -117,3 +117,10 @@ a {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
 }
+
+/* The side-by-side Watch layout: from md, or a phone or short window in landscape at least 640 px wide (design §7.4). */
+@custom-variant wide {
+  @media (min-width: 48rem) or ((orientation: landscape) and (min-width: 40rem)) {
+    @slot;
+  }
+}
