@@ -303,6 +303,22 @@ test.describe('fixed layout', () => {
     expect((await page.getByTestId('player').boundingBox())!.height).toBeGreaterThanOrEqual(h === 390 ? 110 : 200);
   });
 
+  test('a short laptop window keeps the full desktop bar at 1366×650', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 650 });
+    await page.goto(url());
+    await recordings(page).getByRole('option').first().click();
+    const bar = page.getByRole('group', { name: 'Player controls' });
+    await expect(bar.getByRole('button', { name: 'Back 10 seconds' })).toBeVisible();
+    await expect(bar.getByRole('button', { name: 'Forward 10 seconds' })).toBeVisible();
+  });
+
+  test('the legend is in the timeline row on a 1280×720 desktop', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await openShell(page);
+    await expect(page.getByRole('list', { name: 'Legend' })).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Legend' })).toContainText('not monitored');
+  });
+
   test('the Live pill can be pressed while a clip is still verifying', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await openShell(page);

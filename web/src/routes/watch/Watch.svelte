@@ -54,15 +54,26 @@
   const now = $derived(nowMs ?? env.wall);
   const todayDay = $derived(localDayOf(now, zone));
 
-  // Short screens: thinner phone lanes so the list keeps three rows, and the one-row player bar.
+  // Short phone screens get thinner lanes so the list keeps three rows.
   let short = $state(false);
+  // A phone in landscape: the side-by-side layout, but phone controls (one-row bar, legend behind ?).
+  let handheld = $state(false);
   onMount(() => {
     const mq = window.matchMedia?.('(max-height: 700px)');
-    const sync = () => (short = mq?.matches ?? false);
+    const hq = window.matchMedia?.('(max-height: 480px) and (max-width: 1023px)');
+    const sync = () => {
+      short = mq?.matches ?? false;
+      handheld = hq?.matches ?? false;
+    };
     sync();
     mq?.addEventListener?.('change', sync);
-    return () => mq?.removeEventListener?.('change', sync);
+    hq?.addEventListener?.('change', sync);
+    return () => {
+      mq?.removeEventListener?.('change', sync);
+      hq?.removeEventListener?.('change', sync);
+    };
   });
+  const phoneControls = $derived(env.phone || handheld);
 
   let camera = $state('');
   let triggers = $state<string[]>([]);
@@ -254,7 +265,7 @@
             {profile}
             {factory}
             env={exportEnv}
-            compact={env.phone || short}
+            compact={phoneControls}
             cameraName={data.nameOf}
             {triggersOf}
             onState={onPlayerState}
@@ -279,7 +290,7 @@
         {/if}
       </div>
 
-      <div class="@container min-w-0 border-t border-rule px-3 pt-1 pb-2 wide:col-start-1 wide:row-start-2">
+      <div class="min-w-0 border-t border-rule px-3 pt-1 pb-2 wide:col-start-1 wide:row-start-2">
         {#if data.dayError}
           <LoadProblem kind={data.dayError} text="Could not load recordings." onRetry={data.retry} />
         {:else}
@@ -294,7 +305,7 @@
             <button type="button" class={tool} title="Jump to now (T)" onclick={() => runCommand('now', ctx())}>Now</button>
             <ul
               aria-label="Legend"
-              class="{shortcutsOpen ? 'flex' : 'hidden @min-[60rem]:flex'} flex-wrap items-center gap-x-3 gap-y-1 @max-[60rem]:order-last @max-[60rem]:w-full @min-[60rem]:ml-auto"
+              class="{shortcutsOpen || !phoneControls ? 'flex' : 'hidden'} {phoneControls ? 'order-last w-full' : 'ml-auto'} flex-wrap items-center gap-x-3 gap-y-1"
             >
               {#each LEGEND_TRIGGERS as t (t)}
                 {@const st = triggerStyle(t)}
@@ -334,7 +345,7 @@
             </ul>
             <button
               type="button"
-              class="{tool} @max-[60rem]:ml-auto"
+              class="{tool} {phoneControls ? 'ml-auto' : ''}"
               aria-label="Keyboard shortcuts"
               title="Keyboard shortcuts"
               aria-expanded={shortcutsOpen}
