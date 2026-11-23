@@ -575,28 +575,28 @@ describe('Player', () => {
         const btn = within(bar).getByRole('button', { name: 'Playback speed' });
         expect(btn).toHaveTextContent('1×');
         await fireEvent.click(btn);
-        const menu = screen.getByRole('group', { name: 'Speeds' });
+        const menu = screen.getByRole('group', { name: 'Playback speed' });
         const items = within(menu).getAllByRole('button');
         expect(items.map((b) => b.textContent?.trim())).toEqual(['0.25×', '0.5×', '1×', '1.5×', '2×', '4×']);
         expect(within(menu).getByRole('button', { name: '1×' })).toHaveAttribute('aria-pressed', 'true');
         await fireEvent.click(within(menu).getByRole('button', { name: '2×' }));
         expect(v.playbackRate).toBe(2);
         expect(btn).toHaveTextContent('2×');
-        expect(screen.queryByRole('group', { name: 'Speeds' })).toBeNull();
+        expect(screen.queryByRole('group', { name: 'Playback speed' })).toBeNull();
         await fireEvent.click(btn);
-        expect(within(screen.getByRole('group', { name: 'Speeds' })).getByRole('button', { name: '2×' })).toHaveAttribute('aria-pressed', 'true');
-        expect(within(screen.getByRole('group', { name: 'Speeds' })).getByRole('button', { name: '1×' })).toHaveAttribute('aria-pressed', 'false');
+        expect(within(screen.getByRole('group', { name: 'Playback speed' })).getByRole('button', { name: '2×' })).toHaveAttribute('aria-pressed', 'true');
+        expect(within(screen.getByRole('group', { name: 'Playback speed' })).getByRole('button', { name: '1×' })).toHaveAttribute('aria-pressed', 'false');
       });
 
       it('the menu closes on Escape and on a click outside', async () => {
         await mount();
         const btn = screen.getByRole('button', { name: 'Playback speed' });
         await fireEvent.click(btn);
-        await fireEvent.keyDown(screen.getByRole('group', { name: 'Speeds' }), { key: 'Escape' });
-        expect(screen.queryByRole('group', { name: 'Speeds' })).toBeNull();
+        await fireEvent.keyDown(screen.getByRole('group', { name: 'Playback speed' }), { key: 'Escape' });
+        expect(screen.queryByRole('group', { name: 'Playback speed' })).toBeNull();
         await fireEvent.click(btn);
         await fireEvent.click(document.body);
-        expect(screen.queryByRole('group', { name: 'Speeds' })).toBeNull();
+        expect(screen.queryByRole('group', { name: 'Playback speed' })).toBeNull();
       });
 
       it('the speed stays when the player moves to another clip', async () => {
@@ -610,6 +610,44 @@ describe('Player', () => {
         expect(v.playbackRate).toBe(2);
       });
 
+      it('focus returns to the speed button after a pick or Escape', async () => {
+        await mount();
+        const btn = screen.getByRole('button', { name: 'Playback speed' });
+        await fireEvent.click(btn);
+        const two = screen.getByRole('button', { name: '2×' });
+        two.focus();
+        await fireEvent.click(two);
+        expect(document.activeElement).toBe(btn);
+        await fireEvent.click(btn);
+        screen.getByRole('button', { name: '4×' }).focus();
+        await fireEvent.keyDown(screen.getByRole('button', { name: '4×' }), { key: 'Escape' });
+        expect(document.activeElement).toBe(btn);
+      });
+
+      it('compact: a pick or Escape closes More and focus returns to the More button', async () => {
+        await mount({ compact: true });
+        const more = screen.getByRole('button', { name: 'More' });
+        await fireEvent.click(more);
+        await fireEvent.click(screen.getByRole('button', { name: '2×' }));
+        expect(screen.queryByRole('group', { name: 'More controls' })).toBeNull();
+        expect(document.activeElement).toBe(more);
+        await fireEvent.click(more);
+        const back = screen.getByRole('button', { name: 'Back 10 seconds' });
+        back.focus();
+        await fireEvent.keyDown(back, { key: 'Escape' });
+        expect(screen.queryByRole('group', { name: 'More controls' })).toBeNull();
+        expect(document.activeElement).toBe(more);
+      });
+
+      it('compact: every More item is a 44 px target at any width (jsdom has no layout, so the classes are pinned)', async () => {
+        await mount({ compact: true });
+        await fireEvent.click(screen.getByRole('button', { name: 'More' }));
+        const menu = screen.getByRole('group', { name: 'More controls' });
+        for (const b of within(menu).getAllByRole('button')) expect(b).toHaveClass('min-h-11');
+        for (const b of within(within(menu).getByRole('group', { name: 'Playback speed' })).getAllByRole('button')) expect(b).toHaveClass('min-w-11');
+        expect(within(menu).getByText('Autoplay next').closest('label')).toHaveClass('min-h-11');
+      });
+
       it('compact: the speeds are in the More menu, not in the bar', async () => {
         await mount({ compact: true });
         const v = screen.getByTestId('player') as HTMLVideoElement;
@@ -621,7 +659,8 @@ describe('Player', () => {
         expect(within(speeds).getByRole('button', { name: '1×' })).toHaveAttribute('aria-pressed', 'true');
         await fireEvent.click(within(speeds).getByRole('button', { name: '0.5×' }));
         expect(v.playbackRate).toBe(0.5);
-        expect(within(speeds).getByRole('button', { name: '0.5×' })).toHaveAttribute('aria-pressed', 'true');
+        await fireEvent.click(screen.getByRole('button', { name: 'More' }));
+        expect(screen.getByRole('button', { name: '0.5×' })).toHaveAttribute('aria-pressed', 'true');
       });
     });
   });

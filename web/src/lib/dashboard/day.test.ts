@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { dayTitle, dayTitleShort, daySubtitle, shiftDay, zoneCity } from './day';
 
 describe('shiftDay', () => {
@@ -32,6 +32,18 @@ describe('dayTitleShort', () => {
   });
   it('appends the year otherwise', () => {
     expect(dayTitleShort('2025-11-20', '2026-11-20')).toBe('Thu, 20 Nov 2025');
+  });
+});
+
+describe('day titles do not depend on how ICU punctuates', () => {
+  it('stay single-commaed when the engine already writes "Monday, 23 November"', () => {
+    const spy = vi.spyOn(Intl.DateTimeFormat.prototype as unknown as { format: unknown }, 'format', 'get').mockReturnValue(() => 'Monday, 23 November');
+    try {
+      expect(dayTitle('2026-11-23', '2026-11-23')).toBe('Monday, 23 November');
+      expect(dayTitleShort('2026-11-23', '2026-11-23')).toBe('Mon, 23 Nov');
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

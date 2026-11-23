@@ -22,9 +22,15 @@ const TITLE = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'UTC',
 });
 
+/** "Weekday, day month" from the parts, so the punctuation does not depend on the ICU version. */
+function title(fmt: Intl.DateTimeFormat, day: string): string {
+  const p = Object.fromEntries(fmt.formatToParts(noon(day)).map((x) => [x.type, x.value]));
+  return `${p.weekday}, ${p.day} ${p.month}`;
+}
+
 /** "Friday, 20 November"; the year is added when `day` is not in `todayDay`'s year. */
 export function dayTitle(day: string, todayDay: string): string {
-  const text = TITLE.format(noon(day)).replace(' ', ', ');
+  const text = title(TITLE, day);
   return day.slice(0, 4) === todayDay.slice(0, 4) ? text : `${text} ${day.slice(0, 4)}`;
 }
 
@@ -37,7 +43,7 @@ const TITLE_SHORT = new Intl.DateTimeFormat('en-GB', {
 
 /** "Fri, 20 Nov", for the phone top bar; the year is added as in `dayTitle`. */
 export function dayTitleShort(day: string, todayDay: string): string {
-  const text = TITLE_SHORT.format(noon(day)).replace(' ', ', ');
+  const text = title(TITLE_SHORT, day);
   return day.slice(0, 4) === todayDay.slice(0, 4) ? text : `${text} ${day.slice(0, 4)}`;
 }
 

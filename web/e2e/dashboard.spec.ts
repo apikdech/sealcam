@@ -320,6 +320,7 @@ test.describe('fixed layout', () => {
   for (const [w, h] of [
     [390, 844],
     [844, 390],
+    [667, 375],
   ] as const)
   test(`the compact player bar keeps its controls on one row at ${w}×${h}`, async ({ page }) => {
     await page.setViewportSize({ width: w, height: h });
@@ -337,8 +338,20 @@ test.describe('fixed layout', () => {
     const highestBottom = Math.min(...boxes.map((r) => r.bottom));
     expect(lowestTop).toBeLessThan(highestBottom);
     for (const r of boxes) expect(r.right).toBeLessThanOrEqual(w);
-    // The picture keeps a usable height (in landscape the bar, the integrity line and the timeline share 390 px).
-    expect((await page.getByTestId('player').boundingBox())!.height).toBeGreaterThanOrEqual(h === 390 ? 110 : 200);
+    // The picture keeps a usable height (in landscape the bar, the integrity line and the timeline share the height).
+    expect((await page.getByTestId('player').boundingBox())!.height).toBeGreaterThanOrEqual(h === 844 ? 200 : h === 390 ? 110 : 80);
+    // Every item in More is on screen and a 44 px target.
+    await page.getByRole('button', { name: 'More' }).click();
+    const items = page.getByRole('group', { name: 'More controls' }).getByRole('button');
+    expect(await items.count()).toBeGreaterThanOrEqual(9);
+    for (const b of await items.all()) {
+      const r = (await b.boundingBox())!;
+      expect(r.y).toBeGreaterThanOrEqual(0);
+      expect(r.y + r.height).toBeLessThanOrEqual(h);
+      expect(r.x).toBeGreaterThanOrEqual(0);
+      expect(r.x + r.width).toBeLessThanOrEqual(w);
+      expect(r.height).toBeGreaterThanOrEqual(44);
+    }
   });
 
   test('a short laptop window keeps the full desktop bar at 1366×650', async ({ page }) => {

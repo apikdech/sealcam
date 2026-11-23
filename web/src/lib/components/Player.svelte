@@ -82,6 +82,8 @@
   let rate = $state(1);
   let speedOpen = $state(false);
   let speedBox: HTMLElement | undefined = $state();
+  let speedBtn: HTMLButtonElement | undefined = $state();
+  let moreBtn: HTMLButtonElement | undefined = $state();
   /** Engines and source swaps can reset the rate, so it is applied again after each load and play. */
   const applyRate = (v: HTMLVideoElement) => {
     if (v.playbackRate !== rate) v.playbackRate = rate;
@@ -89,9 +91,15 @@
   $effect(() => {
     if (video) applyRate(video);
   });
+  /** Closes the speed or More menu and gives focus back to the button that opened it. */
+  function closeMenu(): void {
+    speedOpen = false;
+    moreOpen = false;
+    (compact ? moreBtn : speedBtn)?.focus();
+  }
   function pickSpeed(s: number): void {
     rate = s;
-    speedOpen = false;
+    closeMenu();
   }
 
   let player: Player | undefined = $state();
@@ -193,6 +201,8 @@
     'inline-flex h-10 w-10 max-md:h-11 max-md:w-11 items-center justify-center rounded border border-rule text-ink hover:bg-ground disabled:cursor-not-allowed disabled:opacity-40';
   const ghost =
     'inline-flex items-center gap-2 rounded border border-rule px-3 py-2 max-md:min-h-11 text-sm text-ink hover:bg-ground disabled:cursor-not-allowed disabled:opacity-40';
+  /** The phone bar is also used above md (phone landscape), so its 44 px targets follow `compact`, not the width. */
+  const tap = $derived(compact ? 'min-h-11' : '');
 
   // ---- export --------------------------------------------------------------
 
@@ -365,7 +375,7 @@
     </span>
   {/snippet}
   {#snippet autoplay()}
-    <label class="flex items-center gap-1 text-sm text-muted max-md:min-h-11">
+    <label class="flex items-center gap-1 text-sm text-muted max-md:min-h-11 {tap}">
       <input type="checkbox" bind:checked={autoAdvance} />
       <span>Autoplay next</span>
     </label>
@@ -374,7 +384,7 @@
   {#snippet exportButton()}
     <button
       type="button"
-      class={ghost}
+      class="{ghost} {tap}"
       aria-label="Export"
       disabled={!exportable}
       title={exportHint}
@@ -387,12 +397,12 @@
       {#if compact}<span>Export</span>{/if}
     </button>
   {/snippet}
-  {#snippet speedChoices(label: string)}
-    <div role="group" aria-label={label} class="flex {compact ? 'flex-wrap' : 'flex-col'} gap-1">
+  {#snippet speedChoices()}
+    <div role="group" aria-label="Playback speed" class="flex {compact ? 'flex-wrap' : 'flex-col'} gap-1">
       {#each SPEEDS as s (s)}
         <button
           type="button"
-          class="rounded px-2 py-1 text-sm num max-md:min-h-11 max-md:min-w-11 hover:bg-ground {s === rate ? 'bg-ground font-semibold text-ink' : 'text-muted'}"
+          class="rounded px-2 py-1 text-sm num max-md:min-h-11 max-md:min-w-11 {compact ? 'min-h-11 min-w-11' : ''} hover:bg-ground {s === rate ? 'bg-ground font-semibold text-ink' : 'text-muted'}"
           aria-pressed={s === rate}
           onclick={() => pickSpeed(s)}>{s}×</button
         >
@@ -439,8 +449,9 @@
       }}
     />
     {#if !compact}
-      <div bind:this={speedBox} class="relative" role="presentation" onkeydown={(e) => e.key === 'Escape' && (speedOpen = false)}>
+      <div bind:this={speedBox} class="relative" role="presentation" onkeydown={(e) => e.key === 'Escape' && closeMenu()}>
         <button
+          bind:this={speedBtn}
           type="button"
           class="{ghost} num"
           aria-label="Playback speed"
@@ -450,7 +461,7 @@
         >
         {#if speedOpen}
           <div class="absolute bottom-full left-0 z-10 mb-1 rounded border border-rule bg-plate p-1">
-            {@render speedChoices('Speeds')}
+            {@render speedChoices()}
           </div>
         {/if}
       </div>
@@ -469,31 +480,36 @@
     {/if}
   </div>
   {#if compact}
-    <div class="relative flex items-center justify-between gap-2 px-3 pb-2">
+    <div class="relative flex items-center justify-between gap-2 px-3 pb-2" role="presentation" onkeydown={(e) => e.key === 'Escape' && closeMenu()}>
       {@render integrityRow()}
       <button
+        bind:this={moreBtn}
         type="button"
         class={icon}
         aria-label="More"
         aria-expanded={moreOpen}
-        onclick={() => (moreOpen = !moreOpen)}
-        onkeydown={(e) => e.key === 'Escape' && (moreOpen = false)}>⋯</button
+        onclick={() => (moreOpen = !moreOpen)}>⋯</button
       >
       {#if moreOpen}
+        <!-- Three rows, so it fits above the bar in phone landscape (667×375). -->
         <div
           role="group"
           aria-label="More controls"
           class="absolute right-3 bottom-full z-10 flex flex-col items-stretch gap-1 rounded border border-rule bg-plate p-2"
         >
-          <button type="button" class={ghost} aria-label="Back 10 seconds" onclick={() => skip(-10_000)}>
-            <Icon name="back10" size={16} /><span>Back 10 s</span>
-          </button>
-          <button type="button" class={ghost} aria-label="Forward 10 seconds" onclick={() => skip(10_000)}>
-            <Icon name="fwd10" size={16} /><span>Forward 10 s</span>
-          </button>
-          {@render speedChoices('Playback speed')}
-          {@render autoplay()}
-          {@render exportButton()}
+          <div class="flex gap-1">
+            <button type="button" class="{ghost} {tap} flex-1" aria-label="Back 10 seconds" onclick={() => skip(-10_000)}>
+              <Icon name="back10" size={16} /><span>Back 10 s</span>
+            </button>
+            <button type="button" class="{ghost} {tap} flex-1" aria-label="Forward 10 seconds" onclick={() => skip(10_000)}>
+              <Icon name="fwd10" size={16} /><span>Forward 10 s</span>
+            </button>
+          </div>
+          {@render speedChoices()}
+          <div class="flex items-center justify-between gap-3">
+            {@render autoplay()}
+            {@render exportButton()}
+          </div>
         </div>
       {/if}
     </div>
