@@ -20,6 +20,7 @@ describe('DayNav', () => {
   it('shows the title and subtitle', () => {
     render(DayNav, { ...props, onDay: () => {}, menu });
     expect(screen.getByText('Friday 20 November')).toBeTruthy();
+    expect(screen.getByText('Fri 20 Nov')).toBeTruthy();
     expect(screen.getByText('Jakarta time · today')).toBeTruthy();
   });
 

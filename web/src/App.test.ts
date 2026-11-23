@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Request } from './worker/protocol';
 
@@ -92,24 +92,42 @@ describe('App routing', () => {
     expect(screen.getByTestId('route-demo')).toHaveAttribute('data-clip', '01M6RXRJAQRJY105FSDF0QRBH1');
   });
 
-  it('the active tab has aria-current, in the top bar and the bottom bar', async () => {
-    location.hash = '#/timeline';
-    render(App, { client: fake() });
-    await settled('watch');
-    const navs = screen.getAllByRole('navigation', { name: 'Views' });
-    expect(navs).toHaveLength(2);
-    for (const nav of navs) {
-      expect(within(nav).getByRole('link', { name: 'Timeline' })).toHaveAttribute('aria-current', 'page');
-      expect(within(nav).getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current');
+  it('has no Views navigation, on Watch or elsewhere', async () => {
+    for (const h of ['#/timeline', '#/key', '#/demo']) {
+      location.hash = h;
+      const { unmount } = render(App, { client: fake() });
+      await new Promise((r) => setTimeout(r, 20));
+      expect(screen.queryByRole('navigation', { name: 'Views' })).toBeNull();
+      unmount();
     }
   });
 
-  it('Home, Timeline and Keys are the tabs; the demo page stays out', async () => {
-    location.hash = '#/demo';
+  for (const h of ['#/live', '#/timeline']) {
+    it(`${h} renders the Watch screen`, async () => {
+      location.hash = h;
+      render(App, { client: fake() });
+      expect(await settled('watch')).toEqual(['watch']);
+    });
+  }
+
+  it('the theme button is on Watch and on Keys', async () => {
+    location.hash = '';
     render(App, { client: fake() });
-    for (const nav of screen.getAllByRole('navigation', { name: 'Views' })) {
-      expect([...nav.querySelectorAll('a')].map((a) => a.textContent?.trim())).toEqual(['Home', 'Timeline', 'Keys']);
-    }
+    await settled('watch');
+    expect(screen.getByRole('button', { name: /theme/i })).toBeInTheDocument();
+    cleanup();
+    location.hash = '#/key';
+    render(App, { client: fake() });
+    await settled('key');
+    expect(screen.getByRole('button', { name: /theme/i })).toBeInTheDocument();
+  });
+
+  it('Manage keys in the key menu goes to #/key', async () => {
+    location.hash = '';
+    render(App, { client: fake() });
+    await settled('watch');
+    await fireEvent.click(screen.getByRole('button', { name: 'Key and lock' }));
+    expect(screen.getByRole('menuitem', { name: 'Manage keys' })).toHaveAttribute('href', '#/key');
   });
 
   it('follows hash changes', async () => {
@@ -126,17 +144,16 @@ describe('App routing', () => {
 });
 
 describe('App first run and Lock', () => {
-  it('no keys renders FirstRun on Home, while Timeline stays reachable', async () => {
-    location.hash = '';
+  it('no keys renders FirstRun on Home, and #/timeline is Home too', async () => {
+    location.hash = '#/timeline';
     render(App, { client: fake([]) });
     expect(await settled('firstrun')).toEqual(['firstrun']);
-    location.hash = '#/timeline';
-    await fireEvent(window, new HashChangeEvent('hashchange'));
-    await waitFor(() => expect(shown()).toEqual(['watch']));
   });
 
   it('importing on FirstRun shows Home once the user leaves it; the remember choice stays reachable until then', async () => {
     location.hash = '';
+    // jsdom delivers this hashchange asynchronously; let it pass before the shell mounts.
+    await new Promise((r) => setTimeout(r, 0));
     let keys: Keys = [];
     const client = {
       async call<T>(msg: Request): Promise<T> {
@@ -155,17 +172,10 @@ describe('App first run and Lock', () => {
     await waitFor(() => expect(shown()).toEqual(['watch']));
   });
 
-  it('marks no tab current during first run, in either bar', async () => {
-    location.hash = '';
-    render(App, { client: fake([]) });
-    await settled('firstrun');
-    for (const nav of screen.getAllByRole('navigation', { name: 'Views' })) {
-      expect(nav.querySelector('[aria-current]')).toBeNull();
-    }
-  });
-
   it('Open Home lands at the top of the page', async () => {
     location.hash = '';
+    // jsdom delivers this hashchange asynchronously; let it pass before the shell mounts.
+    await new Promise((r) => setTimeout(r, 0));
     let keys: Keys = [];
     const client = {
       async call<T>(msg: Request): Promise<T> {
@@ -187,21 +197,24 @@ describe('App first run and Lock', () => {
   it('Lock shows the result text for a remembered key', async () => {
     render(App, { client: fake([KEY], [KEY]) });
     await settled('watch');
-    await fireEvent.click(screen.getByRole('button', { name: 'Lock' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Key and lock' }));
+    await fireEvent.click(screen.getByRole('menuitem', { name: 'Lock now' }));
     expect(await screen.findByText('Locked. Opening a recording unlocks it again on this device.')).toBeInTheDocument();
   });
 
   it('Lock shows the session-only text when no key is kept', async () => {
     render(App, { client: fake([{ keyId: 'a', remembered: false }], []) });
     await settled('watch');
-    await fireEvent.click(screen.getByRole('button', { name: 'Lock' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Key and lock' }));
+    await fireEvent.click(screen.getByRole('menuitem', { name: 'Lock now' }));
     expect(await screen.findByText('Locked. Add the key again to watch.')).toBeInTheDocument();
   });
 
-  it('Lock is disabled with no key', async () => {
+  it('Lock now is disabled with no key', async () => {
     render(App, { client: fake([]) });
     await settled('firstrun');
-    expect(screen.getByRole('button', { name: 'Lock' })).toBeDisabled();
+    await fireEvent.click(screen.getByRole('button', { name: 'Key and lock' }));
+    expect(screen.getByRole('menuitem', { name: 'Lock now' })).toBeDisabled();
   });
 });
 
@@ -279,11 +292,11 @@ describe('App on the Keys page', () => {
     vi.useRealTimers();
   });
 
-  it('has no top-bar Lock on #/key', async () => {
+  it('has the key menu on #/key', async () => {
     location.hash = '#/key';
     render(App, { client: fake() });
     await settled('key');
-    expect(screen.queryByRole('button', { name: 'Lock' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Key and lock' })).toBeInTheDocument();
   });
 
   it('an idle lock on #/key adds no shell notice (the Keys page says it)', async () => {
@@ -345,7 +358,6 @@ describe('App when the keys cannot be read', () => {
     fail = false;
     await fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await settled('watch')).toEqual(['watch']);
-    expect(screen.getAllByRole('link', { name: 'Timeline' }).length).toBeGreaterThan(0);
   });
 
   it('a key.list that never answers shows the same alert after 5 s', async () => {

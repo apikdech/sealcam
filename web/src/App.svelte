@@ -3,7 +3,8 @@
   import FirstRun from './routes/onboarding/FirstRun.svelte';
   import Watch from './routes/watch/Watch.svelte';
   import DemoPage from './routes/demo/+page.svelte';
-  import Icon, { type IconName } from './lib/components/Icon.svelte';
+  import KeyMenu from './lib/components/KeyMenu.svelte';
+  import ThemeButton from './lib/theme/ThemeButton.svelte';
   import StatusPill from './lib/components/StatusPill.svelte';
   import UpdatePrompt from './lib/pwa/UpdatePrompt.svelte';
   import type { Updater } from './lib/pwa/update';
@@ -23,19 +24,14 @@
   const STATUS_EVERY_MS = 60_000;
   const KEYS_HANG_MS = 5_000;
 
-  // Top-level views (design §7.2 as amended): Home is the default; `#/live` is its old name.
-  // `#/demo?clip=<id>` is the playback engine's test page (used by e2e); it is not in the nav.
-  const tabs: { hash: '#/' | '#/timeline' | '#/key'; label: string; icon: IconName }[] = [
-    { hash: '#/', label: 'Home', icon: 'home' },
-    { hash: '#/timeline', label: 'Timeline', icon: 'timeline' },
-    { hash: '#/key', label: 'Keys', icon: 'key' },
-  ];
-  type Hash = '#/' | '#/timeline' | '#/key' | '#/demo';
+  // Views: the Watch screen is the default (`#/live` and `#/timeline` are its old names).
+  // `#/demo?clip=<id>` is the playback engine's test page (used by e2e).
+  type Hash = '#/' | '#/key' | '#/demo';
 
   /** The route part of the hash, without its query. */
   const route = (): Hash => {
     const r = location.hash.split('?')[0];
-    return r === '#/timeline' || r === '#/demo' || r === '#/key' ? r : '#/';
+    return r === '#/demo' || r === '#/key' ? r : '#/';
   };
   const clip = (): string => new URLSearchParams(location.hash.split('?')[1] ?? '').get('clip') ?? '';
 
@@ -58,8 +54,8 @@
   const syncZone = () => (zone = loadZonePref() ?? browserZone());
   const hasKey = $derived((keys?.length ?? 0) > 0);
   const showFirstRun = $derived(keys !== null && (keys.length === 0 || holdFirstRun));
-  /** The Watch screen owns its top bar: the Lock and the status move into it. */
-  const watching = $derived(hash === '#/timeline' || (hash === '#/' && keys !== null && !showFirstRun));
+  /** The Watch screen owns its top bar and the notices row under it. */
+  const watching = $derived(hash === '#/' && keys !== null && !showFirstRun);
 
   async function refreshKeys(result?: KeyListResult) {
     if (result) {
@@ -136,9 +132,6 @@
     };
   });
 
-  /** FirstRun is not the Home view: no tab is current while it shows. */
-  const current = (h: string): boolean => hash === h && !(h === '#/' && showFirstRun);
-
   const tabBase = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line';
 </script>
 
@@ -153,52 +146,35 @@
   }}
 />
 
-<UpdatePrompt {updater} />
-
-<header class="flex items-center gap-4 border-b border-rule bg-ground px-4">
-  <p class="text-xl font-semibold tracking-wide"><span class="text-ink">z</span><span class="text-line">view</span></p>
-  <nav aria-label="Views" class="hidden gap-1 md:flex">
-    {#each tabs as t (t.hash)}
-      <a
-        href={t.hash}
-        aria-current={current(t.hash) ? 'page' : undefined}
-        class="{tabBase} inline-flex min-h-11 items-center px-3 text-sm {current(t.hash) ? 'text-line underline underline-offset-8' : 'text-muted'}">{t.label}</a
-      >
-    {/each}
-  </nav>
-  {#if !watching}
-    <div class="ml-auto flex items-center">{@render barEnd()}</div>
-  {/if}
-</header>
-
 {#snippet barEnd()}
-  {#if hash !== '#/key'}
-  <button
-    type="button"
-    aria-label="Lock"
-    title="Lock"
-    disabled={!hasKey}
-    class="{tabBase} inline-flex h-11 w-11 items-center justify-center text-ink disabled:opacity-40"
-    onclick={() => void lock()}><Icon name="lock" size={22} /></button
-  >
-  {/if}
   <StatusPill {status} nowMs={env.wall} {zone} />
+  <ThemeButton />
+  <KeyMenu canLock={hasKey} onLock={() => void lock()} />
 {/snippet}
 
-{#if notice}
-  <p role="status" class="border-b border-rule bg-plate px-4 py-2 text-sm">{notice}</p>
-{/if}
-{#if lockFailed}
-  <p role="alert" class="border-b border-rule bg-plate px-4 py-2 text-sm text-void">Could not lock. Try again.</p>
+{#snippet notices()}
+  <UpdatePrompt {updater} />
+  {#if notice}
+    <p role="status" class="border-b border-rule bg-plate px-4 py-2 text-sm">{notice}</p>
+  {/if}
+  {#if lockFailed}
+    <p role="alert" class="border-b border-rule bg-plate px-4 py-2 text-sm text-void">Could not lock. Try again.</p>
+  {/if}
+{/snippet}
+
+{#if !watching}
+  <header class="flex items-center gap-4 border-b border-rule bg-ground px-4">
+    <p class="py-2 text-xl font-semibold tracking-wide"><span class="text-ink">z</span><span class="text-line">view</span></p>
+    <div class="ml-auto flex items-center">{@render barEnd()}</div>
+  </header>
+  {@render notices()}
 {/if}
 
-<div class="pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
+<div>
   {#if hash === '#/demo'}
     <DemoPage {clipId} />
   {:else if hash === '#/key'}
     <Onboarding />
-  {:else if hash === '#/timeline'}
-    <Watch {client} {status} topRight={barEnd} />
   {:else if keys === null && keysFailed}
     <main class="mx-auto max-w-xl space-y-3 p-4">
       <p role="alert" class="text-void">Could not read the keys on this device.</p>
@@ -227,22 +203,6 @@
       />
     </div>
   {:else}
-    <Watch {client} {status} topRight={barEnd} />
+    <Watch {client} {status} topRight={barEnd} {notices} />
   {/if}
 </div>
-
-<nav
-  aria-label="Views"
-  class="fixed inset-x-0 bottom-0 z-40 box-content grid h-16 grid-cols-3 border-t border-rule bg-plate pb-[env(safe-area-inset-bottom)] md:hidden"
->
-  {#each tabs as t (t.hash)}
-    <a
-      href={t.hash}
-      aria-current={current(t.hash) ? 'page' : undefined}
-      class="{tabBase} flex flex-col items-center justify-center gap-1 text-xs {current(t.hash) ? 'text-line' : 'text-muted'}"
-    >
-      <Icon name={t.icon} size={22} />
-      <span>{t.label}</span>
-    </a>
-  {/each}
-</nav>

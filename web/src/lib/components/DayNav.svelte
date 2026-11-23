@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { dayTitle, daySubtitle, shiftDay } from '../dashboard/day';
+  import { dayTitle, dayTitleShort, daySubtitle, shiftDay } from '../dashboard/day';
   import Icon from './Icon.svelte';
 
   interface Props {
@@ -52,7 +52,8 @@
     aria-controls={open ? menuId : undefined}
     onclick={() => (open = !open)}
   >
-    <span class="truncate text-[15px] font-semibold">{dayTitle(day, todayDay)}</span>
+    <span class="truncate text-[15px] font-semibold md:hidden">{dayTitleShort(day, todayDay)}</span>
+    <span class="truncate text-[15px] font-semibold max-md:hidden">{dayTitle(day, todayDay)}</span>
     <span class="truncate text-xs text-muted max-md:hidden">{daySubtitle(day, todayDay, zone)}</span>
   </button>
   <button

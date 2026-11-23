@@ -28,6 +28,19 @@ export function dayTitle(day: string, todayDay: string): string {
   return day.slice(0, 4) === todayDay.slice(0, 4) ? text : `${text} ${day.slice(0, 4)}`;
 }
 
+const TITLE_SHORT = new Intl.DateTimeFormat('en-GB', {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  timeZone: 'UTC',
+});
+
+/** "Fri 20 Nov", for the phone top bar; the year is added as in `dayTitle`. */
+export function dayTitleShort(day: string, todayDay: string): string {
+  const text = TITLE_SHORT.format(noon(day));
+  return day.slice(0, 4) === todayDay.slice(0, 4) ? text : `${text} ${day.slice(0, 4)}`;
+}
+
 /** "Jakarta time · today", "Jakarta time · yesterday", or just "Jakarta time". */
 export function daySubtitle(day: string, todayDay: string, zone: string): string {
   const base = `${zoneCity(zone)} time`;

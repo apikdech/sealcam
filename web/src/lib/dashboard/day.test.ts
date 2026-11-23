@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayTitle, daySubtitle, shiftDay, zoneCity } from './day';
+import { dayTitle, dayTitleShort, daySubtitle, shiftDay, zoneCity } from './day';
 
 describe('shiftDay', () => {
   it('rolls over months and years', () => {
@@ -23,6 +23,15 @@ describe('dayTitle', () => {
   });
   it('appends the year otherwise', () => {
     expect(dayTitle('2025-11-20', '2026-11-20')).toBe('Thursday 20 November 2025');
+  });
+});
+
+describe('dayTitleShort', () => {
+  it('abbreviates weekday and month', () => {
+    expect(dayTitleShort('2026-11-23', '2026-11-23')).toBe('Mon 23 Nov');
+  });
+  it('appends the year otherwise', () => {
+    expect(dayTitleShort('2025-11-20', '2026-11-20')).toBe('Thu 20 Nov 2025');
   });
 });
 

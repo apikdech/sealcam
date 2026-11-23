@@ -39,9 +39,11 @@
     exportEnv?: ExportEnv;
     /** The shell's end of the top bar (status, theme, key), so the bar is one row. */
     topRight: Snippet;
+    /** The shell's notices, rendered full width directly under the top bar. */
+    notices?: Snippet;
   }
 
-  let { client = getWorkerClient(), status, zone: initialZone, nowMs, profile, factory, exportEnv, topRight }: Props = $props();
+  let { client = getWorkerClient(), status, zone: initialZone, nowMs, profile, factory, exportEnv, topRight, notices }: Props = $props();
 
   // The forced display zone (e.g. Asia/Jakarta for relatives abroad); null follows the viewer's own.
   let forcedZone = $state<string | null>(untrack(() => initialZone ?? loadZonePref()));
@@ -80,6 +82,16 @@
 
   /** Live on today with nothing picked; a past day with nothing picked waits for a pick. */
   const mode = $derived(selectedId === null ? (day === todayDay ? 'live' : 'idle') : 'recording');
+
+  // At midnight a live view moves on to the new today instead of dropping to the idle prompt.
+  let prevToday = untrack(() => todayDay);
+  $effect.pre(() => {
+    const t = todayDay;
+    untrack(() => {
+      if (t !== prevToday && day === prevToday && selectedId === null) day = t;
+      prevToday = t;
+    });
+  });
 
   // ---- derived views -----------------------------------------------------------
 
@@ -211,6 +223,7 @@
 
   <!-- Notices: one line each, full width; they take their height from the stage. -->
   <div>
+    {@render notices?.()}
     {#if data.invalid > 0 && data.ready && !data.dayError}
       <p role="status" class="border-b border-rule px-4 py-1.5 text-xs text-amber">
         {data.invalid} {data.invalid === 1 ? 'recording' : 'recordings'} could not be read and {data.invalid === 1 ? 'is' : 'are'} not shown.
