@@ -46,15 +46,20 @@ From now on, open zview from the new icon.
    **Only for now**.
 6. Tap **Open Home**.
 
-**Home** opens by default. It shows the live cameras above the events of today. Tap an event to
-watch the recording. Open **Timeline** to choose another day.
+zview opens on one screen. It shows the live cameras and the events of today. Tap an event to
+watch the recording. The recording plays in the same place. Tap **Live** on the video to go back to
+the live cameras.
+
+To see another day, use the arrows at the top. Tap the day name to pick a date. Use the sun or
+moon button to change the colors: System, Light or Dark. Tap the key button to lock zview or to
+manage keys.
 
 ## Important information
 
 * The key never goes into a link, a message, or the address bar. Do not give the key to persons
   outside the family. A person with the key and Tailscale access can watch the cameras.
-* To remove the key from a device, open **Keys** and tap **Forget** next to the key. Then tap
-  **Forget key** to confirm. If you lose a phone, tell the owner immediately.
+* To remove the key from a device, tap the key button at the top. Tap **Manage keys**. Tap
+  **Forget** next to the key. Then tap **Forget key** to confirm. If you lose a phone, tell the owner immediately.
 * When an update is available, the app shows "New version available — reload". Tap reload when
   no video plays.
 * Each recording has a round seal. The seal shows the result of the check that the app did on

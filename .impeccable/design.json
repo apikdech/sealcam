@@ -34,7 +34,7 @@
           "#bdccd1",
           "#e4f1f5"
         ],
-        "purpose": "One tonal step up: fields, lanes, tab bar, selected row, notices."
+        "purpose": "One tonal step up: fields, lanes, control bar, selected row, notices."
       },
       "rule": {
         "role": "neutral",
@@ -66,7 +66,7 @@
           "#a2d5cf",
           "#cef9f3"
         ],
-        "purpose": "Verified seals, clip bars, current tab, primary fill, Live badge."
+        "purpose": "Verified seals, clip bars, primary fill, Live badge."
       },
       "ink": {
         "role": "neutral",
@@ -98,7 +98,7 @@
           "#becdcb",
           "#e5f1f0"
         ],
-        "purpose": "Secondary text, inactive tabs, unchecked seal, not-monitored hatch."
+        "purpose": "Secondary text, unchecked seal, not-monitored hatch."
       },
       "foil": {
         "role": "secondary",
@@ -421,7 +421,7 @@
       },
       "label": {
         "displayName": "Label",
-        "purpose": "Tab labels, field labels, day subtitle, trigger glyphs, Live badge."
+        "purpose": "Field labels, day subtitle, trigger glyphs, Live badge."
       },
       "canvas": {
         "displayName": "Canvas",
@@ -473,15 +473,14 @@
       {
         "name": "md",
         "value": "768px",
-        "purpose": "Tabs move to the top bar; Home becomes video and timeline | 22rem list."
+        "purpose": "Below this the Watch screen is one pinned column with a scrolling list; above about 900px it is video and timeline | 380px list."
       }
     ],
     "layout": {
       "gutter": "16px",
-      "homeListColumn": "22rem",
       "formColumn": "36rem",
-      "playerWidth": "min(100%, calc(56vh * 16 / 9))",
-      "bottomBar": "64px + env(safe-area-inset-bottom)"
+      "playerWidth": "fills the space left by the top bar, control bar and timeline (letterboxed)",
+      "listColumn": "380px"
     },
     "icons": {
       "source": "web/src/lib/components/Icon.svelte",
@@ -539,12 +538,12 @@
       "css": ":host{--z-ground:#0e1a1f;--z-plate:#132429;--z-rule:#22393f;--z-line:#5fa8a0;--z-ink:#e6e2d6;--z-muted:#93a6a4;--z-foil:#c9a44c;--z-amber:#d9a441;--z-void:#d2554a;--z-on-trigger:#071014;}.ds-field{width:100%;padding:12px;border:1px solid var(--z-rule);border-radius:4px;background:var(--z-plate);color:var(--z-ink);font:400 16px/1.5 'Atkinson Hyperlegible Next', ui-sans-serif, system-ui, sans-serif;caret-color:var(--z-foil)}.ds-field::placeholder{color:var(--z-muted)}.ds-field:focus-visible{outline:2px solid var(--z-line);outline-offset:2px}"
     },
     {
-      "name": "Bottom Tab Bar",
+      "name": "Control Bar",
       "kind": "nav",
-      "refersTo": "tab-bar",
-      "description": "Phone navigation: plate, rule on top, icon over label, current in line.",
-      "html": "<nav class=\"ds-tabs\"><a href=\"#\" class=\"ds-tab\" aria-current=\"page\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 11l9-8 9 8\"/><path d=\"M5 10v11h14V10\"/><path d=\"M10 21v-6h4v6\"/></svg><span>Home</span></a><a href=\"#\" class=\"ds-tab\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 12h18\"/><path d=\"M7 8v8\"/><path d=\"M12 5v14\"/><path d=\"M17 9v6\"/></svg><span>Timeline</span></a><a href=\"#\" class=\"ds-tab\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7.5 21a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z\"/><path d=\"M11 12l10-10\"/><path d=\"M18 5l3 3\"/><path d=\"M15 8l3 3\"/></svg><span>Keys</span></a></nav>",
-      "css": ":host{--z-ground:#0e1a1f;--z-plate:#132429;--z-rule:#22393f;--z-line:#5fa8a0;--z-ink:#e6e2d6;--z-muted:#93a6a4;--z-foil:#c9a44c;--z-amber:#d9a441;--z-void:#d2554a;--z-on-trigger:#071014;}.ds-tabs{display:grid;grid-template-columns:repeat(3,1fr);height:64px;border-top:1px solid var(--z-rule);background:var(--z-plate);font:400 12px/1.333 'Atkinson Hyperlegible Next', ui-sans-serif, system-ui, sans-serif}.ds-tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--z-muted);text-decoration:none}.ds-tab[aria-current=page]{color:var(--z-line)}.ds-tab:hover{color:var(--z-ink)}.ds-tab:focus-visible{outline:2px solid var(--z-line);outline-offset:2px}"
+      "refersTo": "control-bar",
+      "description": "One plate bar under the video: transport buttons, clock in serial figures, scrubber, rule above and below.",
+      "html": "<div class=\"ds-ctl\"><button class=\"ds-ctl-btn\" aria-label=\"Play\">▶</button><span class=\"ds-clock\">11:19:24</span><span class=\"ds-pos\">0:12 / 0:28</span></div>",
+      "css": ":host{--z-ground:#0e1a1f;--z-plate:#132429;--z-rule:#22393f;--z-line:#5fa8a0;--z-ink:#e6e2d6;--z-muted:#93a6a4;--z-foil:#c9a44c;--z-amber:#d9a441;--z-void:#d2554a;--z-on-trigger:#071014;}.ds-ctl{display:flex;align-items:center;gap:12px;height:48px;padding:0 12px;border-top:1px solid var(--z-rule);border-bottom:1px solid var(--z-rule);background:var(--z-plate);color:var(--z-ink);font:400 14px/1.43 'Atkinson Hyperlegible Next', ui-sans-serif, system-ui, sans-serif}.ds-ctl-btn{width:44px;height:44px;border:1px solid var(--z-rule);border-radius:10px;background:transparent;color:var(--z-ink)}.ds-ctl-btn:focus-visible{outline:2px solid var(--z-foil);outline-offset:2px}.ds-clock{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.02em}.ds-pos{color:var(--z-muted);font-variant-numeric:tabular-nums}"
     },
     {
       "name": "Trigger Chip",
@@ -581,7 +580,7 @@
   ],
   "narrative": {
     "northStar": "The Intaglio Seal",
-    "overview": "zview treats every recording like a stamped document from a security printer: banknotes, the Indonesian meterai. The ground is a deep intaglio blue-green in the dark theme and an off-white security paper in the light one; everything on it is drawn in fine 1 px rules and a few printing inks. Each clip carries its own guilloché seal, generated from the clip's id and drawn from its verification state, wherever the clip appears: event row, player, timeline bar, and the key screen, where the key's fingerprint is the same rosette.\n\nThe system is quiet so the footage and the timeline can own the space. Chrome is a top bar, a day row and a bottom tab bar, separated by rules, never boxed into cards or lifted with shadows. Density is moderate and phone-first: 44 px targets, 64 px event rows, one face at a few sizes, and tabular \"serial\" figures for every time so a column of clock readings reads like a register.\n\nThe world rejects the category default (a black NVR grid with a red REC dot and a dashboard of cards) and the generic Tailwind look it replaced.",
+    "overview": "zview treats every recording like a stamped document from a security printer: banknotes, the Indonesian meterai. The ground is a deep intaglio blue-green in the dark theme and an off-white security paper in the light one; everything on it is drawn in fine 1 px rules and a few printing inks. Each clip carries its own guilloché seal, generated from the clip's id and drawn from its verification state, wherever the clip appears: event row, player, timeline bar, and the key screen, where the key's fingerprint is the same rosette.\n\nThe system is quiet so the footage and the timeline can own the space. Chrome is one top bar and a control bar under the video, separated by rules, never boxed into cards or lifted with shadows. Density is moderate and phone-first: 44 px targets, 64 px event rows, one face at a few sizes, and tabular \"serial\" figures for every time so a column of clock readings reads like a register.\n\nThe world rejects the category default (a black NVR grid with a red REC dot and a dashboard of cards) and the generic Tailwind look it replaced.",
     "keyCharacteristics": [
       "Dark intaglio ground by default; light security paper follows `prefers-color-scheme`.",
       "Four inks with fixed meanings: teal line (verified, selection, primary action), gold foil (focus, today, now), amber (degraded), VOID red (tampered).",

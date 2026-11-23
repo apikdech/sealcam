@@ -298,17 +298,13 @@ ui-spec §4–5 unchanged, except:
 
 * The data origin **is** the app origin. The worker calls relative `/api/v1/*` paths.
 * **New worker message:** `live.offer {cameraId, sdp} → {sdp, sessionPath}` and `live.close {sessionPath}`. The worker performs the WHEP `POST`/`DELETE` with `K_api`. `RTCPeerConnection` runs on the main thread (it is unavailable in workers), so the main thread sees only SDP and media, never `K_api`.
-* **Live tiles:** camera tiles, each a `<video muted playsinline>` attached to a WHEP session. The tiles live on **Home** (below).
-  * Sessions close when the tab is hidden (`visibilitychange`) and reopen when it is visible. While Home is open and visible, each tile holds one viewer slot of `live.max_viewers`.
+* **Live tiles:** camera tiles, each a `<video muted playsinline>` attached to a WHEP session. The tiles live on the **Watch** view (below).
+  * Sessions close when the tab is hidden (`visibilitychange`) and reopen when it is visible. While Watch is open and visible in live mode, each tile holds one viewer slot of `live.max_viewers`.
   * Each tile shows a live badge (only after the video plays), a reconnecting state with backoff and a "Try now" action, a tap-to-unmute control (audio only when the track exists, one tile unmuted at a time), and a "viewer limit reached" state on `503`.
   * A tile does not retry when the retry cannot succeed. With no key (`ErrNoKey`) it shows "key locked" with a link to Keys. When `/api/v1/status` reports the camera `down`, it shows "camera offline".
   * The grid follows the camera count: 1 camera fills the width, 2 sit side by side, 3–4 form a 2×2 grid.
   * The CSP needs no change for WebRTC.
-* **Navigation:** three top-level views:
-  * **Home** (`#/`, the default): the live tiles above the selected day's events, newest first. Selecting an event plays it in place of the live tiles, with a "Back to live" control. With no key, Home shows the key import instead (first run, ui-spec §4.1).
-  * **Timeline** (`#/timeline`): ui-spec §4.6–4.7.
-  * **Keys** (`#/key`): ui-spec §4.1.
-  * `#/live` is kept as an alias of Home.
+* **Navigation:** one **Watch** view at `#/` (live and recordings: the live tiles or the playing clip, the event list, ui-spec §4.6 timeline and §4.7 player and transport), plus **Keys** at `#/key`, opened from the key menu in the top bar. There is no tab bar. `#/timeline` and `#/live` are aliases of `#/`. Selecting an event plays it on the same stage; the **Live** button returns to the live tiles. With no key, Watch shows the key import instead (first run, ui-spec §4.1). (Amended by `2026-11-23-zview-watch-screen-design.md` §10.)
 * The service worker MUST NOT intercept `/api` or `/live`.
 
 ---
@@ -535,7 +531,12 @@ Ordered so the camera core and live view come first. They exercise the real C220
 * §3.6: replaced by §8.2 here.
 * §4.1: "Remember this device" is asked right after a successful import; the worker message key.remember {keyId} stores the in-memory base key.
 * §4.2: add the `live.offer` and `live.close` messages. All requests are same-origin.
-* §4.7: add Home (the live tiles and the day's events) as the default view, and the three-view navigation (§7.2 here).
+* §4.7: add Watch (the live tiles and the day's events) as the default view, and the navigation (§7.2 here).
+* §4.7 (Watch screen, 2026-11-23, see `2026-11-23-zview-watch-screen-design.md`):
+  * Navigation: one **Watch** view at `#/` (live and recordings) plus **Keys** at `#/key` from the top bar. `#/timeline` and `#/live` are aliases of `#/`. The "Back to live" control becomes the **Live** button.
+  * Layout, mobile: the player, its control bar and the timeline are pinned at the top. The event list fills the rest of the screen and is the only part that scrolls (no bottom sheet). The header stays one row (no menu collapse); the camera filter and time zone are in the day menu.
+  * Layout, desktop: the trigger filter is a row of chips above the event list. The time zone choice is in the day menu.
+  * Relay status: the dot carries text when it is not OK. A theme switch (System / Light / Dark, per browser) is added to the header.
 * §7: replaced by §10 here.
 
 ---

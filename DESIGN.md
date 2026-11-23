@@ -139,13 +139,28 @@ components:
     textColor: "{colors.ink}"
     rounded: "{rounded.control}"
     size: "{spacing.target}"
-  tab-bar:
+  control-bar:
     backgroundColor: "{colors.plate}"
-    textColor: "{colors.muted}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    height: "{spacing.target}"
+  status-dot:
+    backgroundColor: "{colors.line}"
+    rounded: "{rounded.full}"
+  theme-button:
+    textColor: "{colors.ink}"
+    rounded: "{rounded.control}"
+    size: "{spacing.target}"
+  key-menu:
+    backgroundColor: "{colors.plate}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    rounded: "{rounded.sm}"
+  live-pill:
+    backgroundColor: "{colors.ground}"
+    textColor: "{colors.ink}"
     typography: "{typography.label}"
-    height: "{spacing.row}"
-  tab-bar-current:
-    textColor: "{colors.line}"
+    rounded: "{rounded.sm}"
 ---
 
 # Design System: zview
@@ -156,12 +171,12 @@ components:
 
 zview treats every recording like a stamped document from a security printer: banknotes, the Indonesian meterai. The ground is a deep intaglio blue-green in the dark theme and an off-white security paper in the light one; everything on it is drawn in fine 1 px rules and a few printing inks. Each clip carries its own guilloché seal, generated from the clip's id and drawn from its verification state, wherever the clip appears: event row, player, timeline bar, and the key screen, where the key's fingerprint is the same rosette.
 
-The system is quiet so the footage and the timeline can own the space. Chrome is a top bar, a day row and a bottom tab bar, separated by rules, never boxed into cards or lifted with shadows. Density is moderate and phone-first: 44 px targets, 64 px event rows, one face at a few sizes, and tabular "serial" figures for every time so a column of clock readings reads like a register.
+The system is quiet so the footage and the timeline can own the space. Chrome is one top bar and a control bar under the video, separated by rules, never boxed into cards or lifted with shadows. Density is moderate and phone-first: 44 px targets, 64 px event rows, one face at a few sizes, and tabular "serial" figures for every time so a column of clock readings reads like a register.
 
 The world rejects the category default (a black NVR grid with a red REC dot and a dashboard of cards) and the generic Tailwind look it replaced.
 
 **Key Characteristics:**
-- Dark intaglio ground by default; light security paper follows `prefers-color-scheme`.
+- Dark intaglio ground by default; light security paper follows `prefers-color-scheme` until the theme button sets Light or Dark by hand.
 - Four inks with fixed meanings: teal line (verified, selection, primary action), gold foil (focus, today, now), amber (degraded), VOID red (tampered).
 - One face, Atkinson Hyperlegible Next; tabular figures for every time and duration.
 - Flat: 1 px rules and tonal plates, no shadows, no cards.
@@ -171,13 +186,13 @@ The world rejects the category default (a black NVR grid with a red REC dot and 
 
 A low-chroma intaglio palette of ground, plate and rule, printed in four inks, with the spec's five trigger colours kept apart as a separate, fixed set.
 
-All UI colours are custom properties on `:root` (`--z-ground` … `--z-void`, `--z-on-trigger`), exposed to Tailwind as `bg-ground`, `text-ink`, `border-rule` and so on. The dark values are the default; the `-light` tokens replace them under `@media (prefers-color-scheme: light)`. The canvas timeline reads the same custom properties at draw time and keeps a hard-coded copy of both palettes as a fallback.
+All UI colours are custom properties on `:root` (`--z-ground` … `--z-void`, `--z-on-trigger`), exposed to Tailwind as `bg-ground`, `text-ink`, `border-rule` and so on. The dark values are the default; the `-light` tokens replace them under `@media (prefers-color-scheme: light)`, and under `:root[data-theme="light"]`; `:root[data-theme="dark"]` forces the dark set. The theme button stores its choice (System, Light, Dark) per browser. The canvas timeline reads the same custom properties at draw time and keeps a hard-coded copy of both palettes as a fallback.
 
 ### Primary
-- **Ink-Teal Line** (`line` / `line-light`): the "verified" ink. Verified seals, timeline clip bars, the current tab, the wordmark's "view", the Live badge, the primary button fill, `accent-color` and selection tint (35% mix). It means genuine or chosen, never decoration.
+- **Ink-Teal Line** (`line` / `line-light`): the "verified" ink. Verified seals, timeline clip bars, the wordmark's "view", the Live badge, the primary button fill, `accent-color` and selection tint (35% mix). It means genuine or chosen, never decoration.
 
 ### Secondary
-- **Gold Foil** (`foil` / `foil-light`): focus and the present. The 2 px focus ring on every control, the caret, the outline of the selected event row, and the timeline's now line. Used sparingly, like foil on a note.
+- **Gold Foil** (`foil` / `foil-light`): focus and the present. The 2 px focus ring on every control, the caret, the outline and "playing" mark of the selected event row, and the timeline's now line. Used sparingly, like foil on a note.
 
 ### Tertiary
 - **Warm Amber** (`amber` / `amber-light`): degraded but not broken. Incomplete and mismatch seals, "could not be read" notices, warning status dot.
@@ -185,13 +200,13 @@ All UI colours are custom properties on `:root` (`--z-ground` … `--z-void`, `-
 
 ### Neutral
 - **Intaglio Ground** (`ground` / `ground-light` security paper): the page background and the text colour on line-filled buttons and badges.
-- **Plate** (`plate` / `plate-light`): one tonal step up. Field fills, timeline lanes, the bottom tab bar, the selected or hovered row, notices and the status details panel.
+- **Plate** (`plate` / `plate-light`): one tonal step up. Field fills, timeline lanes, the control bar, the selected or hovered row, notices and the status details panel.
 - **Rule** (`rule` / `rule-light`): every 1 px divider and control border, the timeline grid, scrollbar thumbs.
 - **Ink** (`ink` / `ink-light`): primary text.
-- **Muted Ink** (`muted` / `muted-light`): secondary text, inactive tabs, the unchecked seal, the not-monitored hatch.
+- **Muted Ink** (`muted` / `muted-light`): secondary text, the unchecked seal, the not-monitored hatch.
 
 ### Trigger colours (fixed by ui-spec §4.6)
-`trigger-person` P, `trigger-vehicle` V, `trigger-pet` A, `trigger-motion` M, `trigger-other` •. Identical in both themes. The glyph is always printed on the colour in `on-trigger`, which holds at least 4.5:1 on all five (enforced by `triggerContrast.test.ts`).
+`trigger-person` P, `trigger-vehicle` V, `trigger-pet` A, `trigger-motion` M, `trigger-other` •. Identical in both themes. Known limit: on the light plate all five are below 3:1 (recorded as known failures in `web/src/lib/theme/contrast.test.ts`), because the Spec Colours Rule forbids retinting them; the glyph on each chip keeps the meaning. The glyph is always printed on the colour in `on-trigger`, which holds at least 4.5:1 on all five (enforced by `triggerContrast.test.ts`).
 
 ### Named Rules
 **The Fixed Inks Rule.** Each ink has one meaning: line is verified or chosen, foil is focus or now, amber is degraded, void is tampered. Never reuse an ink for decoration or brand emphasis.
@@ -207,13 +222,13 @@ All UI colours are custom properties on `:root` (`--z-ground` … `--z-void`, `-
 **Character:** One legibility-first face carries everything, from the wordmark to the 11 px canvas labels. Hierarchy comes from size and a single step of weight (400 to 600), not from a second family.
 
 ### Hierarchy
-- **Headline** (600, 24px, 1.333): the one `h1` on pages that show it (Keys, first run). Home's `h1` is screen-reader only.
+- **Headline** (600, 24px, 1.333): the one `h1` on pages that show it (Keys, first run). The Watch screen's `h1` is screen-reader only.
 - **Title** (600, 20px, 1.4): section heads ("Lock", "Key added") and the wordmark (with slight positive tracking).
-- **Serial** (600, 20px, tabular, +0.02em): the start time in each event row; the largest figure on Home.
+- **Serial** (600, 20px, tabular, +0.02em): the start time in each event row; the largest figure on the Watch screen, with the clock in the control bar.
 - **Day** (600, 17px): the day title in the day row ("Saturday 7 November").
 - **Body field** (400, 16px, 1.5): inputs and selects that take typing on phones, and primary button text, so iOS never zooms.
 - **Body** (400, 14px, 1.43): most UI text: list meta, status, notices, buttons, list headings (600).
-- **Label** (400, 12px): tab labels, field labels, the day subtitle ("Jakarta time · today"), trigger glyphs (700) and the Live badge (600, wider tracking).
+- **Label** (400, 12px): field labels, the day subtitle ("Jakarta time · today"), trigger glyphs (700) and the Live badge (600, wider tracking).
 - **Canvas** (400 and bold, 11px): timeline ruler, lane names and in-span glyphs.
 
 ### Named Rules
@@ -223,22 +238,22 @@ All UI colours are custom properties on `:root` (`--z-ground` … `--z-void`, `-
 
 ## Layout
 
-Phone first. The page gutter is 16px; the top bar carries the wordmark left, and the lock and the recorder status (in words) right. Below it, the day row: 44px arrows either side of the day title and its zone subtitle. On phones a fixed bottom tab bar (64px plus the safe-area inset) holds Home, Timeline and Keys with a 22px icon over a label; from 768px (`md`) the tabs move into the top bar as text links and the bottom bar is removed.
+Phone first. The Watch screen fills the window and never scrolls. The page gutter is 16px; the top bar is one row: the wordmark, then the day navigator (arrows either side of the day title and its zone subtitle), the camera select (only with more than one camera), then the recorder status dot, the theme button and the key menu. There is no tab bar and no tab row; Keys opens from the key menu.
 
-Home is one column on phones: live video (16:9) full width within the gutter, the 24 h timeline under it, then "Today · N events" and the event list. From 768px it becomes two columns: video and timeline in a flexible column, the day's list in a fixed 22rem column. The player is capped at `min(100%, 56vh × 16/9)` wide so a clip never pushes the controls below the fold. Form pages (Keys, first run) sit in a centred 36rem column.
+On phones the video (16:9), its control bar and the 24 h timeline are pinned at the top. The trigger chips and the event list fill the rest, and only the list scrolls. From about 900px wide it becomes two columns: video, control bar and timeline in a flexible column, the day's list in a fixed 380px column. The video is letterboxed in the space that is left, so a clip never pushes the controls below the fold. Form pages (Keys, first run) sit in a centred 36rem column.
 
 Rhythm is the 4px Tailwind step: 8px and 12px gaps inside rows, 14px above the timeline and list heading, 64px event rows. Every interactive target is at least 44px on phones; some desktop controls tighten to 36–40px.
 
 ## Elevation & Depth
 
-Flat. The system has no shadows. Depth is one tonal step (ground to plate) plus 1 px rules: plates mark fields, lanes, the tab bar, the selected row and notices; rules separate bars, rows and lists. The only gradients are the scrims at the foot of video, a transparent-to-85% over-video ground, which exist to keep captions legible over footage.
+Flat. The system has no shadows. Depth is one tonal step (ground to plate) plus 1 px rules: plates mark fields, lanes, the control bar, the selected row and notices; rules separate bars, rows and lists. The only gradients are the scrims at the foot of video, a transparent-to-85% over-video ground, which exist to keep captions legible over footage.
 
 ### Named Rules
 **The Printed Sheet Rule.** Surfaces are flat and separated by 1 px rules. No drop shadows, no elevated cards, no blur. If a region needs to stand out, it moves one tone to plate.
 
 ## Shapes
 
-Corners are small and functional. Text buttons, fields, the key input, trigger chips and the Live badge use a 4px corner. The 44px square chrome controls (day arrows, over-video buttons) and the timeline filter selects use a slightly softer 10px corner. Video frames (live tiles and the player) use 8px with a 1 px rule border. The status dot is the only full circle besides the seal. Lines are 1 px everywhere; the seal itself is drawn at a 0.8 stroke.
+Corners are small and functional. Text buttons, fields, the key input, trigger chips and the Live badge use a 4px corner. The 44px square chrome controls (day arrows, theme button, over-video buttons) and the timeline filter selects use a slightly softer 10px corner. Video frames (live tiles and the player) use 8px with a 1 px rule border. The status dot is the only full circle besides the seal. Lines are 1 px everywhere; the seal itself is drawn at a 0.8 stroke.
 
 Hatching is part of the form language: not-monitored gaps on the timeline are hatched in muted ink, tampered spans hatched in void.
 
@@ -258,17 +273,25 @@ Restrained and printed, not filled by default.
 - **Focus:** 2px outline (foil from the global rule; the key field overrides it to line).
 
 ### Navigation
-- **Top bar:** ground, 1 px rule underneath. Wordmark "z" in ink and "view" in line. On desktop, tabs are 14px text links: muted at rest, line with an 8px-offset underline when current.
-- **Bottom tab bar (phones):** plate, 1 px rule on top, three equal columns, 22px stroke icon over a 12px label; current in line, others muted.
-- **Day row:** 44px arrow buttons with a 10px corner and rule border; a disabled "next day" fades to 50%.
+- **Top bar:** ground, 1 px rule underneath, one row. Wordmark "z" in ink and "view" in line. No tabs.
+- **Theme button:** 44px icon button, 10px corner, rule border. One press cycles System (screen icon), Light (sun), Dark (moon). Its name and tooltip read "Theme: System", "Theme: Light" or "Theme: Dark".
+- **Key menu:** a key icon button that opens a small plate panel with a rule border and two items: "Lock now" and "Manage keys" (opens Keys).
+- **Day navigator:** in the top bar; 44px arrow buttons with a 10px corner and rule border; a disabled "next day" fades to 50%.
 
 ### Event list
+- **Trigger chips:** a row above the list: All, then one chip per trigger with its glyph. Multi-select; All clears. On phones the row stays on one line and scrolls sideways.
 - **Row:** 64px minimum, three columns: serial start time; trigger chips plus camera (600, ink) and duration (muted); the seal at 38px. Rows are separated by 1 px rules.
-- **Selected:** plate fill with a 1 px foil outline inset. Hover fills plate.
+- **Selected:** plate fill with a 1 px foil outline inset and a small "playing" mark. Hover fills plate.
 - **Trigger chip:** 20px minimum, 4px corner, trigger colour with the glyph in `on-trigger`, 12px bold.
 
-### Status pill
-Recorder health in words ("Recorder quiet 4 min"), a 10px dot in line, amber, void or muted, opening a plate panel with a rule border that lists the details in serial figures.
+### Status dot
+Recorder health: a 10px dot in line, amber, void or muted. When the status is not OK, a short phrase ("Recorder quiet 4 min") sits beside the dot; when it is OK there is no text, only the accessible name. Tapping it opens a plate panel with a rule border that lists the details in serial figures.
+
+### Control bar
+One plate bar directly under the video, always visible, 1 px rule above and below. In recording mode it holds previous and next event, back and forward 10 s, play and pause, the clock (the wall time of the frame in large serial figures, with the clip position beside it), the scrubber, the seal with its integrity sentence, Export, sound and fullscreen. On phones it fits one row without wrapping. In live mode it reads "Live now" and, with a single tile, that tile's sound and fullscreen.
+
+### Live pill
+In recording mode a "Live" pill with a small dot sits at the top right of the video; it returns to live. It uses the over-video values (ground fill, line dot), a 4px corner and the Label size. It is not shown in live mode, where the badge at the top left already says Live.
 
 ### Video and over-video controls
 Video frames have an 8px corner and a rule border. The bottom scrim holds the camera name (600), "as of" time in serial figures (over-video muted), the Live badge (over-video line fill, ground text, shown only once playing) and 44px buttons: 1 px over-video rule border, 10px corner, 70% over-video ground fill. Reconnect and viewer-limit states fill the frame with a 70% over-video ground panel and a plain sentence.
