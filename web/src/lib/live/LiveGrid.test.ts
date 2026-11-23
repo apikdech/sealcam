@@ -59,7 +59,7 @@ describe('LiveGrid', () => {
     const onFocus = vi.fn();
     render(LiveGrid, { ...props(cams('a', 'b')), onFocus });
     await fireEvent.click(screen.getAllByTestId('live-tile')[1]!.querySelector('video')!);
-    expect(onFocus).toHaveBeenCalledWith('b');
+    await waitFor(() => expect(onFocus).toHaveBeenCalledWith('b'));
   });
 
   it('four cameras get two columns from sm', () => {

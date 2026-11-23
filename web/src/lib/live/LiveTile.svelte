@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import Icon from '../components/Icon.svelte';
   import { formatClock } from '../timeline/timezone';
   import { overVideo } from '../overVideo';
@@ -89,10 +89,15 @@
     'inline-flex h-10 w-10 max-md:h-11 max-md:w-11 items-center justify-center rounded border border-rule text-ink hover:bg-plate';
   const showFs = $derived((live || fullscreen) && fsMode !== 'none');
 
+  // Focus waits a beat so a double-click (fullscreen) can cancel it.
+  let focusTimer: ReturnType<typeof setTimeout> | undefined;
+  onDestroy(() => clearTimeout(focusTimer));
+
   function onRootClick(e: MouseEvent) {
     if (single || !onFocus) return;
     if ((e.target as Element).closest('button, a')) return;
-    onFocus();
+    clearTimeout(focusTimer);
+    focusTimer = setTimeout(() => onFocus?.(), 250);
   }
   // The announced sentence: never includes the countdown, so it does not change as time passes.
   const sentence = $derived(
@@ -115,7 +120,7 @@
   bind:this={root}
   role="group"
   aria-label={name}
-  class="relative overflow-hidden rounded-lg border border-rule bg-ground [&:fullscreen_video]:aspect-auto [&:fullscreen_video]:h-full {single
+  class="relative overflow-hidden rounded-lg border border-rule bg-ground [&:fullscreen_video]:aspect-auto [&:fullscreen_video]:h-full [&:fullscreen>div:not([role])]:h-full {single
     ? 'flex h-full flex-col'
     : onFocus
       ? 'cursor-pointer'
@@ -133,7 +138,10 @@
       muted
       playsinline
       autoplay
-      ondblclick={() => (live || fullscreen) && toggleFs()}
+      ondblclick={() => {
+        clearTimeout(focusTimer);
+        if (live || fullscreen) toggleFs();
+      }}
       class="w-full bg-ground object-contain {single ? 'h-full min-h-0' : 'aspect-video'}"
     ></video>
 

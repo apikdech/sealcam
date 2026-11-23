@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeClient, FakePeer, FakeStream } from '../../../test-support/live-fakes';
@@ -326,7 +326,63 @@ describe('LiveTile focus and single mode', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Try now' }));
     expect(onFocus).not.toHaveBeenCalled();
     await fireEvent.click(screen.getByTestId('live-tile').querySelector('video')!);
-    expect(onFocus).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onFocus).toHaveBeenCalledTimes(1));
+  });
+
+  it('grid: onFocus fires after a delay following a single click', async () => {
+    vi.useFakeTimers();
+    try {
+      const f = fakeTile();
+      const onFocus = vi.fn();
+      render(LiveTile, { cameraId: 'cam1', client: new FakeClient(), zone: ZONE, makeTile: f.make, onFocus });
+      await fireEvent.click(screen.getByTestId('live-tile').querySelector('video')!);
+      expect(onFocus).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(300);
+      expect(onFocus).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('grid: a double-click cancels focus and toggles fullscreen', async () => {
+    vi.useFakeTimers();
+    try {
+      const f = fakeTile();
+      const onFocus = vi.fn();
+      render(LiveTile, { cameraId: 'cam1', client: new FakeClient(), zone: ZONE, makeTile: f.make, onFocus });
+      await f.emit({ state: 'live' });
+      const v = screen.getByTestId('live-tile').querySelector('video')!;
+      await fireEvent.click(v);
+      await fireEvent.click(v);
+      await fireEvent.dblClick(v);
+      vi.advanceTimersByTime(500);
+      expect(onFocus).not.toHaveBeenCalled();
+      expect(request).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('grid: unmounting clears a pending focus', async () => {
+    vi.useFakeTimers();
+    try {
+      const f = fakeTile();
+      const onFocus = vi.fn();
+      render(LiveTile, { cameraId: 'cam1', client: new FakeClient(), zone: ZONE, makeTile: f.make, onFocus });
+      await fireEvent.click(screen.getByTestId('live-tile').querySelector('video')!);
+      cleanup();
+      vi.advanceTimersByTime(500);
+      expect(onFocus).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('the video wrapper fills the tile in fullscreen so the picture does too', () => {
+    renderTile();
+    const wrap = screen.getByTestId('live-tile').querySelector('video')!.parentElement!;
+    expect(screen.getByTestId('live-tile').className).toContain('[&:fullscreen>div:not([role])]:h-full');
+    expect(wrap.hasAttribute('role')).toBe(false);
   });
 
   it('single: clicking the video does not call onFocus', async () => {
