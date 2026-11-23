@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { THEME_EVENT, THEME_KEY, applyTheme, loadTheme, nextTheme, saveTheme } from './theme';
+import { THEME_EVENT, THEME_KEY, applyTheme, currentTheme, followSystemTheme, loadTheme, nextTheme, saveTheme } from './theme';
 
 beforeEach(() => {
   document.head.replaceChildren();
@@ -75,5 +75,63 @@ describe('applyTheme', () => {
     window.matchMedia = ((q: string) => ({ matches: !q.includes('light') && false })) as never;
     applyTheme('system');
     expect(meta()).toBe('#0E1A1F');
+  });
+});
+
+describe('currentTheme', () => {
+  it('reads the applied theme first, so a blocked store does not lose the choice', () => {
+    document.documentElement.dataset.theme = 'dark';
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    expect(currentTheme()).toBe('dark');
+  });
+  it('falls back to the stored choice when nothing is applied', () => {
+    localStorage.setItem(THEME_KEY, 'light');
+    expect(currentTheme()).toBe('light');
+    localStorage.removeItem(THEME_KEY);
+    expect(currentTheme()).toBe('system');
+  });
+});
+
+describe('followSystemTheme', () => {
+  const meta = () => document.querySelector('meta[name="theme-color"]')!.getAttribute('content');
+  function fakeScheme(light: boolean) {
+    const listeners: (() => void)[] = [];
+    const mq = {
+      matches: light,
+      addEventListener: (_: string, f: () => void) => listeners.push(f),
+      removeEventListener: (_: string, f: () => void) => listeners.splice(listeners.indexOf(f), 1),
+    };
+    window.matchMedia = (() => mq) as never;
+    return {
+      flip(to: boolean) {
+        mq.matches = to;
+        for (const f of [...listeners]) f();
+      },
+      listeners,
+    };
+  }
+
+  it('in System mode the browser chrome colour follows an OS switch', () => {
+    const os = fakeScheme(false);
+    applyTheme('system');
+    const stop = followSystemTheme();
+    expect(meta()).toBe('#0E1A1F');
+    os.flip(true);
+    expect(meta()).toBe('#EDE9DF');
+    os.flip(false);
+    expect(meta()).toBe('#0E1A1F');
+    stop();
+    expect(os.listeners).toHaveLength(0);
+  });
+
+  it('a Light or Dark choice ignores an OS switch', () => {
+    const os = fakeScheme(false);
+    applyTheme('dark');
+    followSystemTheme();
+    os.flip(true);
+    expect(meta()).toBe('#0E1A1F');
+    expect(document.documentElement.dataset.theme).toBe('dark');
   });
 });

@@ -1,10 +1,10 @@
 <script lang="ts">
   import Icon from '../components/Icon.svelte';
-  import { applyTheme, loadTheme, nextTheme, saveTheme, type ThemeChoice } from './theme';
+  import { applyTheme, currentTheme, nextTheme, saveTheme, type ThemeChoice } from './theme';
 
   const LABEL: Record<ThemeChoice, string> = { system: 'System', light: 'Light', dark: 'Dark' };
 
-  let choice = $state<ThemeChoice>(loadTheme());
+  let choice = $state<ThemeChoice>(currentTheme());
 
   function cycle(): void {
     choice = nextTheme(choice);

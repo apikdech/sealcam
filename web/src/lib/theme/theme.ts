@@ -27,6 +27,12 @@ export function saveTheme(c: ThemeChoice, storage?: Pick<Storage, 'setItem' | 'r
   }
 }
 
+/** The theme on the page now (set at start-up), else the stored choice. A blocked store then keeps the page's choice. */
+export function currentTheme(doc: Document = document): ThemeChoice {
+  const t = doc.documentElement.dataset.theme;
+  return t === 'light' || t === 'dark' ? t : loadTheme();
+}
+
 export function nextTheme(c: ThemeChoice): ThemeChoice {
   return ORDER[(ORDER.indexOf(c) + 1) % ORDER.length]!;
 }
@@ -39,4 +45,14 @@ export function applyTheme(c: ThemeChoice, doc: Document = document): void {
   const light = c === 'system' ? (window.matchMedia?.('(prefers-color-scheme: light)').matches ?? false) : c === 'light';
   doc.querySelector('meta[name="theme-color"]')?.setAttribute('content', light ? GROUND.light : GROUND.dark);
   window.dispatchEvent(new Event(THEME_EVENT));
+}
+
+/** In System mode, re-applies the theme when the OS switches between light and dark (the browser chrome colour). */
+export function followSystemTheme(doc: Document = document): () => void {
+  const mq = window.matchMedia?.('(prefers-color-scheme: light)');
+  const sync = () => {
+    if (!doc.documentElement.dataset.theme) applyTheme('system', doc);
+  };
+  mq?.addEventListener?.('change', sync);
+  return () => mq?.removeEventListener?.('change', sync);
 }
