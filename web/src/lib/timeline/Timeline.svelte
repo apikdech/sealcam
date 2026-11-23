@@ -15,6 +15,7 @@
     type TimelineCamera,
     type TimelineClip,
   } from './model';
+  import { THEME_EVENT } from '../theme/theme';
   import { backingSize, createScheduler, drawTimeline, readPalette, DARK, type Palette, type Scheduler } from './render';
   import { browserZone, localDayRange } from './timezone';
   import { fullView, panBy, stepPreset, zoomAround, type View } from './zoom';
@@ -148,6 +149,7 @@
       sched?.invalidate();
     };
     scheme?.addEventListener?.('change', onScheme);
+    window.addEventListener(THEME_EVENT, onScheme);
     const ro = new ResizeObserver(([entry]) => {
       cssWidth = entry?.contentRect.width ?? canvas.clientWidth;
       resize();
@@ -163,6 +165,7 @@
     return () => {
       clearInterval(tick);
       scheme?.removeEventListener?.('change', onScheme);
+      window.removeEventListener(THEME_EVENT, onScheme);
       ro.disconnect();
       sched?.dispose();
     };

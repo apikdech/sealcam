@@ -6,6 +6,7 @@ import Timeline from './Timeline.svelte';
 import Harness from './TimelineHarness.test.svelte';
 import { drawTimeline } from './render';
 import { localDayRange } from './timezone';
+import { THEME_EVENT } from '../theme/theme';
 
 // Draw synchronously on every invalidation and record what is drawn, so the
 // component's view state can be read through getLayout() without a real canvas.
@@ -232,5 +233,17 @@ describe('Timeline selectedClipId', () => {
   it('draws nothing selected when the prop is not given', () => {
     mount();
     expect(lastSelected()).toBeNull();
+  });
+});
+
+describe('Timeline theme change', () => {
+  it('reads the palette again and repaints when the theme switch fires', () => {
+    mount();
+    const spy = vi.spyOn(window, 'getComputedStyle');
+    const draws = vi.mocked(drawTimeline).mock.calls.length;
+    window.dispatchEvent(new Event(THEME_EVENT));
+    expect(spy).toHaveBeenCalled();
+    expect(vi.mocked(drawTimeline).mock.calls.length).toBeGreaterThan(draws);
+    spy.mockRestore();
   });
 });

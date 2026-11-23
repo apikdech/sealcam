@@ -5,7 +5,7 @@ import Icon, { ICON_NAMES } from './Icon.svelte';
 
 describe('Icon', () => {
   it('renders every IconName as an svg with at least one path', () => {
-    expect(ICON_NAMES.length).toBe(26);
+    expect(ICON_NAMES.length).toBe(29);
     for (const name of ICON_NAMES) {
       const { container, unmount } = render(Icon, { name });
       const svg = container.querySelector('svg');
