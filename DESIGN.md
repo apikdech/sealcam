@@ -149,7 +149,6 @@ components:
     rounded: "{rounded.full}"
   theme-button:
     textColor: "{colors.ink}"
-    rounded: "{rounded.control}"
     size: "{spacing.target}"
   key-menu:
     backgroundColor: "{colors.plate}"
@@ -160,7 +159,7 @@ components:
     backgroundColor: "{colors.ground}"
     textColor: "{colors.ink}"
     typography: "{typography.label}"
-    rounded: "{rounded.sm}"
+    rounded: "{rounded.full}"
 ---
 
 # Design System: zview
@@ -240,7 +239,7 @@ All UI colours are custom properties on `:root` (`--z-ground` … `--z-void`, `-
 
 Phone first. The Watch screen fills the window and never scrolls. The page gutter is 16px; the top bar is one row: the wordmark, then the day navigator (arrows either side of the day title and its zone subtitle), the camera select (only with more than one camera), then the recorder status dot, the theme button and the key menu. There is no tab bar and no tab row; Keys opens from the key menu.
 
-On phones the video (16:9), its control bar and the 24 h timeline are pinned at the top. The trigger chips and the event list fill the rest, and only the list scrolls. From about 900px wide it becomes two columns: video, control bar and timeline in a flexible column, the day's list in a fixed 380px column. The video is letterboxed in the space that is left, so a clip never pushes the controls below the fold. Form pages (Keys, first run) sit in a centred 36rem column.
+On phones the video (16:9), its control bar and the 24 h timeline are pinned at the top. The trigger chips and the event list fill the rest, and only the list scrolls. From 768px wide (Tailwind `md`), or in landscape from 640px wide (the `wide` variant in `app.css`), it becomes two columns: video, control bar and timeline in a flexible column, the day's list in a fixed column (380px from 768px, 300px below). The video is letterboxed in the space that is left, so a clip never pushes the controls below the fold. Form pages (Keys, first run) sit in a centred 36rem column.
 
 Rhythm is the 4px Tailwind step: 8px and 12px gaps inside rows, 14px above the timeline and list heading, 64px event rows. Every interactive target is at least 44px on phones; some desktop controls tighten to 36–40px.
 
@@ -253,7 +252,7 @@ Flat. The system has no shadows. Depth is one tonal step (ground to plate) plus 
 
 ## Shapes
 
-Corners are small and functional. Text buttons, fields, the key input, trigger chips and the Live badge use a 4px corner. The 44px square chrome controls (day arrows, theme button, over-video buttons) and the timeline filter selects use a slightly softer 10px corner. Video frames (live tiles and the player) use 8px with a 1 px rule border. The status dot is the only full circle besides the seal. Lines are 1 px everywhere; the seal itself is drawn at a 0.8 stroke.
+Corners are small and functional. Text buttons, fields, the key input, the glyph chips and the Live badge use a 4px corner. Over-video buttons, the day arrows' hover fill, menus and the timeline filter selects use a slightly softer 10px corner. Grid tiles (several live cameras) use 8px with a 1 px rule border; the single live tile and the player have no frame and fill the dark stage. Full rounds are kept for a few marks: the status dot, the Live pill and its dot, and the trigger filter chips above the list. Lines are 1 px everywhere; the seal itself is drawn at a 0.8 stroke.
 
 Hatching is part of the form language: not-monitored gaps on the timeline are hatched in muted ink, tampered spans hatched in void.
 
@@ -274,9 +273,9 @@ Restrained and printed, not filled by default.
 
 ### Navigation
 - **Top bar:** ground, 1 px rule underneath, one row. Wordmark "z" in ink and "view" in line. No tabs.
-- **Theme button:** 44px icon button, 10px corner, rule border. One press cycles System (screen icon), Light (sun), Dark (moon). Its name and tooltip read "Theme: System", "Theme: Light" or "Theme: Dark".
+- **Theme button:** 44px icon button with no border or fill. One press cycles System (screen icon), Light (sun), Dark (moon). Its name and tooltip read "Theme: System", "Theme: Light" or "Theme: Dark".
 - **Key menu:** a key icon button that opens a small plate panel with a rule border and two items: "Lock now" and "Manage keys" (opens Keys).
-- **Day navigator:** in the top bar; 44px arrow buttons with a 10px corner and rule border; a disabled "next day" fades to 50%.
+- **Day navigator:** in the top bar; 44px arrow buttons (36px on desktop) with no border, a plate fill with a 10px corner on hover; a disabled "next day" fades to 50%.
 
 ### Event list
 - **Trigger chips:** a row above the list: All, then one chip per trigger with its glyph. Multi-select; All clears. On phones the row stays on one line and scrolls sideways.
@@ -288,13 +287,13 @@ Restrained and printed, not filled by default.
 Recorder health: a 10px dot in line, amber, void or muted. When the status is not OK, a short phrase ("Recorder quiet 4 min") sits beside the dot; when it is OK there is no text, only the accessible name. Tapping it opens a plate panel with a rule border that lists the details in serial figures.
 
 ### Control bar
-One plate bar directly under the video, always visible, 1 px rule above and below. In recording mode it holds previous and next event, back and forward 10 s, play and pause, the clock (the wall time of the frame in large serial figures, with the clip position beside it), the scrubber, the seal with its integrity sentence, Export, sound and fullscreen. On phones it fits one row without wrapping. In live mode it reads "Live now" and, with a single tile, that tile's sound and fullscreen.
+One plate bar directly under the video, always visible, 1 px rule above and below. In recording mode it holds previous and next event, back and forward 10 s, play and pause, the clock (the wall time of the frame in large serial figures, with the clip position beside it), the scrubber, the seal with its integrity sentence, Export and fullscreen (recordings have no sound control). On phones it fits one row without wrapping. In live mode, with a single tile, it holds that tile's sound and fullscreen and reads "Live now" only while the tile is live; when that camera was picked from several, an "All cameras" button goes back to them all. With several tiles it is a short muted line: "Live now · tap a camera to see it alone".
 
 ### Live pill
-In recording mode a "Live" pill with a small dot sits at the top right of the video; it returns to live. It uses the over-video values (ground fill, line dot), a 4px corner and the Label size. It is not shown in live mode, where the badge at the top left already says Live.
+In recording mode a "Live" pill with a small dot sits at the top right of the video; it returns to live. It uses the over-video values (ground fill, 1 px over-video rule border, line dot), a full pill corner and the Label size. It is not shown in live mode, where the badge at the top left already says Live.
 
 ### Video and over-video controls
-Video frames have an 8px corner and a rule border. The bottom scrim holds the camera name (600), "as of" time in serial figures (over-video muted), the Live badge (over-video line fill, ground text, shown only once playing) and 44px buttons: 1 px over-video rule border, 10px corner, 70% over-video ground fill. Reconnect and viewer-limit states fill the frame with a 70% over-video ground panel and a plain sentence.
+Several live cameras share the stage in equal cells: 2 side by side, 3–4 as 2×2 (one row of 3–4 when the stage is very wide and short). Each grid tile has an 8px corner and a rule border, and its picture is letterboxed inside the tile, never cropped. The bottom scrim holds the camera name (600), "as of" time in serial figures (over-video muted), the Live badge (over-video line fill, ground text, shown only once playing) and 44px buttons: 1 px over-video rule border, 10px corner, 70% over-video ground fill. Reconnect and viewer-limit states fill the tile with a 70% over-video ground panel, the camera name, a plain sentence and the action (Try now, Unlock); a short tile drops the sentence first (it is still announced), then the name, never the button.
 
 ### The Seal (signature component)
 A per-clip guilloché seal, seeded from the clip id (or the key id), in an SVG at a 0.8 stroke.
