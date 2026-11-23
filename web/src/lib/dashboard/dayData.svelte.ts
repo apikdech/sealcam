@@ -1,5 +1,5 @@
-// What the Home and Timeline pages share: the cameras, one day's clips and coverage, how loading
-// them went, and the views the pages draw from them. Call it while a component initialises.
+// What the Watch screen draws from: the cameras, one day's clips and coverage, how loading
+// them went, and the views drawn from them. Call it while a component initialises.
 import { onMount } from 'svelte';
 import type { Request } from '../../worker/protocol';
 import type { Camera, Sidecar } from '../../worker/schemas';

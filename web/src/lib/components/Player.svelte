@@ -8,7 +8,7 @@
   import ExportDialog from './ExportDialog.svelte';
   import Icon from './Icon.svelte';
   import { overVideo } from '../overVideo';
-    import { fullscreenMode, toggleFullscreen, watchFullscreen, type FullscreenMode } from '../live/fullscreen';
+  import { fullscreenMode, toggleFullscreen, watchFullscreen, type FullscreenMode } from '../live/fullscreen';
   import Seal from '../seal/Seal.svelte';
   import type { SealState } from '../seal/rosette';
   import { formatClock } from '../timeline/timezone';
@@ -333,7 +333,7 @@
       <span>Autoplay next</span>
     </label>
   {/snippet}
-  <!-- Export saves plaintext: it is labelled and kept apart from the routine controls. -->
+  <!-- Export saves plaintext: the button only opens the export dialog, which says so before anything is saved. -->
   {#snippet exportButton()}
     <button
       type="button"

@@ -5,7 +5,7 @@ import Icon, { ICON_NAMES } from './Icon.svelte';
 
 describe('Icon', () => {
   it('renders every IconName as an svg with at least one path', () => {
-    expect(ICON_NAMES.length).toBe(29);
+    expect(ICON_NAMES.length).toBe(26);
     for (const name of ICON_NAMES) {
       const { container, unmount } = render(Icon, { name });
       const svg = container.querySelector('svg');
@@ -23,7 +23,7 @@ describe('Icon', () => {
   });
 
   it('has role img and the label when labelled', () => {
-    const { getByRole } = render(Icon, { name: 'lock', label: 'Encrypted' });
+    const { getByRole } = render(Icon, { name: 'key', label: 'Encrypted' });
     const svg = getByRole('img', { name: 'Encrypted' });
     expect(svg.getAttribute('aria-hidden')).toBeNull();
   });

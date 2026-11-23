@@ -132,7 +132,7 @@
     };
   });
 
-  const tabBase = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line';
+  const focusRing = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line';
 </script>
 
 <svelte:window
@@ -180,7 +180,7 @@
       <p role="alert" class="text-void">Could not read the keys on this device.</p>
       <button
         type="button"
-        class="{tabBase} inline-flex min-h-11 items-center rounded border border-rule px-4 text-ink"
+        class="{focusRing} inline-flex min-h-11 items-center rounded border border-rule px-4 text-ink"
         onclick={() => void refreshKeys()}>Try again</button
       >
     </main>

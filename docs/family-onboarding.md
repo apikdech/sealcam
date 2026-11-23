@@ -50,8 +50,8 @@ zview opens on one screen. It shows the live cameras and the events of today. Ta
 watch the recording. The recording plays in the same place. Tap **Live** on the video to go back to
 the live cameras.
 
-To see another day, use the arrows at the top. Tap the day name to pick a date. Use the sun or
-moon button to change the colors: System, Light or Dark. Tap the key button to lock zview or to
+To see another day, use the arrows at the top. Tap the day name to pick a date. Use the theme
+button to change the colors: System, Light or Dark. Tap the key button to lock zview or to
 manage keys.
 
 ## Important information
