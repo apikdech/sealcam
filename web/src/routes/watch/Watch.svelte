@@ -17,7 +17,7 @@
   import { overVideo } from '../../lib/overVideo';
   import { sealLabel } from '../../lib/seal/rosette';
   import Timeline from '../../lib/timeline/Timeline.svelte';
-  import { LANE_GAP, RULER_HEIGHT, triggerStyle } from '../../lib/timeline/model';
+  import { triggerStyle } from '../../lib/timeline/model';
   import { browserZone } from '../../lib/timeline/timezone';
   import { loadZonePref, saveZonePref } from '../../lib/timeline/zonePref';
   import { spanLabel } from '../../lib/timeline/zoom';
@@ -99,9 +99,6 @@
   const available = $derived([...new Set([...data.rows.flatMap((r) => r.triggers), ...triggers])]);
   const triggersOf = (id: string) => data.rows.find((r) => r.id === id)?.triggers ?? [];
   const laneHeight = $derived(env.phone ? (short ? 32 : 48) : 40);
-  // Phones: what sits around the video (top bar, player bar and seal line, timeline, list header,
-  // three rows). The video gives up height first so the list keeps three rows.
-  const chrome = $derived(52 + 112 + 44 + RULER_HEIGHT + Math.max(filtered.length, 1) * (laneHeight + LANE_GAP) + 8 + 88 + 3 * 64);
 
   const heading = $derived(`${day === todayDay ? 'Today' : dayTitle(day, todayDay)} · ${data.rows.length} ${data.rows.length === 1 ? 'event' : 'events'}`);
   const summary = $derived.by(() => {
@@ -238,15 +235,13 @@
   {:else if data.cameras.length === 0}
     <p class="px-4 py-3 text-sm text-muted">No cameras are set up yet.</p>
   {:else}
+    <!-- Phones: the stage row grows to its content only while the list row keeps its header and
+         three rows (the scroller's minimum height), so the video gives up height first. -->
     <div
-      class="grid min-h-0 min-w-0 grid-rows-[auto_auto_minmax(0,1fr)] [--list-w:300px] md:[--list-w:380px] wide:grid-cols-[minmax(0,1fr)_var(--list-w)] wide:grid-rows-[minmax(0,1fr)_auto]"
-      style:--chrome="{chrome}px"
+      class="grid min-h-0 min-w-0 grid-rows-[minmax(0,auto)_auto_minmax(min-content,1fr)] [--list-w:300px] md:[--list-w:380px] wide:grid-cols-[minmax(0,1fr)_var(--list-w)] wide:grid-rows-[minmax(0,1fr)_auto]"
     >
-      <!-- The stage is a screen, dark in both themes. On phones the video gives up height first. -->
-      <div
-        data-testid="stage"
-        class="relative min-h-0 min-w-0 overflow-hidden bg-black [&_video]:max-h-[calc(100dvh-var(--chrome))] wide:[&_video]:max-h-none [&_:fullscreen_video]:max-h-none wide:col-start-1 wide:row-start-1"
-      >
+      <!-- The stage is a screen, dark in both themes. -->
+      <div data-testid="stage" class="relative min-h-0 min-w-0 overflow-hidden bg-black wide:col-start-1 wide:row-start-1">
         <!-- The grid unmounts while the player shows, which frees the viewer slots. -->
         {#if mode === 'live'}
           <LiveGrid cameras={filtered} {client} {zone} {status} onFocus={(id) => (camera = id)} />
@@ -389,7 +384,7 @@
         {#if !data.dayError && !data.ready}
           <p role="status" class="px-4 py-3 text-sm text-muted">Loading…</p>
         {:else if !data.dayError}
-          <div class="min-h-0 flex-1 overflow-y-auto">
+          <div class="min-h-48 flex-1 overflow-y-auto contain-size wide:min-h-0">
             <EventList clips={data.rows} {selectedId} {zone} {integrity} onSelect={(id) => select(id)} />
           </div>
         {/if}

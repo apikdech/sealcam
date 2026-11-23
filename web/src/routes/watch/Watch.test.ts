@@ -141,7 +141,8 @@ describe('Watch', () => {
     mount(client());
     expect(screen.getByTestId('watch')).toHaveClass('grid', 'h-dvh', 'overflow-hidden');
     const box = await screen.findByRole('listbox', { name: /recordings/i });
-    expect(box.parentElement).toHaveClass('overflow-y-auto', 'min-h-0');
+    // On phones the rows keep three rows (64 px each); e2e/dashboard.spec.ts checks the real layout.
+    expect(box.parentElement).toHaveClass('overflow-y-auto', 'min-h-48', 'contain-size', 'wide:min-h-0');
   });
 
   it('no bottom sheet: the list is in the screen flow on phones', async () => {
