@@ -56,12 +56,13 @@ test.describe('desktop', () => {
     await page.goto(url());
     const list = recordings(page);
     await expect(list.getByRole('option').first()).toBeVisible();
-    // 400 recordings, 50 rows in the DOM; "Show 50 more" adds one page.
+    // 400 recordings, 50 rows in the DOM; scrolling to the end loads one more page.
     expect(await list.getByRole('option').count()).toBe(50);
     // Newest first: the last clip of the day (index 399) leads.
     await expect(list.getByRole('option').first()).toHaveAttribute('data-clip', /399$/);
-    await page.getByRole('button', { name: 'Show 50 more' }).click();
-    expect(await list.getByRole('option').count()).toBe(100);
+    await list.locator('xpath=..').evaluate((el) => el.scrollTo(0, el.scrollHeight));
+    await expect(list.getByRole('option').nth(50)).toBeAttached();
+    await expect(list.getByRole('option')).toHaveCount(100);
     const [t, l] = await Promise.all([page.locator('canvas').first().boundingBox(), list.boundingBox()]);
     expect(l!.x).toBeGreaterThan(t!.x + t!.width - 1); // the day's list sits to the right of the timeline
     expect(errors).toEqual([]);
@@ -278,7 +279,7 @@ test.describe('fixed layout', () => {
       await scroller.hover();
       for (let i = 0; i < 10; i++) await page.mouse.wheel(0, 2000);
       await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
-      await expect(page.getByRole('button', { name: 'Show 50 more' })).toBeInViewport();
+      await expect(page.getByText(/^Showing \d+ of 400$/)).toBeInViewport();
       expect(await scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
     };
     const videoInView = async () => {
@@ -405,10 +406,7 @@ test.describe('phone', () => {
     const list = recordings(page);
     await expect(list.getByRole('option').first()).toBeVisible();
     expect(await list.locator('xpath=..').evaluate((el) => getComputedStyle(el).overflowY)).toBe('auto');
-    const more = page.getByRole('button', { name: 'Show 50 more' });
-    await more.scrollIntoViewIfNeeded();
-    await expect(more).toBeInViewport();
-    // Bounded DOM, no page scroll either way.
+    // Bounded DOM (the end is not reached, so no more rows load), no page scroll either way.
     expect(await list.getByRole('option').count()).toBe(50);
     const { sh, ih, sw, iw } = await noScroll(page);
     expect(sh).toBeLessThanOrEqual(ih);

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { tick } from 'svelte';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import EventList from './EventList.svelte';
 
 afterEach(cleanup);
@@ -42,6 +43,62 @@ describe('EventList', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Show 50 more' }));
     expect(screen.getAllByRole('option')).toHaveLength(100);
     expect(screen.getByText('Showing 100 of 120')).toBeInTheDocument();
+  });
+
+  describe('with IntersectionObserver', () => {
+    class MockIO {
+      static all: MockIO[] = [];
+      disconnected = false;
+      constructor(
+        public cb: (e: { isIntersecting: boolean }[]) => void,
+        public opts: IntersectionObserverInit,
+      ) {
+        MockIO.all.push(this);
+      }
+      observe = vi.fn();
+      disconnect = () => {
+        this.disconnected = true;
+      };
+    }
+    beforeEach(() => {
+      MockIO.all = [];
+      vi.stubGlobal('IntersectionObserver', MockIO);
+    });
+    afterEach(() => vi.unstubAllGlobals());
+    const last = () => MockIO.all.filter((o) => !o.disconnected).at(-1)!;
+
+    it('loads 50 more when the sentinel intersects, with no button', async () => {
+      render(EventList, { ...base, clips: many(120) });
+      expect(screen.queryByRole('button', { name: /show .* more/i })).toBeNull();
+      expect(last().opts.rootMargin).toBe('200px');
+      last().cb([{ isIntersecting: true }]);
+      await tick();
+      expect(screen.getAllByRole('option')).toHaveLength(100);
+      expect(screen.getByText('Showing 100 of 120')).toBeInTheDocument();
+    });
+
+    it('ignores a callback that is not intersecting', async () => {
+      render(EventList, { ...base, clips: many(120) });
+      last().cb([{ isIntersecting: false }]);
+      await tick();
+      expect(screen.getAllByRole('option')).toHaveLength(50);
+    });
+
+    it('drops the sentinel and disconnects once everything is shown', async () => {
+      render(EventList, { ...base, clips: many(60) });
+      expect(screen.getByTestId('sentinel')).toBeInTheDocument();
+      last().cb([{ isIntersecting: true }]);
+      await tick();
+      expect(screen.getAllByRole('option')).toHaveLength(60);
+      expect(screen.queryByTestId('sentinel')).toBeNull();
+      expect(MockIO.all.every((o) => o.disconnected)).toBe(true);
+    });
+
+    it('disconnects on destroy', () => {
+      const a = render(EventList, { ...base, clips: many(120) });
+      a.unmount();
+      expect(MockIO.all.every((o) => o.disconnected)).toBe(true);
+    });
   });
 
   it('hides the button when everything is shown', () => {

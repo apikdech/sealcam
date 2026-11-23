@@ -43,6 +43,8 @@
 
   let extra = $state(0);
   let list: HTMLDivElement;
+  let sentinel = $state<HTMLElement>();
+  const hasObserver = typeof IntersectionObserver !== 'undefined';
 
   const selectedIndex = $derived(selectedId === null ? -1 : clips.findIndex((c) => c.id === selectedId));
   // A selection made elsewhere (J/K, the timeline) is always rendered.
@@ -73,6 +75,20 @@
       focusRow(shown - 1);
     }
   }
+
+  // Load the next page when the end of the list is within 200 px of the scroller (its parent).
+  // Without IntersectionObserver the "Show more" button stays as the fallback.
+  $effect(() => {
+    if (!hasObserver || !sentinel || !list.parentElement) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) extra += pageSize;
+      },
+      { root: list.parentElement, rootMargin: '200px' },
+    );
+    io.observe(sentinel);
+    return () => io.disconnect();
+  });
 
   // Bring a selection made elsewhere into view.
   $effect(() => {
@@ -123,7 +139,9 @@
 {:else}
   <div class="flex items-center justify-between gap-3 border-t border-rule px-4 py-3 text-sm text-muted">
     <span class="num">Showing {shown} of {clips.length}</span>
-    {#if shown < clips.length}
+    {#if shown < clips.length && hasObserver}
+      <span bind:this={sentinel} data-testid="sentinel" aria-hidden="true"></span>
+    {:else if shown < clips.length}
       <button
         type="button"
         onclick={() => (extra += pageSize)}
