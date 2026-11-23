@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font",
+        "value": "hyperlegible next\",ui-sans-serif,system-ui,sans-serif",
+        "createdAt": "2026-11-23T04:32:29.432Z",
+        "reason": "Claude: mockup uses Atkinson Hyperlegible Next, the face DESIGN.md declares; hook mis-parses the quoted family stack"
+      }
+    ]
+  }
+}
