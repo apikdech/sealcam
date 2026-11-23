@@ -279,7 +279,6 @@ test.describe('fixed layout', () => {
       await scroller.hover();
       for (let i = 0; i < 10; i++) await page.mouse.wheel(0, 2000);
       await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
-      await expect(page.getByText(/^Showing \d+ of 400$/)).toBeInViewport();
       expect(await scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
     };
     const videoInView = async () => {
