@@ -16,7 +16,7 @@ storage:
   driver: "s3"                        # s3 | local (tests)
   root: "zrelay"
   s3:
-    endpoint: "ENV:S3_ENDPOINT"       # for example https://nas.<tailnet>.ts.net:9000
+    endpoint: "ENV:S3_ENDPOINT"       # for example https://<minio-host>.<tailnet>.ts.net:9000
     region: "us-east-1"
     bucket: "cctv"
     use_path_style: true
@@ -61,5 +61,6 @@ cameras:
     credentials:
       username: "ENV:CAMERA_USERNAME"
       password: "ENV:CAMERA_PASSWORD"
+    # Example camera: a Tapo C220 uses RTSP port 554, path /stream1, ONVIF port 2020.
     rtsp: { port: 554, path: "/stream1" }
     events: { source: "onvif", port: 2020 }

@@ -10,7 +10,7 @@ web
 
 Two audiences are equally important:
 
-- **Household family members.** They are not technical and share one master key (Contract D2). They use the installed PWA, mostly on phones. Some are relatives abroad who view in a forced display zone (for example `Asia/Jakarta`).
+- **Household family members.** They are not technical and share one master key (Contract D2). They use the installed PWA, mostly on phones. Some may view in a forced display zone, for example the time zone of the family (such as `Europe/Amsterdam`).
 - **The operator.** This is the technical person who runs zrelay, MinIO and the deploy. They use zview on a desktop or a phone to check recordings, live cameras and relay health.
 
 Both audiences open zview for two equally common jobs:
@@ -37,7 +37,7 @@ zview is zero-knowledge. A Web Worker in the browser does all decryption. zview-
 - Live: a responsive grid of camera tiles, each with a live badge, a reconnecting state, tap-to-unmute, and a "viewer limit reached" state.
 - Relay status: a dot that turns red when the relay status is older than 3 minutes or a camera is down.
 - Export saves an unencrypted MP4 to the device, after a confirmation step.
-- Production: read-only containers on a Mac mini, with MinIO on the NAS. Local testing uses `make demo` (a simulated camera) or `make local-up` (full stack with RustFS).
+- Production: read-only containers on an always-on host, with MinIO or other S3 storage. Local testing uses `make demo` (a simulated camera) or `make local-up` (full stack with RustFS).
 
 ## Capabilities and Constraints
 
@@ -60,7 +60,7 @@ zview is zero-knowledge. A Web Worker in the browser does all decryption. zview-
 ## Evidence on Hand
 
 - Test footage: `testdata/video/`, and the looping simulated camera from `make demo`.
-- Real camera: a Tapo C220 in the operator's home (used with `make local-up`).
+- Real camera: a Tapo C220 (used with `make local-up`).
 - There are no product screenshots, testimonials, user research or usage metrics. Do not fabricate them.
 
 ## Product Principles

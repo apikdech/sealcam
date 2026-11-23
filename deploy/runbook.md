@@ -1,7 +1,8 @@
 # Sealcam runbook
 
-This runbook tells the owner how to install and operate Sealcam (zrelay and zview). zrelay runs on the Mac mini
-(OrbStack). MinIO runs on the Synology NAS. The procedures follow design §8.3 and the decisions
+This runbook tells the owner how to install and operate Sealcam (zrelay and zview). zrelay runs in Docker on the
+host. The host is an always-on computer, for example a mini PC, a server, or a Mac. The S3 storage is a MinIO
+server, for example on a NAS. The procedures follow design §8.3 and the decisions
 D11 to D19 in `docs/superpowers/specs/2026-11-06-zrelay-v2-design.md`.
 
 Overview of the system:
@@ -12,10 +13,10 @@ Overview of the system:
   objects, but they cannot delete an archive object (D15).
 * A MinIO lifecycle (ILM) rule removes old clips. zrelay has no retention code. The rule also
   operates when zrelay is stopped.
-* The Mac mini and the Synology are on the tailnet. MinIO is available only on the tailnet. The
-  camera can be on the home LAN (see section 8).
+* The host and the MinIO server are on the tailnet. MinIO is available only on the tailnet. The
+  camera can be on the local network (LAN). If the host runs macOS, see section 8.
 
-Do all commands on the Mac mini, from the repository root, unless a step gives a different
+Do all commands on the host, from the repository root, unless a step gives a different
 location.
 
 * `mc` is the MinIO client.
@@ -31,7 +32,7 @@ the relay sees only the key names of zrelay objects.
 > versions, and MinIO never gets the storage space back (design §6.7).
 
 ```sh
-mc alias set <alias> https://nas.<tailnet>.ts.net:9000 <admin-access-key> <admin-secret-key>
+mc alias set <alias> https://<minio-host>.<tailnet>.ts.net:9000 <admin-access-key> <admin-secret-key>
 mc mb <alias>/cctv
 mc version info <alias>/cctv        # must report that versioning is not enabled
 ```
@@ -113,7 +114,7 @@ Notes:
 
 ## 4. Keys
 
-Make the household master key one time.
+Make the master key one time. The family shares this key.
 
 > **Warning:** Keep the master key safe. If you lose it, you cannot decrypt the recordings. There
 > is no recovery.
@@ -228,13 +229,16 @@ tailscale serve status
 ```
 
 The web app, `/api/v1/*`, and `/live/*` all use this one origin (D18). Phones open
-`https://<mac-mini>.<tailnet>.ts.net/`.
+`https://<host>.<tailnet>.ts.net/`.
 
-## 8. OrbStack: Local Network permission
+## 8. macOS only: Local Network permission
 
-The camera is on the home LAN. It is not on the tailnet. On macOS Sequoia and later, an
+Do this section only if the host runs macOS. On Linux, go to section 9.
+
+The camera is on the LAN. It is not on the tailnet. On macOS Sequoia and later, an
 application must have the **Local Network** permission to connect to LAN addresses. The traffic of
-the containers goes out through OrbStack. Thus OrbStack must have this permission.
+the containers goes out through the Docker application (for example OrbStack or Docker Desktop).
+Thus this application must have this permission.
 
 > **Note:** A macOS update can remove the permission. After an update, check this permission
 > first.
@@ -242,8 +246,8 @@ the containers goes out through OrbStack. Thus OrbStack must have this permissio
 Do these steps:
 
 1. Open System Settings > Privacy & Security > Local Network.
-2. Turn on **OrbStack**.
-3. If OrbStack is not in the list, quit OrbStack and start it again.
+2. Turn on your Docker application (for example **OrbStack** or **Docker Desktop**).
+3. If the application is not in the list, quit it and start it again.
 4. Run a container that connects to a LAN address. macOS then asks for the permission.
 5. Restart zrelay: `docker compose -f deploy/compose.yaml restart zrelay`.
 

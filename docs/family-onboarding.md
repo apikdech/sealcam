@@ -9,7 +9,7 @@ You need two things from the person who operates the system (the owner):
 
 ## 1. Install Tailscale
 
-The viewer is private. It opens only on devices in the family Tailscale network.
+The viewer is private. It opens only on devices in the Tailscale network of your family.
 
 1. Install the Tailscale app from the App Store or Google Play.
 2. Sign in with the account that the owner invited.
@@ -21,7 +21,7 @@ The viewer is private. It opens only on devices in the family Tailscale network.
 1. Open the address from the owner in Safari (iPhone) or Chrome (Android).
 2. Make sure that the zview page shows "Add the family key".
 
-The address looks like `https://mini.<name>.ts.net`.
+The address looks like `https://<host>.<name>.ts.net`.
 
 If the page does not open, make sure that Tailscale is on.
 
