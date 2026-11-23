@@ -29,3 +29,6 @@ deploy/zview.yaml
 
 # Local end-to-end run: real camera + RustFS (configs, throwaway key, S3 secrets)
 .e2e/
+
+# Brainstorm mockups and agent scratch (can hold real camera frames)
+.superpowers/

@@ -264,7 +264,7 @@ Do these steps:
    uppercase form that the scanner uses.
 2. Show the QR code from that terminal when you make the key. Or keep the QR code in your
    password manager. The web app also accepts the `zk1-...` text.
-3. On the phone, open the zview URL (section 7). Open the **Key** tab. Scan or paste the key.
+3. On the phone, open the zview URL (section 7). On the first visit, zview asks for the key. If it does not, open the key menu (**Key and lock**) and select **Manage keys**. Scan or paste the key.
 4. Make sure that the fingerprint in the web app is the same as the output of
    `zrelay key fingerprint`.
 
