@@ -20,11 +20,13 @@
     single?: boolean;
     /** Grid tile: a click on the picture asks to see this camera alone. */
     onFocus?: () => void;
+    /** Single tile picked from several cameras: an "All cameras" button in the bar goes back to them all. */
+    onAll?: () => void;
     /** Test seam: builds the tile. */
     makeTile?: typeof createTile;
   }
 
-  let { cameraId, name = cameraId, client, zone, offline = false, single = false, onFocus, makeTile = createTile }: Props = $props();
+  let { cameraId, name = cameraId, client, zone, offline = false, single = false, onFocus, onAll, makeTile = createTile }: Props = $props();
 
   let root: HTMLDivElement | undefined = $state();
   let video: HTMLVideoElement | undefined = $state();
@@ -88,6 +90,8 @@
   const icon =
     'inline-flex h-10 w-10 max-md:h-11 max-md:w-11 items-center justify-center rounded border border-rule text-ink hover:bg-ground';
   const showFs = $derived((live || fullscreen) && fsMode !== 'none');
+  // A grid tile's bottom bar: only while it has something to show. Otherwise the name sits in the state panel.
+  const scrim = $derived(live || showFs || snap.canUnmute);
 
   // Focus waits a beat so a double-click (fullscreen) can cancel it.
   let focusTimer: ReturnType<typeof setTimeout> | undefined;
@@ -123,8 +127,8 @@
   class="relative overflow-hidden bg-(--z-ov-ground) [&:fullscreen_video]:aspect-auto [&:fullscreen_video]:h-full [&:fullscreen>[data-stage]]:h-full {single
     ? 'flex h-full flex-col'
     : onFocus
-      ? 'cursor-pointer rounded-lg border border-rule'
-      : 'rounded-lg border border-rule'}"
+      ? 'tile cursor-pointer rounded-lg border border-rule'
+      : 'tile rounded-lg border border-rule'}"
   data-testid="live-tile"
   data-camera={cameraId}
   data-state={snap.state}
@@ -132,7 +136,7 @@
   onclick={onRootClick}
 >
   <span role="status" class="sr-only">{sentence}</span>
-  <div data-stage class="relative {single ? 'min-h-0 flex-1' : ''}">
+  <div data-stage class="relative {single ? 'min-h-0 flex-1' : 'h-full'}">
     <video
       bind:this={video}
       muted
@@ -142,12 +146,19 @@
         clearTimeout(focusTimer);
         if (live || fullscreen) toggleFs();
       }}
-      class="aspect-video w-full bg-(--z-ov-ground) object-contain {single ? 'h-full min-h-0' : ''}"
+      class="w-full bg-(--z-ov-ground) object-contain {single ? 'aspect-video h-full min-h-0' : 'h-full'}"
     ></video>
 
     {#if !live}
-      <div class="ov-panel absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center text-(--z-ov-ink) {single ? 'pt-12' : ''}">
-        <p aria-hidden="true">
+      <div
+        class="ov-panel absolute inset-0 flex flex-col items-center justify-center text-center text-(--z-ov-ink) {single
+          ? 'gap-3 p-4 pt-12'
+          : 'gap-2 p-2 text-sm'}"
+      >
+        {#if !single && !scrim}
+          <span class="ov-name max-w-full truncate font-semibold">{name}</span>
+        {/if}
+        <p class="ov-msg" aria-hidden="true">
           {#if snap.state === 'connecting'}
             Connecting…
           {:else if snap.state === 'reconnecting'}
@@ -183,7 +194,16 @@
 
   {#if single}
     <div role="group" aria-label="Live controls" class="flex min-h-14 items-center max-md:min-h-15 justify-between gap-x-2 border-t border-rule bg-plate px-3 py-2">
-      <span class="text-sm text-muted">Live now</span>
+      <div class="flex min-w-0 items-center gap-3">
+        {#if onAll}
+          <button
+            type="button"
+            class="inline-flex min-h-10 items-center rounded border border-rule px-3 text-sm whitespace-nowrap text-ink hover:bg-ground max-md:min-h-11"
+            onclick={() => onAll()}>All cameras</button
+          >
+        {/if}
+        {#if live}<span class="text-sm text-muted">Live now</span>{/if}
+      </div>
       <div class="flex items-center gap-2">
         {#if snap.canUnmute}
           <button
@@ -203,7 +223,7 @@
         {/if}
       </div>
     </div>
-  {:else}
+  {:else if scrim}
     <div class="scrim absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 px-3 py-2.5 text-(--z-ov-ink)">
       <div class="flex min-w-0 flex-col">
         <span class="truncate font-semibold">{name}</span>
@@ -243,6 +263,29 @@
   }
   .ov-panel {
     background: color-mix(in srgb, var(--z-ov-ground) 70%, transparent);
+  }
+  .tile {
+    container-type: size;
+  }
+  /* A short grid tile keeps what matters most: the button, then the name, then the sentence (still announced). */
+  @container (max-height: 160px) {
+    .ov-msg {
+      display: none;
+    }
+  }
+  @container (max-height: 90px) {
+    .ov-panel {
+      padding: 4px;
+    }
+    .ov-btn {
+      padding-inline: 8px;
+      white-space: nowrap;
+    }
+  }
+  @container (max-height: 78px) {
+    .ov-panel:has(.ov-btn) .ov-name {
+      display: none;
+    }
   }
   .ov-btn {
     border: 1px solid var(--z-ov-rule);

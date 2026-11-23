@@ -49,9 +49,12 @@ describe('LiveGrid', () => {
     expect(grid().className).toContain('h-full');
   });
 
-  it('two cameras go side by side from md, with the hint line', () => {
+  it('two cameras go side by side at every width, with the hint line', () => {
     render(LiveGrid, props(cams('a', 'b')));
-    expect(cols().className).toContain('md:grid-cols-2');
+    expect(cols().className).toContain('grid-cols-2');
+    expect(cols().className).not.toMatch(/(^|\s)(sm|md):grid-cols/);
+    // The tiles area takes the shape of two 16:9 pictures side by side when its height is free.
+    expect(cols().parentElement!.style.aspectRatio).toBe('32 / 9');
     expect(screen.getByText('Live now · tap a camera to see it alone')).toBeTruthy();
   });
 
@@ -62,9 +65,11 @@ describe('LiveGrid', () => {
     await waitFor(() => expect(onFocus).toHaveBeenCalledWith('b'));
   });
 
-  it('four cameras get two columns from sm', () => {
+  it('four cameras are a 2×2 grid at every width', () => {
     render(LiveGrid, props(cams('a', 'b', 'c', 'd')));
-    expect(cols().className).toContain('sm:grid-cols-2');
+    expect(cols().className).toContain('grid-cols-2');
+    expect(cols().className).toContain('grid-rows-2');
+    expect(cols().parentElement!.style.aspectRatio).toBe('16 / 9');
     expect(screen.getAllByTestId('live-tile')).toHaveLength(4);
   });
 

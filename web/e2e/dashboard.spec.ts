@@ -230,6 +230,44 @@ test.describe('fixed layout', () => {
     });
   }
 
+  for (const cams of [2, 4] as const)
+    for (const [w, h, rowPx] of [
+      [390, 844, 64],
+      [375, 667, 64],
+      [1280, 720, 56],
+      [844, 390, 56],
+    ] as const)
+      test(`${cams} live tiles show their whole picture and Try now at ${w}×${h}`, async ({ page }) => {
+        await page.setViewportSize({ width: w, height: h });
+        await openShell(page, `&cams=${cams}`);
+        const tiles = page.getByTestId('live-tile');
+        await expect(tiles).toHaveCount(cams);
+        // The canned API never goes live: every tile waits to reconnect and offers Try now.
+        for (let i = 0; i < cams; i++) await expect(tiles.nth(i)).toHaveAttribute('data-state', 'reconnecting');
+        await expectFits(page, rowPx);
+        const stage = (await page.getByTestId('stage').boundingBox())!;
+        for (let i = 0; i < cams; i++) {
+          const tile = tiles.nth(i);
+          const t = (await tile.boundingBox())!;
+          const v = (await tile.locator('video').boundingBox())!;
+          // The tile sits in the stage and its picture box sits in the tile (letterboxed, not cropped).
+          expect(t.y).toBeGreaterThanOrEqual(stage.y - 1);
+          expect(t.y + t.height).toBeLessThanOrEqual(stage.y + stage.height + 1);
+          expect(v.y).toBeGreaterThanOrEqual(t.y - 1);
+          expect(v.y + v.height).toBeLessThanOrEqual(t.y + t.height + 1);
+          expect(v.x + v.width).toBeLessThanOrEqual(t.x + t.width + 1);
+          const tryNow = tile.getByRole('button', { name: 'Try now' });
+          await expect(tryNow).toBeInViewport({ ratio: 1 });
+          const b = (await tryNow.boundingBox())!;
+          expect(b.y).toBeGreaterThanOrEqual(t.y - 1);
+          expect(b.y + b.height).toBeLessThanOrEqual(t.y + t.height + 1);
+          expect(b.height).toBeGreaterThanOrEqual(44);
+          // Nothing covers it: the topmost element at its centre is the button.
+          const top = await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.textContent?.trim(), [b.x + b.width / 2, b.y + b.height / 2]);
+          expect(top).toBe('Try now');
+        }
+      });
+
   test('on a phone the video stays in view after scrolling the list, live and playing', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(url());

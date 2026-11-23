@@ -311,6 +311,51 @@ describe('LiveTile focus and single mode', () => {
     expect(within(tile).getByText(/as of /)).toBeTruthy();
   });
 
+  it('grid: while not live the name sits in the state panel and no bottom bar covers Try now', async () => {
+    const f = fakeTile();
+    render(LiveTile, { cameraId: 'front', name: 'Front', client: new FakeClient(), zone: ZONE, makeTile: f.make, onFocus: () => {} });
+    await f.emit({ state: 'reconnecting', retryAt: Date.now() + 5000 });
+    const tile = screen.getByTestId('live-tile');
+    expect(tile.querySelector('.scrim')).toBeNull();
+    const panel = within(tile).getByRole('button', { name: 'Try now' }).parentElement!;
+    expect(within(panel).getByText('Front')).toBeTruthy();
+    // The picture fills the tile's box (letterboxed), not a free 16:9 height.
+    const video = tile.querySelector('video')!;
+    expect(video.className).toContain('h-full');
+    expect(video.className).toContain('object-contain');
+    expect(video.className).not.toContain('aspect-video');
+    await f.emit({ state: 'live' });
+    expect(tile.querySelector('.scrim')).not.toBeNull();
+  });
+
+  it('single: says Live now only while live', async () => {
+    const f = fakeTile();
+    render(LiveTile, { cameraId: 'front', client: new FakeClient(), zone: ZONE, makeTile: f.make, single: true });
+    const bar = () => screen.getByRole('group', { name: 'Live controls' });
+    for (const state of ['connecting', 'reconnecting', 'limit', 'locked', 'offline'] as const) {
+      await f.emit({ state });
+      expect(within(bar()).queryByText('Live now')).toBeNull();
+    }
+    await f.emit({ state: 'live' });
+    expect(within(bar()).getByText('Live now')).toBeTruthy();
+  });
+
+  it('single: an All cameras button in the bar goes back to every camera', async () => {
+    const f = fakeTile();
+    const onAll = vi.fn();
+    render(LiveTile, { cameraId: 'front', client: new FakeClient(), zone: ZONE, makeTile: f.make, single: true, onAll });
+    await f.emit({ state: 'reconnecting' });
+    await fireEvent.click(within(screen.getByRole('group', { name: 'Live controls' })).getByRole('button', { name: 'All cameras' }));
+    expect(onAll).toHaveBeenCalledOnce();
+  });
+
+  it('single: no All cameras button without onAll', async () => {
+    const f = fakeTile();
+    render(LiveTile, { cameraId: 'front', client: new FakeClient(), zone: ZONE, makeTile: f.make, single: true });
+    await f.emit({ state: 'live' });
+    expect(screen.queryByRole('button', { name: 'All cameras' })).toBeNull();
+  });
+
   it('single: no sound button without canUnmute', async () => {
     const f = fakeTile();
     render(LiveTile, { cameraId: 'front', client: new FakeClient(), zone: ZONE, makeTile: f.make, single: true });
@@ -378,8 +423,9 @@ describe('LiveTile focus and single mode', () => {
     }
   });
 
-  it('only the video wrapper is marked to fill the tile in fullscreen, not the scrim', () => {
+  it('only the video wrapper is marked to fill the tile in fullscreen, not the scrim', async () => {
     const tile = renderTile();
+    await goLive(tile);
     expect(tile.className).toContain('[&:fullscreen>[data-stage]]:h-full');
     expect(tile.querySelector('video')!.parentElement!.hasAttribute('data-stage')).toBe(true);
     expect(tile.querySelectorAll('[data-stage]')).toHaveLength(1);

@@ -109,7 +109,8 @@
   const filtered = $derived((data.cameras ?? []).filter((c) => !camera || c.id === camera));
   const available = $derived([...new Set([...data.rows.flatMap((r) => r.triggers), ...triggers])]);
   const triggersOf = (id: string) => data.rows.find((r) => r.id === id)?.triggers ?? [];
-  const laneHeight = $derived(env.phone ? (short ? 32 : 48) : 40);
+  // A phone in landscape is a short screen too.
+  const laneHeight = $derived(env.phone ? (short ? 32 : 48) : handheld ? 32 : 40);
 
   const heading = $derived(`${day === todayDay ? 'Today' : dayTitle(day, todayDay)} · ${data.rows.length} ${data.rows.length === 1 ? 'event' : 'events'}`);
   const summary = $derived.by(() => {
@@ -255,7 +256,14 @@
       <div data-testid="stage" class="relative min-h-0 min-w-0 overflow-hidden bg-black wide:col-start-1 wide:row-start-1">
         <!-- The grid unmounts while the player shows, which frees the viewer slots. -->
         {#if mode === 'live'}
-          <LiveGrid cameras={filtered} {client} {zone} {status} onFocus={(id) => (camera = id)} />
+          <LiveGrid
+            cameras={filtered}
+            {client}
+            {zone}
+            {status}
+            onFocus={(id) => (camera = id)}
+            onAll={camera && (data.cameras?.length ?? 0) > 1 ? () => (camera = '') : undefined}
+          />
         {:else if mode === 'recording'}
           <Player
             bind:this={playerView}

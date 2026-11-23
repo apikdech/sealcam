@@ -547,6 +547,17 @@ describe('filters', () => {
     expect(screen.getAllByTestId('live-tile')).toHaveLength(1);
     expect(screen.getByTestId('live-tile').dataset.camera).toBe('yard');
     await waitFor(() => expect(lastClips(c)).toMatchObject({ camera: 'yard' }));
+    // The live bar offers the way back.
+    await fireEvent.click(screen.getByRole('button', { name: 'All cameras' }));
+    await waitFor(() => expect(screen.getAllByTestId('live-tile')).toHaveLength(2));
+    expect(screen.getByRole('combobox', { name: 'Camera' })).toHaveValue('');
+  });
+
+  it('with one camera the live bar has no All cameras button', async () => {
+    mount(client());
+    await listRows();
+    expect(screen.getByTestId('live-tile')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'All cameras' })).toBeNull();
   });
 
   it('pressing Person reloads the day with that trigger and lists only person rows', async () => {

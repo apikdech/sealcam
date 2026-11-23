@@ -1,7 +1,7 @@
 // Test page for e2e/dashboard.spec.ts: the real Watch screen (or, with ?shell, the app) with a canned
 // API and a scripted player, so layout and keyboard handling run in a real
 // browser engine. The clock is fixed at 2026-11-06 15:00 UTC (22:00 in Jakarta).
-// `?long` gives the camera a long name; `?cams=2` adds a second camera.
+// `?long` gives the camera a long name; `?cams=2` adds a second camera, `?cams=4` three more.
 import { createRawSnippet, mount } from 'svelte';
 import '../../src/app.css';
 import App from '../../src/App.svelte';
@@ -14,6 +14,8 @@ const params = new URLSearchParams(location.search);
 const client = new DashClient();
 if (params.has('long')) client.cameras = [{ id: 'front-door', name: 'Front Door and the Path to the Garden Gate' }];
 if (params.get('cams') === '2') client.cameras = [...client.cameras, { id: 'garage', name: 'Garage' }];
+if (params.get('cams') === '4')
+  client.cameras = [...client.cameras, { id: 'garage', name: 'Garage' }, { id: 'garden', name: 'Garden' }, { id: 'side-gate', name: 'Side Gate' }];
 client.status = {
   schema: 'zrec.status/1',
   relay_id: 'r',
