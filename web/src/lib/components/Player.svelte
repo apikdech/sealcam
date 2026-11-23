@@ -12,6 +12,7 @@
   import Seal from '../seal/Seal.svelte';
   import type { SealState } from '../seal/rosette';
   import { formatClock } from '../timeline/timezone';
+  import { triggerStyle } from '../timeline/model';
 
   /** Where to play: a clip, and how far into it. A new object (`n`) seeks again even within the same clip. */
   export interface Target {
@@ -37,6 +38,8 @@
     onLive?: () => void;
     /** The phone bar: fewer buttons, the rest under a More menu. */
     compact?: boolean;
+    /** The trigger types of a clip, drawn as glyph chips in the Recording badge. */
+    triggersOf?: (clipId: string) => readonly string[];
     onPrev?: () => void;
     onNext?: () => void;
   }
@@ -52,6 +55,7 @@
     cameraName = (id: string) => id,
     onLive,
     compact = false,
+    triggersOf,
     onPrev,
     onNext,
   }: Props = $props();
@@ -281,6 +285,16 @@
         style={overVideo}
       >
         Recording · {cameraName(header.cameraId)} <span class="num">{formatClock(header.startUnixMs, zone, true)}</span>
+        {#each snap.clipId !== null && triggersOf ? triggersOf(snap.clipId) : [] as t (t)}
+          {@const st = triggerStyle(t)}
+          <span
+            role="img"
+            aria-label={st.label}
+            title={st.label}
+            style:background={st.color}
+            class="ml-1 inline-block min-w-5 rounded px-1 text-center text-xs font-bold text-on-trigger">{st.glyph}</span
+          >
+        {/each}
       </div>
     {/if}
     {#if onLive}

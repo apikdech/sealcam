@@ -464,6 +464,20 @@ describe('Player', () => {
       expect(screen.getByTestId('badge')).toHaveTextContent('Recording · Front door 11:17:12');
     });
 
+    it('the badge shows the glyph chips of the playing clip after the time', async () => {
+      await mount({ triggersOf: (id: string) => (id === ids.a ? ['person', 'vehicle'] : []) });
+      const badge = screen.getByTestId('badge');
+      const chips = within(badge).getAllByRole('img');
+      expect(chips.map((c) => c.getAttribute('aria-label'))).toEqual(['Person', 'Vehicle']);
+      expect(chips.map((c) => c.textContent)).toEqual(['P', 'V']);
+      expect(badge.textContent!.indexOf('11:17:12')).toBeLessThan(badge.textContent!.indexOf('P'));
+    });
+
+    it('the badge has no chips without triggersOf', async () => {
+      await mount();
+      expect(within(screen.getByTestId('badge')).queryAllByRole('img')).toHaveLength(0);
+    });
+
     it('updates the badge and the clock when auto-advance opens another clip', async () => {
       await mount();
       const v = screen.getByTestId('player');

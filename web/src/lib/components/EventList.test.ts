@@ -99,6 +99,18 @@ describe('EventList', () => {
     expect(onSelect).toHaveBeenCalledWith('id1');
   });
 
+  it('only the selected row carries the playing mark', () => {
+    render(EventList, { ...base, clips: [row(1), row(0)], selectedId: 'id0' });
+    const [a, b] = screen.getAllByRole('option');
+    expect(within(b!).getByText('playing')).toHaveClass('text-foil');
+    expect(within(a!).queryByText('playing')).toBeNull();
+  });
+
+  it('rows are 64 px on phones and 56 px from md', () => {
+    render(EventList, { ...base, clips: many(2) });
+    for (const r of screen.getAllByRole('option')) expect(r).toHaveClass('h-16', 'md:h-14');
+  });
+
   it('a row without integrity shows the unchecked seal', () => {
     render(EventList, { ...base, clips: [row(0)] });
     expect(screen.getByRole('option').querySelector('[data-seal-state="unchecked"]')).not.toBeNull();

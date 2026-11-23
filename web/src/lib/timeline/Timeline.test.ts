@@ -247,3 +247,38 @@ describe('Timeline theme change', () => {
     spy.mockRestore();
   });
 });
+
+describe('Timeline onNow', () => {
+  // jsdom lays the canvas at 0,0 and 1000 px wide: x maps straight onto the whole day.
+  const xOf = (ms: number) => ((ms - FROM) / (TO - FROM)) * 1000;
+  const click = async (x: number) => {
+    const canvas = screen.getByRole('application');
+    await fireEvent.pointerDown(canvas, { pointerId: 1, clientX: x, clientY: 30 });
+    await fireEvent.pointerUp(canvas, { pointerId: 1, clientX: x, clientY: 30 });
+  };
+
+  it('fires for a click after the now line and selects nothing', async () => {
+    const onNow = vi.fn();
+    const onSelect = vi.fn();
+    mount({ onNow, onSelect });
+    await click(xOf(NOW + HOUR));
+    expect(onNow).toHaveBeenCalledTimes(1);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('does not fire for a click before the now line', async () => {
+    const onNow = vi.fn();
+    const onSelect = vi.fn();
+    mount({ onNow, onSelect });
+    await click(xOf(NOW - 2 * HOUR));
+    expect(onNow).not.toHaveBeenCalled();
+    expect(onSelect).toHaveBeenCalledWith('b', expect.any(Number));
+  });
+
+  it('never fires on a past day', async () => {
+    const onNow = vi.fn();
+    mount({ onNow, nowMs: TO + 5 * HOUR });
+    await click(999);
+    expect(onNow).not.toHaveBeenCalled();
+  });
+});

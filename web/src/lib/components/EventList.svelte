@@ -93,11 +93,14 @@
         tabindex={i === stop ? 0 : -1}
         onclick={() => onSelect(c.id)}
         onkeydown={(e) => onKey(e, i, c.id)}
-        class="grid min-h-16 cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-3 border-t border-rule px-4 outline-offset-[-1px] outline-foil first:border-t-0 focus-visible:outline-2 {sel
+        class="grid h-16 cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-3 border-t border-rule px-4 outline-offset-[-1px] outline-foil first:border-t-0 focus-visible:outline-2 md:h-14 {sel
           ? 'bg-plate outline outline-1'
           : 'hover:bg-plate'}"
       >
-        <span class="num text-[20px] font-semibold text-ink">{formatClock(c.startMs, zone)}</span>
+        <span class="flex flex-col leading-tight">
+          <span class="num text-[20px] font-semibold text-ink">{formatClock(c.startMs, zone)}</span>
+          {#if sel}<span class="text-[11px] text-foil">playing</span>{/if}
+        </span>
         <span class="flex min-w-0 items-center gap-1.5 text-sm text-muted">
           {#each c.triggers as t (t)}
             {@const st = triggerStyle(t)}

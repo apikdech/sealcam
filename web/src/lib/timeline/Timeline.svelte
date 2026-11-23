@@ -41,6 +41,8 @@
     /** Called with the view span (ms) whenever it changes, for a span readout. */
     onSpan?: (spanMs: number) => void;
     onSelect: (clipId: string, offsetMs: number) => void;
+    /** A click at or after the now line (only possible on today). */
+    onNow?: () => void;
     /** Reports the CPU cost (ms) of each drawn frame. */
     onFrame?: (ms: number) => void;
   }
@@ -50,6 +52,7 @@
     laneHeight = LANE_HEIGHT,
     onSpan,
     onSelect,
+    onNow,
     onFrame,
   }: Props = $props();
 
@@ -258,7 +261,8 @@
     if (pointers.size === 0 && dragMoved <= 4) {
       const p = local(e);
       const hit = hitTest(layout, p.x, p.y);
-      if (hit) {
+      if (onNow && xToTime(view, cssWidth, p.x) >= currentNow()) onNow();
+      else if (hit) {
         selectedId = hit.clipId;
         sched?.invalidate();
         onSelect(hit.clipId, hit.offsetMs);
