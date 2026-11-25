@@ -32,7 +32,7 @@
 ### 1.2 Non-goals (v2)
 
 * Continuous recording.
-* Audio.
+* Audio transcoding. Amended: clips MAY record G.711 audio as received when the camera sets `record_audio` (see `docs/superpowers/specs/2026-11-23-clip-audio-design.md`).
 * Live view.
 * Transcoding.
 * Multiple relays writing to the same root.
