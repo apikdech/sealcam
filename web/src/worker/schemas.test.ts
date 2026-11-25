@@ -116,6 +116,23 @@ describe('parseSidecar', () => {
   });
 });
 
+describe('sidecar audio', () => {
+  it('parses a sidecar without audio as audio null', () => {
+    expect(parseSidecar(good()).audio).toBeNull();
+  });
+
+  it('parses the PCMA audio object', () => {
+    const audio = { codec: 'PCMA', sample_rate: 8000, channels: 1 };
+    expect(parseSidecar({ ...good(), audio }).audio).toEqual(audio);
+  });
+
+  it('rejects audio with codec opus', () => {
+    const audio = { codec: 'opus', sample_rate: 8000, channels: 1 };
+    expect(() => parseSidecar({ ...good(), audio })).toThrow(SchemaError);
+    expect(parseClipList([{ ...good(), audio }])).toEqual({ clips: [], invalid: 1 });
+  });
+});
+
 describe('list, cameras, status, coverage', () => {
   it('counts invalid clip summaries instead of serving them', () => {
     const { seek_index: _drop, ...video } = good().video as Record<string, unknown>;
