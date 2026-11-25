@@ -22,6 +22,7 @@ const manifest = JSON.parse(readFileSync(join(clipsDir, 'manifest.json'), 'utf8'
   tamper: { clip_id: string };
   incomplete: { clip_id: string };
   tamper_fail_at_ms: number;
+  audio: { clip_id: string; start_time: string };
 };
 // k_api_sha256 of the Contract §4.5 vector key, which the fixtures are sealed with.
 const vectors = JSON.parse(readFileSync(join(repoRoot, 'testdata', 'zrec', 'v1', 'vectors.json'), 'utf8')) as {
@@ -31,7 +32,7 @@ const vectors = JSON.parse(readFileSync(join(repoRoot, 'testdata', 'zrec', 'v1',
 test.describe.configure({ mode: 'serial' });
 
 let dir: string;
-const origins: Record<'complete' | 'tamper' | 'incomplete', string> = { complete: '', tamper: '', incomplete: '' };
+const origins: Record<'complete' | 'tamper' | 'incomplete' | 'audio', string> = { complete: '', tamper: '', incomplete: '', audio: '' };
 const children: ChildProcess[] = [];
 
 function goBuild(out: string, pkg: string) {
@@ -67,7 +68,7 @@ test.beforeAll(async () => {
   await build({ configFile: webRoot + 'vite.config.ts', root: webRoot, logLevel: 'warn', build: { outDir: app, emptyOutDir: true } });
   goBuild(join(dir, 'zview-server'), './cmd/zview-server');
 
-  for (const variant of ['complete', 'tamper', 'incomplete'] as const) {
+  for (const variant of ['complete', 'tamper', 'incomplete', 'audio'] as const) {
     const store = join(dir, 'store-' + variant);
     mkdirSync(store);
     cpSync(join(clipsDir, variant), store, { recursive: true });
@@ -243,4 +244,30 @@ test('without MSE the Blob fallback plays and seeks the complete clip', async ({
   await page.getByTestId('seek-input').fill('20');
   await page.getByTestId('seek-go').click();
   await expect.poll(() => currentTime(page), { timeout: 2000, intervals: [50] }).toBeGreaterThanOrEqual(20);
+});
+
+test('plays the audio clip with sound available', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => {
+    // The live grid shows briefly before the clip opens; this spec's relay upstream is a dead port, so /live/ answers 502.
+    if (m.type() === 'error' && !new URL(m.location().url || 'http://x/').pathname.startsWith('/live/')) errors.push(m.text() + ' @ ' + m.location().url);
+  });
+  // The Watch screen opens on today; pin the page clock to the day the fixture was recorded.
+  await page.clock.setFixedTime(new Date(manifest.audio.start_time).getTime() + 60_000);
+  await page.goto(`${origins.audio}/#/key`);
+  await page.getByLabel('Family key').fill(manifest.master_key);
+  await page.getByRole('button', { name: 'Add key' }).click();
+  await expect(page.getByLabel('Family key')).toHaveValue('');
+  await page.evaluate(() => {
+    location.hash = '#/';
+  });
+  await page.getByRole('option').first().click();
+
+  await expect.poll(() => currentTime(page), { timeout: 30_000 }).toBeGreaterThan(3);
+  const on = page.getByRole('button', { name: 'Turn sound on' });
+  await expect(on).toBeVisible();
+  await on.click();
+  await expect(page.getByRole('button', { name: 'Turn sound off' })).toBeVisible();
+  expect(errors).toEqual([]);
 });

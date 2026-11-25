@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ClipReadResult, Request } from '../worker/protocol';
+import { loadFixtureClip } from '../../test-support/clip-fixtures';
 import {
   canExport,
   exportClip,
@@ -289,5 +290,20 @@ describe('exportClip', () => {
     await exportClip({ ...base, client, env: env() });
     const reads = client.calls.filter((c): c is Extract<Request, { type: 'clip.read' }> => c.type === 'clip.read');
     expect(reads.map((r) => r.chunk)).toEqual([0, 1, 2]);
+  });
+});
+
+describe('exportClip with audio', () => {
+  it('writes the decrypted bytes unchanged, audio track included', async () => {
+    const fx = await loadFixtureClip('audio');
+    const parts: Uint8Array[] = [];
+    for (let i = 0; i < fx.open.numChunks; i++) parts.push(new Uint8Array(await fx.read(i)));
+    const client = new FakeClient(parts);
+    const e = env();
+    await exportClip({ ...base, client, env: e, blobMax: Number.MAX_SAFE_INTEGER });
+    expect(e.downloads).toHaveLength(1);
+    const out = new Uint8Array(await e.downloads[0]!.blob.arrayBuffer());
+    expect(out).toEqual(await fx.plain());
+    expect(new TextDecoder('latin1').decode(out)).toContain('alaw');
   });
 });
