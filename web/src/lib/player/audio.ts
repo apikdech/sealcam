@@ -125,10 +125,13 @@ export class ClipAudio {
 
   private scheduleRun(r: Run): void {
     const ctx = this.ctx;
-    if (!ctx || r.end <= this.videoTime0) return;
-    const ahead = r.start - this.videoTime0;
-    const when = this.ctxTime0 + Math.max(ahead, 0);
-    const offset = Math.max(-ahead, 0);
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const vNow = this.videoTime0 + (now - this.ctxTime0);
+    if (r.end <= vNow) return;
+    const ideal = this.ctxTime0 + (r.start - this.videoTime0);
+    const when = Math.max(ideal, now);
+    const offset = Math.max(vNow - r.start, 0);
     if (!r.buffer) {
       r.buffer = ctx.createBuffer(1, r.samples.length, SAMPLE_RATE);
       r.buffer.copyToChannel(r.samples as Float32Array<ArrayBuffer>, 0);

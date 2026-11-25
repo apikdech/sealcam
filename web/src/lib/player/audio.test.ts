@@ -187,6 +187,27 @@ describe('ClipAudio', () => {
     expect(live(ctx)[0]!.when).toBeCloseTo(ctx.currentTime + 1, 9);
   });
 
+  it('starts a late-added run at now with the elapsed offset', () => {
+    const { v, ctx, a } = setup();
+    v.paused = false;
+    a.setEnabled(true);
+    ctx.currentTime += 0.2;
+    a.add(run(0));
+    expect(live(ctx)).toHaveLength(1);
+    expect(live(ctx)[0]!.when).toBeCloseTo(ctx.currentTime, 9);
+    expect(live(ctx)[0]!.offset).toBeCloseTo(0.2, 9);
+  });
+
+  it('skips a run that already ended at the current position', () => {
+    const { v, ctx, a } = setup();
+    v.paused = false;
+    v.currentTime = 0;
+    a.setEnabled(true);
+    ctx.currentTime += 1.5;
+    a.add(run(0)); // 0..1, ends before vNow = 1.5
+    expect(ctx.starts).toHaveLength(0);
+  });
+
   it('evictBefore drops old runs', () => {
     const { v, ctx, a } = setup();
     a.add(run(0)); // 0..1
