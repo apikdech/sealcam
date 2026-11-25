@@ -126,10 +126,21 @@ describe('sidecar audio', () => {
     expect(parseSidecar({ ...good(), audio }).audio).toEqual(audio);
   });
 
-  it('rejects audio with codec opus', () => {
-    const audio = { codec: 'opus', sample_rate: 8000, channels: 1 };
-    expect(() => parseSidecar({ ...good(), audio })).toThrow(SchemaError);
-    expect(parseClipList([{ ...good(), audio }])).toEqual({ clips: [], invalid: 1 });
+  it('treats an invalid or future audio hint as absent', () => {
+    for (const audio of [
+      { codec: 'opus', sample_rate: 8000, channels: 1 },
+      { codec: 'PCMA', sample_rate: 16000, channels: 1 },
+      { codec: 'PCMU', sample_rate: 8000, channels: 2 },
+      { codec: 'PCMA', sample_rate: '8000', channels: 1 },
+      'pcma',
+      7,
+    ]) {
+      expect(parseSidecar({ ...good(), audio }).audio).toBeNull();
+      const { clips, invalid } = parseClipList([{ ...good(), audio }]);
+      expect(invalid).toBe(0);
+      expect(clips).toHaveLength(1);
+      expect(clips[0]!.audio).toBeNull();
+    }
   });
 });
 

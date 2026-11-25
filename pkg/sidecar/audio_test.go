@@ -49,7 +49,8 @@ func TestAudioValid(t *testing.T) {
 	}
 }
 
-func TestAudioInvalid(t *testing.T) {
+// The writer side never emits an invalid audio hint: Validate still checks it.
+func TestAudioInvalidFailsWriterValidate(t *testing.T) {
 	cases := map[string]Audio{
 		"audio.codec":       {Codec: "opus", SampleRate: 8000, Channels: 1},
 		"audio.sample_rate": {Codec: "PCMA", SampleRate: 16000, Channels: 1},
@@ -62,6 +63,36 @@ func TestAudioInvalid(t *testing.T) {
 			var fe *FieldError
 			if err := sc.Validate(); !errors.As(err, &fe) || fe.Field != field {
 				t.Fatalf("err = %v, want field error on %s", err, field)
+			}
+		})
+	}
+}
+
+// Readers treat an invalid or future audio hint as absent (Contract §6.2).
+func TestDecodeInvalidAudioIsAbsent(t *testing.T) {
+	base, err := json.Marshal(validFixture(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, audio := range map[string]string{
+		"codec":       `{"codec":"opus","sample_rate":8000,"channels":1}`,
+		"sample_rate": `{"codec":"PCMA","sample_rate":16000,"channels":1}`,
+		"channels":    `{"codec":"PCMU","sample_rate":8000,"channels":2}`,
+		"wrong type":  `{"codec":"PCMA","sample_rate":"8000","channels":1}`,
+		"string":      `"pcma"`,
+		"number":      `7`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			b := append(append([]byte{}, base[:len(base)-1]...), []byte(`,"audio":`+audio+`}`)...)
+			sc, err := Decode(b)
+			if err != nil {
+				t.Fatalf("Decode: %v", err)
+			}
+			if sc.Audio != nil {
+				t.Errorf("audio = %+v, want nil", sc.Audio)
+			}
+			if err := sc.Validate(); err != nil {
+				t.Errorf("Validate: %v", err)
 			}
 		})
 	}

@@ -329,7 +329,7 @@ The last two are the non-obvious ones. Trailing bytes that do **not** form whole
 * **H.264:** `avc1` sample entry, parameter sets in `avcC`.
 * **H.265:** `hvc1` sample entry with parameter sets in `hvcC` (Safari requires `hvc1`, not `hev1`).
 * Audio is off by default (D10). When a camera opts in, the clip adds track 2: `alaw` (PCMA) or `ulaw` (PCMU), 8 000 Hz, mono, timescale 8 000, stored as received. Audio goes in audio-only fragments after each video fragment. Fragments never mix tracks. `video.seek_index` lists video fragments only. Details: `docs/superpowers/specs/2026-11-23-clip-audio-design.md`.
-* A change in SPS/PPS/VPS mid-stream MUST end the clip and start a new segment (§6.4, `end_reason: codec_change`).
+* A change in SPS/PPS/VPS mid-stream, or a change of the audio codec (PCMA↔PCMU), MUST end the clip and start a new segment (§6.4, `end_reason: codec_change`).
 * The RFC 6381 codec string (e.g. `avc1.640032`) MUST be recorded in the sidecar so viewers can call `MediaSource.isTypeSupported`.
 
 ---
@@ -407,7 +407,7 @@ The last two are the non-obvious ones. Trailing bytes that do **not** form whole
 | `video.codec` | string | ✔ | RFC 6381. |
 | `video.init_segment_bytes` | int | ✔ | Plaintext length of `ftyp` + `moov`. |
 | `video.seek_index` | `[[t_ms, plaintext_offset], …]` | ✔ if complete | One entry per fragment. `t_ms` is the fragment's media time; the offset points at its `moof`. |
-| `audio` | object | — | Absent when the clip has no audio. Else `{"codec":"PCMA"\|"PCMU","sample_rate":8000,"channels":1}`. The schema stays `zrec.sidecar/2`. |
+| `audio` | object | — | Absent when the clip has no audio. Else `{"codec":"PCMA"\|"PCMU","sample_rate":8000,"channels":1}`. UI hint only; not authenticated; readers treat a missing, null or invalid value as no audio; zview trusts the init segment. The schema stays `zrec.sidecar/2`. |
 | `recorder.time_source` | enum | ✔ | `rtcp` (RTCP sender report NTP mapping) or `arrival` (host receive time). |
 
 ### 6.3 Compatibility rules

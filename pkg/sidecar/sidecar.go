@@ -152,8 +152,9 @@ type Recorder struct {
 }
 
 // Decode parses a sidecar. It rejects any schema other than
-// zrec.sidecar/2 with ErrUnknownSchema and ignores unknown fields. It does
-// not validate the content; call Validate.
+// zrec.sidecar/2 with ErrUnknownSchema and ignores unknown fields. An
+// invalid audio hint decodes as nil. It does not validate the content;
+// call Validate.
 func Decode(b []byte) (*Sidecar, error) {
 	var head struct {
 		Schema string `json:"schema"`
@@ -164,12 +165,25 @@ func Decode(b []byte) (*Sidecar, error) {
 	if err := checkSchema(head.Schema); err != nil {
 		return nil, err
 	}
+	// audio is a UI hint: a missing, null or invalid value reads as no audio
+	// (Contract §6.2), so it is decoded apart from the rest.
 	var sc Sidecar
-	if err := json.Unmarshal(b, &sc); err != nil {
+	wire := struct {
+		*plainSidecar
+		Audio json.RawMessage `json:"audio"`
+	}{plainSidecar: (*plainSidecar)(&sc)}
+	if err := json.Unmarshal(b, &wire); err != nil {
 		return nil, fmt.Errorf("sidecar: decode: %w", err)
+	}
+	var a Audio
+	if json.Unmarshal(wire.Audio, &a) == nil && a.validate() == nil {
+		sc.Audio = &a
 	}
 	return &sc, nil
 }
+
+// plainSidecar drops Sidecar's methods so Decode can shadow its audio field.
+type plainSidecar Sidecar
 
 func checkSchema(s string) error {
 	major, ok := strings.CutPrefix(s, schemaPrefix)

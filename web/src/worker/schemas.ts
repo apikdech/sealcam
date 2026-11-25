@@ -102,9 +102,13 @@ const sidecarObject = v.object({
     version: capped,
     time_source: v.picklist(['rtcp', 'arrival']),
   }),
-  audio: v.optional(
-    v.nullable(
-      v.object({ codec: v.picklist(['PCMA', 'PCMU']), sample_rate: v.literal(8000), channels: v.literal(1) }),
+  // A UI hint only (Contract §6.2): a missing, null or invalid value reads as no audio.
+  audio: v.fallback(
+    v.optional(
+      v.nullable(
+        v.object({ codec: v.picklist(['PCMA', 'PCMU']), sample_rate: v.literal(8000), channels: v.literal(1) }),
+      ),
+      null,
     ),
     null,
   ),
