@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/bluenviron/mediacommon/v2/pkg/formats/fmp4"
-
 	"github.com/apikdech/zrelay-v2/internal/relay/camera"
 )
 
@@ -79,7 +77,7 @@ func audioTrak(entry string) []byte {
 
 // audioTrex builds the track 2 defaults box.
 func audioTrex() []byte {
-	return mkBox("trex", u32s(0, audioTrackID, 1, 0, 0, 0))
+	return mkBox("trex", u32s(0, audioTrackID, 1, 1, 1, 0))
 }
 
 // withAudioTrack adds track 2 to a video-only init segment (ftyp+moov): the
@@ -132,6 +130,17 @@ func withAudioTrack(init []byte, codec string) ([]byte, error) {
 	return out, nil
 }
 
+// audioMoof builds the moof for one audio fragment of n samples. Every sample
+// is one byte, one tick long and a sync sample, so tfhd carries the defaults
+// and trun holds only the sample count and data offset.
+func audioMoof(seq uint32, base uint64, n int) []byte {
+	const moofLen = 96
+	tfhd := mkBox("tfhd", u32s(0x00020000|0x08|0x10, audioTrackID, 1, 1))
+	tfdt := mkBox("tfdt", u32s(1<<24, uint32(base>>32), uint32(base)))
+	trun := mkBox("trun", u32s(0x1, uint32(n), moofLen+8))
+	return mkBox("moof", mkBox("mfhd", u32s(0, seq)), mkBox("traf", tfhd, tfdt, trun))
+}
+
 // ticks converts a wall time to 8 kHz samples since the clip start, rounded.
 func (m *Muxer) ticks(t time.Time) int64 {
 	d := t.Sub(m.origin)
@@ -156,25 +165,14 @@ func (m *Muxer) writeAudio(pkts []*camera.AudioPacket) error {
 		for _, p := range cur {
 			n += len(p.Payload)
 		}
-		backing := make([]fmp4.Sample, n)
-		samples := make([]*fmp4.Sample, n)
-		i := 0
+		m.seq++
+		moof := audioMoof(m.seq, uint64(base), n)
+		m.buf.Write(moof)
+		m.buf.Write(u32s(uint32(8+n), 0x6d646174)) // mdat
 		for _, p := range cur {
-			for j := range p.Payload {
-				backing[i] = fmp4.Sample{Duration: 1, Payload: p.Payload[j : j+1]}
-				samples[i] = &backing[i]
-				i++
-			}
+			m.buf.Write(p.Payload)
 		}
 		cur = cur[:0]
-		m.seq++
-		part := fmp4.Part{
-			SequenceNumber: m.seq,
-			Tracks:         []*fmp4.PartTrack{{ID: audioTrackID, BaseTime: uint64(base), Samples: samples}},
-		}
-		if err := part.Marshal(&m.buf); err != nil {
-			return fmt.Errorf("mux: marshal audio fragment: %w", err)
-		}
 		if _, err := m.flush(); err != nil {
 			return fmt.Errorf("mux: write audio fragment: %w", err)
 		}

@@ -114,6 +114,10 @@ func TestInitHasAlawTrack(t *testing.T) {
 				t.Fatalf("trex = %x", trex)
 			}
 		}
+		trex2 := find(moov, "trex")[1]
+		if binary.BigEndian.Uint32(trex2[12:]) != 1 || binary.BigEndian.Uint32(trex2[16:]) != 1 {
+			t.Fatalf("audio trex default duration/size = %x, want 1/1", trex2[12:20])
+		}
 	}
 }
 
@@ -140,7 +144,10 @@ type frag struct {
 	base    uint64
 	samples int
 	durs    map[uint32]bool
+	sizes   map[uint32]bool
 	mdatLen int
+	moofLen int
+	mdat    []byte
 }
 
 // fragments parses the top-level moof+mdat pairs after the init segment.
@@ -159,9 +166,27 @@ func fragments(t *testing.T, b []byte) []frag {
 		if n := len(find(moof, "traf")); n != 1 {
 			t.Fatalf("moof has %d trafs", n)
 		}
-		f := frag{mdatLen: top[i+1].end - top[i+1].start - 8, durs: map[uint32]bool{}}
+		f := frag{mdatLen: top[i+1].end - top[i+1].start - 8, durs: map[uint32]bool{}, sizes: map[uint32]bool{},
+			moofLen: top[i].end - top[i].start, mdat: b[top[i+1].start+8 : top[i+1].end]}
 		f.seq = binary.BigEndian.Uint32(find(moof, "mfhd")[0][4:])
-		f.track = binary.BigEndian.Uint32(find(moof, "tfhd")[0][4:])
+		tfhd := find(moof, "tfhd")[0]
+		f.track = binary.BigEndian.Uint32(tfhd[4:])
+		tfFlags := binary.BigEndian.Uint32(tfhd) & 0xffffff
+		var defDur, defSize uint32
+		tp := 8
+		if tfFlags&1 != 0 {
+			tp += 8
+		}
+		if tfFlags&2 != 0 {
+			tp += 4
+		}
+		if tfFlags&8 != 0 {
+			defDur = binary.BigEndian.Uint32(tfhd[tp:])
+			tp += 4
+		}
+		if tfFlags&0x10 != 0 {
+			defSize = binary.BigEndian.Uint32(tfhd[tp:])
+		}
 		tfdt := find(moof, "tfdt")[0]
 		if tfdt[0] != 1 {
 			t.Fatalf("tfdt version %d", tfdt[0])
@@ -181,9 +206,14 @@ func fragments(t *testing.T, b []byte) []frag {
 			if flags&0x100 != 0 {
 				f.durs[binary.BigEndian.Uint32(trun[pos:])] = true
 				pos += 4
+			} else {
+				f.durs[defDur] = true
 			}
 			if flags&0x200 != 0 {
+				f.sizes[binary.BigEndian.Uint32(trun[pos:])] = true
 				pos += 4
+			} else {
+				f.sizes[defSize] = true
 			}
 			if flags&0x400 != 0 {
 				pos += 4
@@ -245,6 +275,16 @@ func TestAudioFragmentsFollowVideo(t *testing.T) {
 	}
 	if fs[1].samples != 800 || fs[1].mdatLen != 800 || len(fs[1].durs) != 1 || !fs[1].durs[1] {
 		t.Fatalf("audio fragment = %+v", fs[1])
+	}
+	if fs[1].moofLen >= 200 || len(fs[1].sizes) != 1 || !fs[1].sizes[1] {
+		t.Fatalf("audio moof is %d B, sizes %v; want < 200 B and size 1 per sample", fs[1].moofLen, fs[1].sizes)
+	}
+	var want []byte
+	for _, p := range g.Audio {
+		want = append(want, p.Payload...)
+	}
+	if !bytes.Equal(fs[1].mdat, want) {
+		t.Fatal("audio mdat is not the packet payloads in order")
 	}
 	if fs[0].seq != 1 || fs[1].seq != 2 {
 		t.Fatalf("sequence numbers %d,%d, want 1,2", fs[0].seq, fs[1].seq)
