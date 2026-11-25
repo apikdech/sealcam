@@ -3,6 +3,7 @@
   import { browserExportEnv, canExport, ExportTooLargeError, exportClip, exportFilename, type ExportEnv } from '../export';
   import { BLOB_MAX, detectProfile, type Profile } from '../player/buffer';
   import { createPlayer, type Player, type PlayerState } from '../player/engine';
+  import { loadSoundPref, saveSoundPref } from '../player/soundPref';
   import { describeIntegrity, initialState } from '../player/status';
   import type { WorkerClient } from '../workerClient';
   import ExportDialog from './ExportDialog.svelte';
@@ -103,6 +104,8 @@
   }
 
   let player: Player | undefined = $state();
+  /** Sound is off until the viewer turns it on; the choice is kept for the page session and across clips. */
+  let soundOn = $state(loadSoundPref());
   let snap: PlayerState = $state(initialState());
   /** The browser's duration once known, else the clip's recorded length, else 0. */
   const duration = $derived(
@@ -129,6 +132,8 @@
       if (s.clipId !== null) current = s.clipId;
       onState?.(s);
     });
+    // A context started outside a click would stay suspended, so only an earlier "on" is applied.
+    if (soundOn) p.setSound(true);
     player = p;
     return () => {
       clearTimeout(savedTimer);
@@ -195,6 +200,13 @@
   );
 
   let moreOpen = $state(false);
+  /** Called straight from the click: the engine starts its AudioContext inside this gesture. */
+  function toggleSound(): void {
+    const next = !soundOn;
+    player?.setSound(next);
+    soundOn = next;
+    saveSoundPref(next);
+  }
   const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 
   const icon =
@@ -397,6 +409,17 @@
       {#if compact}<span>Export</span>{/if}
     </button>
   {/snippet}
+  {#snippet soundButton()}
+    {#if snap.hasAudio}
+      <button
+        type="button"
+        class={icon}
+        aria-label={soundOn ? 'Turn sound off' : 'Turn sound on'}
+        title={soundOn ? 'Turn sound off' : 'Turn sound on'}
+        onclick={toggleSound}><Icon name={soundOn ? 'sound-on' : 'sound-off'} /></button
+      >
+    {/if}
+  {/snippet}
   {#snippet speedChoices()}
     <div role="group" aria-label="Playback speed" class="flex {compact ? 'flex-wrap' : 'flex-col'} gap-1">
       {#each SPEEDS as s (s)}
@@ -465,9 +488,12 @@
           </div>
         {/if}
       </div>
+      {@render soundButton()}
       {@render autoplay()}
       {@render integrityRow()}
       {@render exportButton()}
+    {:else}
+      {@render soundButton()}
     {/if}
     {#if fsMode !== 'none'}
       <button

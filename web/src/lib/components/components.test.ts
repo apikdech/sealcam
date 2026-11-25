@@ -3,11 +3,13 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakePlayer, fakePlayerFactory, ids } from '../../../test-support/dashboard-fakes';
 import type { PlayerState } from '../player/engine';
+import { saveSoundPref } from '../player/soundPref';
 import { initialState } from '../player/status';
 import ExportDialog from './ExportDialog.svelte';
 import Player from './Player.svelte';
 
 beforeEach(() => {
+  saveSoundPref(false);
   FakePlayer.instances = [];
   FakePlayer.nextIntegrity = 'verified';
   HTMLMediaElement.prototype.play = () => Promise.resolve();
@@ -698,6 +700,55 @@ describe('Player', () => {
     FakePlayer.instances[0]!.emit({ ...initialState(), clipId: ids.a, integrity: 'unknown-key', keyId: 'a1b2-c3d4-e5f6-0718' });
     const link = await screen.findByRole('link', { name: 'Open Keys' });
     expect(link).toHaveAttribute('href', '#/key');
+  });
+
+  describe('sound button', () => {
+    const mountWith = async (hasAudio: boolean, over: Record<string, unknown> = {}) => {
+      render(Player, props(over));
+      await waitFor(() => expect(FakePlayer.instances).toHaveLength(1));
+      const fp = FakePlayer.instances[0]!;
+      fp.emit({ ...initialState(), clipId: ids.a, integrity: 'verified', hasAudio });
+      return fp;
+    };
+
+    it('no sound button for a clip without audio', async () => {
+      await mountWith(false);
+      expect(screen.queryByRole('button', { name: /Turn sound/ })).toBeNull();
+    });
+
+    it('the sound button shows for a clip with audio, labelled Turn sound on', async () => {
+      await mountWith(true);
+      expect(await screen.findByRole('button', { name: 'Turn sound on' })).toBeInTheDocument();
+    });
+
+    it('clicking it calls setSound(true) and relabels Turn sound off', async () => {
+      const fp = await mountWith(true);
+      await fireEvent.click(await screen.findByRole('button', { name: 'Turn sound on' }));
+      expect(fp.sounds).toEqual([true]);
+      expect(screen.getByRole('button', { name: 'Turn sound off' })).toBeInTheDocument();
+      await fireEvent.click(screen.getByRole('button', { name: 'Turn sound off' }));
+      expect(fp.sounds).toEqual([true, false]);
+    });
+
+    it('the choice carries to the next clip', async () => {
+      const fp = await mountWith(true);
+      await fireEvent.click(await screen.findByRole('button', { name: 'Turn sound on' }));
+      fp.emit({ ...initialState(), clipId: ids.b, integrity: 'verified', hasAudio: false });
+      fp.emit({ ...initialState(), clipId: ids.c, integrity: 'verified', hasAudio: true });
+      expect(await screen.findByRole('button', { name: 'Turn sound off' })).toBeInTheDocument();
+    });
+
+    it('a new player starts with sound on when the session chose it', async () => {
+      saveSoundPref(true);
+      const fp = await mountWith(true);
+      expect(fp.sounds).toEqual([true]);
+      expect(await screen.findByRole('button', { name: 'Turn sound off' })).toBeInTheDocument();
+    });
+
+    it('the compact bar has it too', async () => {
+      await mountWith(true, { compact: true });
+      expect(await screen.findByRole('button', { name: 'Turn sound on' })).toBeInTheDocument();
+    });
   });
 
   describe('transport', () => {

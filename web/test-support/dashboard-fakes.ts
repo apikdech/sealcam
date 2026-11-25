@@ -43,7 +43,10 @@ export class FakePlayer implements Player {
   setAutoAdvance(on: boolean) {
     this.autoAdvance = on;
   }
-  setSound() {}
+  sounds: boolean[] = [];
+  setSound(on: boolean) {
+    this.sounds.push(on);
+  }
   destroy() {
     this.destroyed = true;
   }
