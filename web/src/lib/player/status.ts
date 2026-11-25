@@ -13,6 +13,7 @@ export function initialState(): PlayerState {
     header: null,
     keyId: null,
     message: null,
+    hasAudio: false,
   };
 }
 

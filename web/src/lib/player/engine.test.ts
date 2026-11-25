@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrAuth, ErrAuthHeader, ErrTrailingData, ErrTruncated, ErrUnknownKey } from '../zrec/errors';
 import {
   CHUNK,
@@ -16,6 +16,18 @@ import {
 } from '../../../test-support/player-fakes';
 import { createPlayer, type Player, type PlayerState } from './engine';
 import type { WorkerClient } from '../workerClient';
+
+// These tests feed synthetic chunks (bytes that are not an MP4), so the audio filter passes them through;
+// engine.audio.test.ts covers the real filter against real clips.
+vi.mock('./fmp4filter', () => ({
+  Fmp4Filter: class {
+    audio = null;
+    push(b: Uint8Array) {
+      return [b];
+    }
+    reset() {}
+  },
+}));
 
 let env: Env;
 beforeEach(() => {

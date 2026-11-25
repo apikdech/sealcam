@@ -7,7 +7,9 @@ import { ErrAuth, ErrAuthHeader, ErrFormat, ErrTrailingData, ErrTruncated, ErrUn
 import type { WorkerClient } from '../workerClient';
 import { findNextClip } from './advance';
 import { BLOB_LRU, BLOB_MAX, WINDOWS, alignToFragments, failureTimeMs, feedsRange, fragmentComplete, isBuffered, needsMore, planEviction, planResume, planSeek, playheadSettled, type Profile } from './buffer';
+import { ClipAudio } from './audio';
 import { BlobLru, blobFromParts } from './blob';
+import { Fmp4Filter, type AudioRun, type AudioTrackInfo } from './fmp4filter';
 import { mseCtor, mseSupports, openSink, type MseKind, type Sink } from './mse';
 import { initialState } from './status';
 
@@ -28,6 +30,8 @@ export interface PlayerState {
   keyId: string | null;
   /** A user-visible problem that is not an integrity state (unsupported codec, too large, network). */
   message: string | null;
+  /** The clip has a G.711 audio track (played by ClipAudio, never by the <video>). */
+  hasAudio: boolean;
 }
 
 export interface Player {
@@ -39,12 +43,16 @@ export interface Player {
   onState(cb: (s: PlayerState) => void): () => void;
   /** When on, a finished clip is followed by the next of its series, then of its camera. */
   setAutoAdvance(on: boolean): void;
+  /** Turns the clip's audio on or off; the choice carries over to the next clip. */
+  setSound(on: boolean): void;
   destroy(): void;
 }
 
 interface BlobEntry {
   url: string;
   outcome: { integrity: 'tampered' | 'incomplete'; failedAtMs: number | null } | null;
+  /** The clip's audio, replayed into ClipAudio on a cache hit. */
+  audio: { track: AudioTrackInfo; runs: AudioRun[] } | null;
 }
 
 const isQuota = (e: unknown): boolean => e instanceof DOMException && e.name === 'QuotaExceededError';
@@ -88,6 +96,12 @@ class PlayerImpl implements Player {
    */
   #fillAt: { gen: number; offset: number } | null = null;
   #autoAdvance = false;
+  #sound = false;
+  /** Per loaded clip: strips the audio track from the stream, and plays it. */
+  #filter: Fmp4Filter | null = null;
+  #audio: ClipAudio | null = null;
+  /** True once the filter has seen the clip's moov and the audio track (if any) is announced. */
+  #trackSet = false;
   #destroyed = false;
   readonly #win;
   readonly #blobs: BlobLru<BlobEntry>;
@@ -157,6 +171,11 @@ class PlayerImpl implements Player {
     this.#autoAdvance = on;
   }
 
+  setSound(on: boolean): void {
+    this.#sound = on;
+    this.#audio?.setEnabled(on);
+  }
+
   // ---- load ----------------------------------------------------------------
 
   async load(clipId: string): Promise<IntegrityState> {
@@ -164,6 +183,14 @@ class PlayerImpl implements Player {
     const g = this.#gen;
     this.#clipId = clipId;
     this.#set({ ...initialState(), clipId });
+    const audio = new ClipAudio(this.video);
+    if (this.#sound) audio.setEnabled(true);
+    this.#audio = audio;
+    // Audio runs only count while this clip's filter is the current one (a stale fill never reaches it anyway).
+    const filter: Fmp4Filter = new Fmp4Filter((run) => {
+      if (this.#filter === filter) audio.add(run);
+    });
+    this.#filter = filter;
 
     let open: ClipOpenResult;
     try {
@@ -323,7 +350,11 @@ class PlayerImpl implements Player {
         if (c + 1 < open.numChunks && !pending.has(c + 1)) pending.set(c + 1, this.#read(c + 1));
         const res = await cur;
         if (g !== this.#gen) return;
-        await this.#append(g, sink, new Uint8Array(res.plaintext, c === from ? intra : 0));
+        // Only authenticated plaintext gets here: the worker throws for a bad chunk instead of returning it.
+        for (const part of this.#strip(new Uint8Array(res.plaintext, c === from ? intra : 0))) {
+          await this.#append(g, sink, part);
+          if (g !== this.#gen) return;
+        }
         if (g !== this.#gen) return;
         this.#appended = true;
         if (force && seek!.done((c + 1) * size)) {
@@ -349,6 +380,21 @@ class PlayerImpl implements Player {
     }
   }
 
+  /** The video-only bytes of `bytes`; audio goes to ClipAudio, and the track is announced once the moov is seen. */
+  #strip(bytes: Uint8Array): Uint8Array[] {
+    const filter = this.#filter!;
+    const out = filter.push(bytes);
+    this.#announceTrack(filter);
+    return out;
+  }
+
+  #announceTrack(filter: Fmp4Filter): void {
+    if (this.#trackSet || filter.audio === null) return;
+    this.#trackSet = true;
+    this.#audio?.setTrack(filter.audio);
+    this.#set({ hasAudio: true });
+  }
+
   async #append(g: number, sink: Sink, bytes: Uint8Array): Promise<void> {
     try {
       await sink.append(bytes);
@@ -364,6 +410,7 @@ class PlayerImpl implements Player {
   /** Removes what is older than `currentTime − behind_seconds` (a tighter bound after a quota error). */
   async #evictBehind(g: number, sink: Sink, tight: boolean): Promise<void> {
     const win = tight ? { ...this.#win, behindSeconds: Math.min(this.#win.behindSeconds, 2) } : this.#win;
+    this.#audio?.evictBefore(Math.max(0, this.#head() - win.behindSeconds));
     for (const [s, e] of planEviction(sink.buffered(), this.#head(), win).behind) {
       // A newer seek has taken over: what this fill planned to trim may be what that seek is about to play.
       if (g !== this.#gen) return;
@@ -377,17 +424,28 @@ class PlayerImpl implements Player {
     const clipId = this.#clipId!;
     const hit = this.#blobs.get(clipId);
     if (hit) {
+      if (hit.audio) {
+        this.#audio?.setTrack(hit.audio.track);
+        for (const run of hit.audio.runs) this.#audio?.add(run);
+        this.#trackSet = true;
+        this.#set({ hasAudio: true });
+      }
       this.video.src = hit.url;
       return;
     }
-    const parts: ArrayBuffer[] = [];
+    // The Blob never holds the audio track: the filter strips it, and its runs are kept with the cache entry.
+    const runs: AudioRun[] = [];
+    const audioFilter = new Fmp4Filter((r) => runs.push(r));
+    const parts: Uint8Array[] = [];
     let outcome: BlobEntry['outcome'] = null;
     let next: Promise<ClipReadResult> | null = this.#read(0);
     for (let c = 0; c < open.numChunks; c++) {
       const cur = next!;
       next = c + 1 < open.numChunks ? this.#read(c + 1) : null;
       try {
-        parts.push((await cur).plaintext);
+        const plaintext = (await cur).plaintext;
+        if (g !== this.#gen) return;
+        parts.push(...audioFilter.push(new Uint8Array(plaintext)));
       } catch (e) {
         if (g !== this.#gen) return;
         this.#fail(e, c);
@@ -398,8 +456,15 @@ class PlayerImpl implements Player {
       if (g !== this.#gen) return;
     }
     if (parts.length === 0) return;
+    const track = audioFilter.audio;
     const url = URL.createObjectURL(blobFromParts(parts));
-    this.#blobs.add(clipId, { url, outcome });
+    this.#blobs.add(clipId, { url, outcome, audio: track ? { track, runs } : null });
+    if (track) {
+      this.#trackSet = true;
+      this.#audio?.setTrack(track);
+      for (const run of runs) this.#audio?.add(run);
+      this.#set({ hasAudio: true });
+    }
     this.video.src = url;
   }
 
@@ -418,6 +483,8 @@ class PlayerImpl implements Player {
   }
 
   #fail(e: unknown, chunk: number): void {
+    // No audio plays past the last authenticated byte.
+    this.#audio?.clear();
     const o = this.#integrityFailure(e, chunk);
     if (o === null) {
       this.#set({ message: e instanceof Error ? e.message : 'Playback failed.' });
@@ -519,6 +586,8 @@ class PlayerImpl implements Player {
     const tok = ++this.#seekTok;
     // ui-spec §4.3.2 step 2: drop the old fetches (their results are ignored), reset the parser, fetch the fragment.
     const g = ++this.#gen;
+    this.#filter?.reset();
+    this.#audio?.clear();
     this.#fetching = { fragmentMs: plan.fragmentMs, gen: g };
     this.#signal();
     target = Math.max(target, plan.fragmentMs);
@@ -576,6 +645,7 @@ class PlayerImpl implements Player {
       try {
         // The stopped fill may have been part-way through a fragment: reset the parser before appending again.
         await sink.abort();
+        this.#filter?.reset();
         if (g !== this.#gen) return;
         await this.#evictAhead(g, open, sink, tMs / 1000);
         if (g !== this.#gen) return;
@@ -630,6 +700,10 @@ class PlayerImpl implements Player {
     if (this.#clipId !== null) this.#close(this.#clipId);
     this.#sink?.destroy();
     this.#sink = null;
+    this.#audio?.dispose();
+    this.#audio = null;
+    this.#filter = null;
+    this.#trackSet = false;
     this.#open = null;
     this.#clipId = null;
     this.video.removeAttribute('src');

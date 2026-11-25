@@ -39,4 +39,4 @@ export class BlobLru<V extends { url: string }> {
 }
 
 /** The parts are referenced, not copied. */
-export const blobFromParts = (parts: readonly ArrayBuffer[]): Blob => new Blob(parts as BlobPart[], { type: 'video/mp4' });
+export const blobFromParts = (parts: readonly (ArrayBuffer | Uint8Array)[]): Blob => new Blob(parts as BlobPart[], { type: 'video/mp4' });
