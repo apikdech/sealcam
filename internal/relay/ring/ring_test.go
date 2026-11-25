@@ -276,3 +276,56 @@ func TestRetainedStableWhilePushing(t *testing.T) {
 			len(snap), len(snap[0].AUs), snap[0].Bytes, n, n*10)
 	}
 }
+
+func audio(d time.Duration, size int) *camera.AudioPacket {
+	return &camera.AudioPacket{Codec: "PCMA", Payload: make([]byte, size), Wall: t0.Add(d)}
+}
+
+func TestPushAudioJoinsOpenGOP(t *testing.T) {
+	r := ring.New(15*time.Second, 1<<40, nil)
+	r.Push(au(0, true, 1000))
+	p := audio(10*time.Millisecond, 160)
+	r.PushAudio(p)
+	got := r.Retained()
+	if len(got) != 1 || len(got[0].Audio) != 1 || got[0].Audio[0] != p {
+		t.Fatalf("GOP audio = %v, want [p]", got[0].Audio)
+	}
+	if got[0].Bytes != 1160 || r.Bytes() != 1160 {
+		t.Errorf("GOP bytes %d, ring bytes %d, want 1160 both", got[0].Bytes, r.Bytes())
+	}
+	// A later push must not change the snapshot.
+	r.PushAudio(audio(20*time.Millisecond, 160))
+	if len(got[0].Audio) != 1 {
+		t.Errorf("snapshot grew to %d audio packets", len(got[0].Audio))
+	}
+}
+
+func TestPushAudioBeforeFirstIDRDropped(t *testing.T) {
+	r := ring.New(15*time.Second, 1<<40, nil)
+	r.PushAudio(audio(0, 160))
+	if r.Bytes() != 0 || len(r.Retained()) != 0 {
+		t.Fatalf("audio before the first IDR was kept: bytes=%d", r.Bytes())
+	}
+	r.Push(au(time.Second, true, 1000))
+	if got := r.Retained(); len(got[0].Audio) != 0 || r.Bytes() != 1000 {
+		t.Errorf("audio leaked into the first GOP: %d packets, %d bytes", len(got[0].Audio), r.Bytes())
+	}
+}
+
+func TestAudioCountsTowardCap(t *testing.T) {
+	truncated := 0
+	r := ring.New(time.Hour, 2500, func() { truncated++ })
+	r.Push(au(0, true, 1000))
+	r.PushAudio(audio(0, 1000))
+	r.Push(au(time.Second, true, 400)) // second GOP; total 2400, within cap
+	if truncated != 0 {
+		t.Fatalf("truncated early: %d", truncated)
+	}
+	r.PushAudio(audio(time.Second, 200)) // 2600 > cap: oldest GOP (2000 incl. audio) goes
+	if truncated != 1 {
+		t.Fatalf("truncated = %d, want 1", truncated)
+	}
+	if r.Bytes() != 600 {
+		t.Errorf("Bytes() = %d, want 600", r.Bytes())
+	}
+}

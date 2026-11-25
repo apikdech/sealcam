@@ -11,9 +11,12 @@ import (
 
 // GOP is one group of pictures: an IDR access unit and the non-IDR units
 // after it, in decode order. Start is the IDR's Wall time, StartDTS its DTS
-// and ParamGen its parameter-set generation. Bytes is the sum of AU Bytes.
+// and ParamGen its parameter-set generation. Bytes is the sum of AU Bytes and
+// audio payload lengths. Audio holds the audio packets that arrived while the
+// GOP was open, in arrival order.
 type GOP struct {
 	AUs      []*camera.AccessUnit
+	Audio    []*camera.AudioPacket
 	Start    time.Time
 	StartDTS int64
 	Bytes    int64
@@ -78,6 +81,26 @@ func (r *Ring) Push(au *camera.AccessUnit) {
 	for len(r.gops) >= 2 && !r.gops[1].Start.After(cut) {
 		r.evictOldest()
 	}
+	r.enforceCap()
+}
+
+// PushAudio adds p to the open GOP, or drops it when there is none. Its
+// payload counts toward the GOP and ring bytes, so the hard cap applies.
+func (r *Ring) PushAudio(p *camera.AudioPacket) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if !r.open {
+		return
+	}
+	g := r.gops[len(r.gops)-1]
+	g.Audio = append(g.Audio, p)
+	n := int64(len(p.Payload))
+	g.Bytes += n
+	r.bytes += n
+	r.enforceCap()
+}
+
+func (r *Ring) enforceCap() {
 	for r.bytes > r.capBytes && len(r.gops) > 0 {
 		r.evictOldest()
 		if r.onTruncate != nil {
@@ -109,6 +132,7 @@ func (r *Ring) Retained() []*GOP {
 	if r.open {
 		g := *out[len(out)-1]
 		g.AUs = g.AUs[:len(g.AUs):len(g.AUs)]
+		g.Audio = g.Audio[:len(g.Audio):len(g.Audio)]
 		out[len(out)-1] = &g
 	}
 	return out

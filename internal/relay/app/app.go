@@ -507,9 +507,16 @@ func (a *app) startCamera(ctx context.Context, cm *cam, keys zrec.Keys) error {
 	})
 	cm.ring = r
 	out := &countingOutput{Output: rec, camera: c.ID, m: a.m}
-	cm.machine = clip.New(clip.Config{Camera: c.ID, PostRoll: c.PostRoll, MaxClip: c.MaxClip}, a.clk, r, out)
+	cm.machine = clip.New(clip.Config{Camera: c.ID, PostRoll: c.PostRoll, MaxClip: c.MaxClip, RecordAudio: c.RecordAudio}, a.clk, r, out)
 
-	sub := cm.handle.Hub.Subscribe(camera.ClassRecorder, c.RecorderQueueFrames)
+	// Audio adds about 50 events/s to the queue; the larger queue keeps the
+	// video headroom.
+	var sub *camera.Sub
+	if c.RecordAudio {
+		sub = cm.handle.Hub.Subscribe(camera.ClassRecorder, c.RecorderQueueFrames*3, camera.WithAudio())
+	} else {
+		sub = cm.handle.Hub.Subscribe(camera.ClassRecorder, c.RecorderQueueFrames)
+	}
 	a.m.RegisterCamera(c.ID, metrics.CameraSources{
 		RingBytes:   r.Bytes,
 		RecorderLag: sub.Lagged,

@@ -6,6 +6,7 @@ package clip
 import (
 	"crypto/rand"
 	"io"
+	"log/slog"
 	"sync/atomic"
 	"time"
 
@@ -41,6 +42,8 @@ type OpenInfo struct {
 	PreRollMs        int64
 	Codec            camera.Codec
 	TimeSource       camera.TimeSource
+	// AudioCodec is "PCMA" or "PCMU" when the clip records audio, else "".
+	AudioCodec string
 }
 
 // FinalInfo completes a clip. End is the end of the last frame written.
@@ -76,6 +79,10 @@ type Config struct {
 	PostRoll, MaxClip time.Duration
 	// Rand is the entropy for ULIDs; nil means crypto/rand.
 	Rand io.Reader
+	// RecordAudio says the camera is set to record audio. The Machine then
+	// logs once per session when no audio arrives within 5 s of the first
+	// video.
+	RecordAudio bool
 }
 
 // States reported by State.
@@ -96,6 +103,7 @@ type segment struct {
 	fragments int       // GOPs written
 	fragEnd   time.Time // end of the last written GOP
 	pend      []*camera.AccessUnit
+	pendAudio []*camera.AudioPacket
 }
 
 // continuation is how the next segment of a series is opened after a split
@@ -136,7 +144,15 @@ type Machine struct {
 	lastWall  time.Time
 	frameDur  time.Duration // estimate of one frame's duration
 	haveFrame bool
+
+	audioCodec  string    // last audio codec seen in this session; "" if none
+	firstVideo  time.Time // first video of the session; zero before it
+	silenceDone bool      // the no-audio log was written or is not needed
 }
+
+// audioSilence is how long after the first video of a session a camera set
+// to record audio may stay silent before the Machine logs it.
+const audioSilence = 5 * time.Second
 
 // New returns an idle Machine reading pre-roll from r and writing clips to out.
 func New(cfg Config, clk clock.Clock, r *ring.Ring, out Output) *Machine {
@@ -183,6 +199,9 @@ func (m *Machine) OnVideo(au *camera.AccessUnit) {
 		}
 	}
 	m.lastWall, m.haveFrame = au.Wall, true
+	if m.firstVideo.IsZero() {
+		m.firstVideo = m.clk.Now()
+	}
 
 	m.ring.Push(au)
 	if m.active() {
@@ -192,6 +211,25 @@ func (m *Machine) OnVideo(au *camera.AccessUnit) {
 	// A failed Open is retried at the next IDR, not on every frame.
 	if au.IDR && m.state.Load() == stateIdle {
 		m.tryOpen()
+	}
+}
+
+// OnAudio takes one audio packet: into the ring, and into the active clip
+// when that clip has an audio track. A change of audio codec ends the active
+// clip with codec_change. Audio that arrives while no GOP is open is dropped
+// by the ring.
+func (m *Machine) OnAudio(p *camera.AudioPacket) {
+	if m.closed() {
+		return
+	}
+	if m.audioCodec != "" && p.Codec != m.audioCodec {
+		m.codecChanged()
+	}
+	m.audioCodec = p.Codec
+	m.ring.PushAudio(p)
+	// A clip that opened without audio does not gain a track mid-clip.
+	if seg := m.cur; seg != nil && seg.info.AudioCodec != "" {
+		seg.pendAudio = append(seg.pendAudio, p)
 	}
 }
 
@@ -209,6 +247,7 @@ func (m *Machine) OnLost() {
 	m.ring.Reset()
 	m.cont = nil
 	m.haveGen, m.haveFrame = false, false
+	m.audioCodec, m.firstVideo, m.silenceDone = "", time.Time{}, false
 }
 
 // OnSignal feeds trigger bookkeeping for the sidecar. It does not decide
@@ -247,6 +286,7 @@ func (m *Machine) OnTriggered(active bool) {
 
 // Tick ends a clip whose post-roll has elapsed. Call it regularly.
 func (m *Machine) Tick() {
+	m.logSilentAudio()
 	if m.state.Load() != statePostRoll || m.clk.Now().Before(m.deadline) {
 		return
 	}
@@ -255,6 +295,22 @@ func (m *Machine) Tick() {
 		return
 	}
 	m.finish(ReasonPostRollElapsed, true, stateIdle)
+}
+
+// logSilentAudio logs once per session when the camera records audio but
+// none arrived within audioSilence of the first video.
+func (m *Machine) logSilentAudio() {
+	if !m.cfg.RecordAudio || m.silenceDone || m.firstVideo.IsZero() {
+		return
+	}
+	if m.audioCodec != "" {
+		m.silenceDone = true
+		return
+	}
+	if m.clk.Now().Sub(m.firstVideo) >= audioSilence {
+		m.silenceDone = true
+		slog.Info("record_audio is set but the camera sent no G.711 audio; recording video only", "camera", m.cfg.Camera)
+	}
 }
 
 // ForceFinalize ends the active clip with reason and suppresses new clips
@@ -364,7 +420,7 @@ func (m *Machine) begin(gops []*ring.GOP, series ulid.ULID, index int, preRollMs
 	info := OpenInfo{
 		ClipID: id, SeriesID: series, SegmentIndex: index,
 		Start: start, PreRollMs: preRollMs,
-		Codec: m.codec, TimeSource: m.ts,
+		Codec: m.codec, TimeSource: m.ts, AudioCodec: m.audioCodec,
 	}
 	w, err := m.out.Open(info)
 	if err != nil {
@@ -378,6 +434,9 @@ func (m *Machine) begin(gops []*ring.GOP, series ulid.ULID, index int, preRollMs
 		}
 	}
 	m.cur.pend = append([]*camera.AccessUnit(nil), gops[last].AUs...)
+	if info.AudioCodec != "" {
+		m.cur.pendAudio = append([]*camera.AudioPacket(nil), gops[last].Audio...)
+	}
 	return beginOpened
 }
 
@@ -437,8 +496,14 @@ func (m *Machine) flushPend(end time.Time) bool {
 	for _, a := range seg.pend {
 		bytes += int64(a.Bytes)
 	}
-	g := &ring.GOP{AUs: seg.pend, Start: first.Wall, StartDTS: first.DTS, Bytes: bytes, ParamGen: first.ParamGen}
-	seg.pend = nil
+	for _, p := range seg.pendAudio {
+		bytes += int64(len(p.Payload))
+	}
+	g := &ring.GOP{
+		AUs: seg.pend, Audio: seg.pendAudio, Start: first.Wall, StartDTS: first.DTS,
+		Bytes: bytes, ParamGen: first.ParamGen,
+	}
+	seg.pend, seg.pendAudio = nil, nil
 	return m.writeGOP(g, end)
 }
 

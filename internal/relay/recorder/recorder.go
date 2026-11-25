@@ -457,6 +457,8 @@ func Run(ctx context.Context, sub *camera.Sub, tracker *events.Tracker, m *clip.
 				m.OnCodec(*ev.Codec, ev.TimeSource)
 			case camera.EventVideo:
 				m.OnVideo(ev.AU)
+			case camera.EventAudio:
+				m.OnAudio(ev.Audio)
 			case camera.EventLost:
 				m.OnLost()
 			}
