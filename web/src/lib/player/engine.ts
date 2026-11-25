@@ -179,7 +179,18 @@ class PlayerImpl implements Player {
 
   setSound(on: boolean): void {
     this.#sound = on;
-    if (on) this.#context();
+    if (on) {
+      // Web Audio defaults to iOS's "ambient" session, which the silent switch mutes. Set it inside the gesture.
+      const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+      if (session) {
+        try {
+          session.type = 'playback';
+        } catch {
+          // A hint only; sound still plays where the browser refuses it.
+        }
+      }
+      this.#context();
+    }
     this.#audio?.setEnabled(on);
   }
 

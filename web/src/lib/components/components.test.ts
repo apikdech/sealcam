@@ -745,6 +745,22 @@ describe('Player', () => {
       expect(await screen.findByRole('button', { name: 'Turn sound off' })).toBeInTheDocument();
     });
 
+    it('at a rate other than 1x a sound-on button says sound plays at 1x only and is dimmed', async () => {
+      await mountWith(true);
+      await fireEvent.click(await screen.findByRole('button', { name: 'Turn sound on' }));
+      const btn = screen.getByRole('button', { name: 'Turn sound off' });
+      expect(btn).toHaveAttribute('title', 'Turn sound off');
+      expect(btn).not.toHaveClass('text-muted');
+      await fireEvent.click(screen.getByRole('button', { name: 'Playback speed' }));
+      await fireEvent.click(within(screen.getByRole('group', { name: 'Playback speed' })).getByRole('button', { name: '2×' }));
+      const slow = screen.getByRole('button', { name: 'Turn sound off' });
+      expect(slow).toHaveAttribute('title', 'Sound plays at 1× only');
+      expect(slow).toHaveClass('text-muted');
+      await fireEvent.click(screen.getByRole('button', { name: 'Playback speed' }));
+      await fireEvent.click(within(screen.getByRole('group', { name: 'Playback speed' })).getByRole('button', { name: '1×' }));
+      expect(screen.getByRole('button', { name: 'Turn sound off' })).toHaveAttribute('title', 'Turn sound off');
+    });
+
     it('the compact bar has it too', async () => {
       await mountWith(true, { compact: true });
       expect(await screen.findByRole('button', { name: 'Turn sound on' })).toBeInTheDocument();

@@ -211,6 +211,8 @@
 
   const icon =
     'inline-flex h-10 w-10 max-md:h-11 max-md:w-11 items-center justify-center rounded border border-rule text-ink hover:bg-ground disabled:cursor-not-allowed disabled:opacity-40';
+  /** The sound button while a rate other than 1x mutes the audio. */
+  const iconDimmed = icon.replace('text-ink', 'text-muted');
   const ghost =
     'inline-flex items-center gap-2 rounded border border-rule px-3 py-2 max-md:min-h-11 text-sm text-ink hover:bg-ground disabled:cursor-not-allowed disabled:opacity-40';
   /** The phone bar is also used above md (phone landscape), so its 44 px targets follow `compact`, not the width. */
@@ -413,9 +415,9 @@
     {#if snap.hasAudio}
       <button
         type="button"
-        class={icon}
+        class={soundOn && rate !== 1 ? iconDimmed : icon}
         aria-label={soundOn ? 'Turn sound off' : 'Turn sound on'}
-        title={soundOn ? 'Turn sound off' : 'Turn sound on'}
+        title={soundOn ? (rate !== 1 ? 'Sound plays at 1× only' : 'Turn sound off') : 'Turn sound on'}
         onclick={toggleSound}><Icon name={soundOn ? 'sound-on' : 'sound-off'} /></button
       >
     {/if}

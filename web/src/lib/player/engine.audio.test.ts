@@ -273,4 +273,25 @@ describe('engine clip audio', () => {
       g.AudioContext = saved;
     }
   });
+
+  describe('iOS audio session', () => {
+    afterEach(() => {
+      delete (navigator as unknown as Record<string, unknown>).audioSession;
+    });
+
+    it('setSound(true) sets the audio session to playback', () => {
+      const session = { type: 'auto' };
+      Object.defineProperty(navigator, 'audioSession', { value: session, configurable: true });
+      const { p } = make(clientFor(audio));
+      p.setSound(false);
+      expect(session.type).toBe('auto');
+      p.setSound(true);
+      expect(session.type).toBe('playback');
+    });
+
+    it('setSound(true) is fine without navigator.audioSession', () => {
+      const { p } = make(clientFor(audio));
+      expect(() => p.setSound(true)).not.toThrow();
+    });
+  });
 });

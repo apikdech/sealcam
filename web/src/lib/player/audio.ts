@@ -135,9 +135,12 @@ export class ClipAudio {
     const now = ctx.currentTime;
     const vNow = this.videoTime0 + (now - this.ctxTime0);
     if (r.end <= vNow) return;
-    const ideal = this.ctxTime0 + (r.start - this.videoTime0);
+    // The output path delays the sound by outputLatency, so start it that much earlier.
+    const latency = ctx.outputLatency ?? ctx.baseLatency ?? 0;
+    const ideal = this.ctxTime0 + (r.start - this.videoTime0) - latency;
     const when = Math.max(ideal, now);
-    const offset = Math.max(vNow - r.start, 0);
+    const offset = Math.max(now - ideal, 0);
+    if (offset >= r.samples.length / SAMPLE_RATE) return;
     if (!r.buffer) {
       r.buffer = ctx.createBuffer(1, r.samples.length, SAMPLE_RATE);
       r.buffer.copyToChannel(r.samples as Float32Array<ArrayBuffer>, 0);

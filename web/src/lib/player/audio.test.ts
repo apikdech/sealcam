@@ -36,6 +36,8 @@ class FakeSource {
 }
 class FakeCtx {
   currentTime = 10;
+  outputLatency: number | undefined = undefined;
+  baseLatency: number | undefined = undefined;
   state = 'running';
   destination = {};
   starts: Start[] = [];
@@ -83,6 +85,28 @@ describe('ClipAudio', () => {
     a.setEnabled(true);
     expect(live(ctx)[0]!.when).toBeCloseTo(ctx.currentTime + 2, 9);
     expect(live(ctx)[0]!.offset).toBe(0);
+  });
+
+  it('starts a future run earlier by the output latency', () => {
+    const { v, ctx, a } = setup();
+    ctx.outputLatency = 0.1;
+    v.currentTime = 3.0;
+    v.paused = false;
+    a.add(run(5));
+    a.setEnabled(true);
+    expect(live(ctx)[0]!.when).toBeCloseTo(ctx.currentTime + 2 - 0.1, 9);
+    expect(live(ctx)[0]!.offset).toBe(0);
+  });
+
+  it('falls back to baseLatency, and clamps to now by moving into the run', () => {
+    const { v, ctx, a } = setup();
+    ctx.baseLatency = 0.05;
+    v.currentTime = 3.0;
+    v.paused = false;
+    a.add(run(2, 16000)); // 2s..4s, already playing
+    a.setEnabled(true);
+    expect(live(ctx)[0]!.when).toBeCloseTo(ctx.currentTime, 9);
+    expect(live(ctx)[0]!.offset).toBeCloseTo(1.05, 9);
   });
 
   it('does nothing while disabled', () => {
