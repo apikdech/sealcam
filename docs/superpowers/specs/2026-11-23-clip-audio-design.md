@@ -91,9 +91,15 @@ Anti-goals
 
 * `ClassRecorder` subscribers receive `EventAudio` only when their camera has `record_audio`.
   Live and restream behaviour do not change.
-* `ring.GOP` gains the audio packets whose `Wall` falls in the GOP's wall span
-  (`[IDR Wall, next IDR Wall)`). Audio arriving before the first GOP is dropped. Audio counts
-  toward `GOP.Bytes`, so ring eviction stays bounded by the same limits.
+* A recorder subscriber with audio never lags because of audio: when its queue is full, the
+  audio packet is dropped and video handling is unchanged.
+* `ring.GOP` gains the audio packets that arrive while it is the open GOP (arrival order). The
+  muxer places each packet by its own `Wall` (§5.4), so which GOP carries it does not matter.
+  Audio arriving before the first GOP is dropped. Audio counts toward `GOP.Bytes`, so ring
+  eviction stays bounded by the same limits.
+* A clip has an audio track when the machine has seen audio since the session started (its
+  last audio codec is set) at the moment the clip opens. Audio that starts mid-clip is not
+  recorded in that clip.
 
 ### 5.4 Clip content profile (amends Contract §5)
 
