@@ -170,6 +170,17 @@ Anti-goals
 
 * No change. Live audio still passes through WebRTC as G.711 (D17).
 
+### 5.10 Rollout
+
+Older zview builds do not strip the audio track: they feed it to MediaSource, and a clip with
+audio fails to play. Roll out in this order:
+
+1. Deploy the new zview-server first.
+2. Make sure each household install has taken the PWA update.
+3. Only then set `record_audio: true` on a camera.
+
+Older builds still list and export a clip with audio; only playback fails.
+
 ## 6. Testing
 
 * Relay: muxer golden tests for a two-track init segment and audio fragments (gap, codec change,

@@ -1,6 +1,7 @@
 // Package mux writes the fMP4 plaintext content profile (Contract §5): an
-// init segment (ftyp+moov) followed by one moof+mdat per GOP, video only,
-// timescale 90 000, tfdt starting at 0 for the clip.
+// init segment (ftyp+moov) followed by one moof+mdat per GOP for the video
+// track 1 (timescale 90 000), plus an optional G.711 audio track 2 (timescale
+// 8 000) in audio-only fragments. tfdt starts at 0 for the clip.
 package mux
 
 import (

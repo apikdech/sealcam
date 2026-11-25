@@ -50,6 +50,9 @@ defaults:
   max_gop_seconds: 4
   trigger_timeout_seconds: 60
   # record_audio: false           # true: record the camera's G.711 audio into clips
+  #   Caution: older zview builds cannot play a clip with audio (they still list and export it).
+  #   Deploy the new zview-server first, make sure each household install has taken the PWA
+  #   update, and only then set this to true.
   recorder_queue_frames: 256
   viewer_queue_frames: 64
 
