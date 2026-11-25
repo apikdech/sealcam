@@ -351,3 +351,56 @@ func TestRTSPServerStopsAfterLastAUWithoutLoop(t *testing.T) {
 		t.Fatalf("got %d access units, want exactly 3 without Loop", got)
 	}
 }
+
+func TestRTSPServerAudioBeeps(t *testing.T) {
+	aus := testutil.LoadAnnexB(t, h264Fixture)
+	const fps = 15
+	srv := testutil.StartRTSPServer(t, testutil.RTSPServerOpts{Codec: "h264", AUs: aus, FPS: fps, Loop: true, AudioBeeps: true})
+
+	c, desc := dialAndSetup(t, srv.URL())
+	var g711 *format.G711
+	medi := desc.FindFormat(&g711)
+	if medi == nil {
+		t.Fatal("no G711 media in SDP")
+	}
+	sink := newSink()
+	c.OnPacketRTP(medi, g711, func(p *rtp.Packet) { sink.add(p) })
+	play(t, c)
+	// IDR sample positions (RTP time of the audio clock) in the first loop.
+	var idrs []int64
+	for i, au := range aus {
+		if au.IDR {
+			idrs = append(idrs, int64(i)*8000/fps)
+		}
+	}
+	if len(idrs) < 2 || idrs[0] != 0 {
+		t.Fatalf("fixture IDRs = %v", idrs)
+	}
+	until := uint32(idrs[1] + 1800)
+	pkts := sink.waitFor(t, "audio past the second IDR's beep", func(p []*rtp.Packet) bool {
+		return len(p) > 0 && p[len(p)-1].Timestamp >= until
+	})
+	idrs = idrs[:2]
+	silent := func(b []byte) bool { return bytes.Equal(b, bytes.Repeat([]byte{0xd5}, len(b))) }
+	var beep, quiet int
+	for _, p := range pkts {
+		ts, end := int64(p.Timestamp), int64(p.Timestamp)+int64(len(p.Payload))
+		for _, s := range idrs {
+			switch {
+			case ts >= s && end <= s+800:
+				beep++
+				if silent(p.Payload) {
+					t.Errorf("packet at sample %d inside the beep after IDR %d is silent", ts, s)
+				}
+			case ts >= s+800 && end <= s+800+1000:
+				quiet++
+				if !silent(p.Payload) {
+					t.Errorf("packet at sample %d after the beep is not silence", ts)
+				}
+			}
+		}
+	}
+	if beep == 0 || quiet == 0 {
+		t.Fatalf("checked %d beep and %d quiet packets", beep, quiet)
+	}
+}

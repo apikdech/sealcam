@@ -22,5 +22,13 @@
   },
   "num_chunks": 36,
   "tamper_chunk": 18,
-  "tamper_fail_at_ms": 16000
+  "tamper_fail_at_ms": 16000,
+  "audio": {
+    "clip_id": "01M893949RGGXBHCCZ8E94D1J5",
+    "dir": "audio",
+    "start_time": "2026-11-25T10:16:04.664Z",
+    "duration_ms": 11266,
+    "num_chunks": 14,
+    "audio_codec": "PCMA"
+  }
 }

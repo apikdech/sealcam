@@ -71,6 +71,17 @@ type fixtureManifest struct {
 	NumChunks      int         `json:"num_chunks"`
 	TamperChunk    int         `json:"tamper_chunk"`
 	TamperFailAtMs int         `json:"tamper_fail_at_ms"`
+	// Audio is the separate short clip with a G.711 track (TestGenerateAudioClipFixture).
+	Audio *fixtureAudioClip `json:"audio,omitempty"`
+}
+
+type fixtureAudioClip struct {
+	ClipID     string `json:"clip_id"`
+	Dir        string `json:"dir"`
+	StartTime  string `json:"start_time"`
+	DurationMs int64  `json:"duration_ms"`
+	NumChunks  int    `json:"num_chunks"`
+	AudioCodec string `json:"audio_codec"`
 }
 
 func vectorKey() zrec.MasterKey {
@@ -84,9 +95,16 @@ func vectorKey() zrec.MasterKey {
 // newFixtureRig is newRigFor with the vector master key, the fixture camera
 // identity and 64 KiB chunks (so a 30 s clip has dozens of chunks), recording
 // to a fresh MinIO bucket. The returned driver reads that bucket back.
-func newFixtureRig(t *testing.T) (*rig, *s3.Driver) {
+//
+// With audio the camera sends a G.711 track with a beep at each IDR and the
+// config sets record_audio.
+func newFixtureRig(t *testing.T, audio bool) (*rig, *s3.Driver) {
 	t.Helper()
-	rtsp := testutil.StartRTSPServer(t, testutil.RTSPServerOpts{AUs: testutil.LoadAnnexB(t, h264Fixture), Loop: true})
+	rtsp := testutil.StartRTSPServer(t, testutil.RTSPServerOpts{AUs: testutil.LoadAnnexB(t, h264Fixture), Loop: true, AudioBeeps: audio})
+	recordAudio := ""
+	if audio {
+		recordAudio = "    record_audio: true\n"
+	}
 	onvif := testutil.StartFakeONVIF(t, testutil.FakeONVIFOpts{})
 	u, err := url.Parse(rtsp.URL())
 	if err != nil {
@@ -140,7 +158,7 @@ cameras:
     credentials: { username: "admin", password: "secret" }
     rtsp: { port: %s, path: "/stream" }
     events: { source: "onvif", port: %d }
-`, freePort(t), vectorKey().String(), fixtureRoot, endpoint, bucket, accessKey, secretKey, fixtureCamera, u.Port(), onvif.Port)
+%s`, freePort(t), vectorKey().String(), fixtureRoot, endpoint, bucket, accessKey, secretKey, fixtureCamera, u.Port(), onvif.Port, recordAudio)
 	p := filepath.Join(dir, "zrelay.yaml")
 	if err := os.WriteFile(p, []byte(yml), 0o600); err != nil {
 		t.Fatal(err)
@@ -158,7 +176,7 @@ func TestGenerateClipFixtures(t *testing.T) {
 		t.Skip("set ZRELAY_FIXTURES_OUT to the testdata/clips directory")
 	}
 	mk := vectorKey()
-	r, store := newFixtureRig(t)
+	r, store := newFixtureRig(t, false)
 	ctx := context.Background()
 
 	run := start(t, r.cfg, app.Options{Version: "fixture"})
@@ -257,6 +275,7 @@ func TestGenerateClipFixtures(t *testing.T) {
 	write("incomplete", ib, truncated)
 
 	m := fixtureManifest{
+		Audio:     previousAudioEntry(out),
 		MasterKey: mk.String(), MasterKeyHex: hex.EncodeToString(mk[:]), KeyIDHex: sc.Video.KeyID,
 		Camera: fixtureCamera, ChunkSize: chunk, Codec: sc.Video.Codec, Width: sc.Video.Width, Height: sc.Video.Height,
 		DurationMs: *sc.DurationMs,
@@ -310,4 +329,102 @@ func must(t *testing.T, err error) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+// previousAudioEntry returns the audio entry of the manifest already in out,
+// so regenerating the main clip keeps the separately generated audio variant.
+func previousAudioEntry(out string) *fixtureAudioClip {
+	b, err := os.ReadFile(filepath.Join(out, "manifest.json"))
+	if err != nil {
+		return nil
+	}
+	var old fixtureManifest
+	if json.Unmarshal(b, &old) != nil {
+		return nil
+	}
+	return old.Audio
+}
+
+// TestGenerateAudioClipFixture records the short testdata/clips/audio variant:
+// a 5-6 GOP clip with a G.711 A-law track (a 1 kHz beep for 100 ms at each
+// IDR), through the same pipeline as the main clip. It touches only the audio
+// tree and the audio entry of manifest.json:
+//
+//	ZRELAY_FIXTURES_OUT=$PWD/testdata/clips \
+//	  go test -tags fixtures -run TestGenerateAudioClipFixture -count=1 -timeout 5m ./internal/relay/app
+func TestGenerateAudioClipFixture(t *testing.T) {
+	out := os.Getenv("ZRELAY_FIXTURES_OUT")
+	if out == "" {
+		t.Skip("set ZRELAY_FIXTURES_OUT to the testdata/clips directory")
+	}
+	mb, err := os.ReadFile(filepath.Join(out, "manifest.json"))
+	if err != nil {
+		t.Fatalf("the main fixtures must exist first: %v", err)
+	}
+	var m fixtureManifest
+	if err := json.Unmarshal(mb, &m); err != nil {
+		t.Fatal(err)
+	}
+	r, store := newFixtureRig(t, true)
+	ctx := context.Background()
+
+	run := start(t, r.cfg, app.Options{Version: "fixture"})
+	eventually(t, "status/relay.json", 30*time.Second, func() bool {
+		_, err := fixtureObject(ctx, store, "status/relay.json")
+		return err == nil
+	})
+	// Audio starts 2 s of media time after the first IDR (time source
+	// decision) and a clip opened before that has no audio track.
+	time.Sleep(4 * time.Second)
+	// 2 s pre-roll + 8 s held + 1 s post-roll: a clip of about 11 s.
+	r.motion(true)
+	time.Sleep(8 * time.Second)
+	r.motion(false)
+	eventually(t, "a clip sidecar", 40*time.Second, func() bool { return len(fixtureSidecars(t, store)) > 0 })
+	if _, err := run.stop(t); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	scs := fixtureSidecars(t, store)
+	if len(scs) != 1 {
+		t.Fatalf("want exactly one clip, got %v", scs)
+	}
+	sb, err := fixtureObject(ctx, store, scs[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	sc, err := sidecar.Decode(sb)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sc.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if sc.Audio == nil || sc.Audio.Codec != "PCMA" || sc.DurationMs == nil {
+		t.Fatalf("unexpected sidecar: %+v", sc)
+	}
+	video, err := fixtureObject(ctx, store, path.Join(path.Dir(scs[0]), sc.Video.Object))
+	if err != nil {
+		t.Fatal(err)
+	}
+	chunk := int(sc.Video.ChunkSize)
+	hdrLen := int(video[6])<<8 | int(video[7])
+	n := (len(video) - hdrLen + chunk + 15) / (chunk + 16)
+
+	dir := filepath.Join(out, "audio", fixtureRoot, path.Dir(scs[0]))
+	must(t, os.RemoveAll(filepath.Join(out, "audio")))
+	must(t, os.MkdirAll(dir, 0o755))
+	must(t, os.WriteFile(filepath.Join(dir, sc.Video.Object), video, 0o644))
+	must(t, os.WriteFile(filepath.Join(dir, strings.TrimSuffix(sc.Video.Object, ".zrec")+".json"), sb, 0o644))
+
+	m.Audio = &fixtureAudioClip{
+		ClipID: sc.ClipID.String(), Dir: "audio", StartTime: sc.StartTime.UTC().Format(time.RFC3339Nano),
+		DurationMs: *sc.DurationMs, NumChunks: n, AudioCodec: sc.Audio.Codec,
+	}
+	mb, err = json.MarshalIndent(&m, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	must(t, os.WriteFile(filepath.Join(out, "manifest.json"), append(mb, '\n'), 0o644))
+	t.Logf("wrote audio fixture under %s: %d chunks, duration %d ms, video %d bytes", out, n, *sc.DurationMs, len(video))
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"sync"
 	"testing"
@@ -30,6 +31,9 @@ type RTSPServerOpts struct {
 	Loop bool
 	// Audio adds a PCMA (G.711 A-law) 8 kHz mono track carrying silence.
 	Audio bool
+	// AudioBeeps adds the same PCMA track as Audio, but with a 1 kHz tone
+	// (about -6 dBFS) for 100 ms from each IDR access unit; silence otherwise.
+	AudioBeeps bool
 	// RTCP enables RTCP sender reports (NTP to RTP mapping). The first report
 	// follows the first RTP packet, then one every 10 s.
 	RTCP bool
@@ -116,7 +120,7 @@ func StartRTSPServer(t testing.TB, opts RTSPServerOpts) *RTSPServer {
 
 	s.video = &description.Media{Type: description.MediaTypeVideo, Formats: []format.Format{videoFormat}}
 	desc := &description.Session{Medias: []*description.Media{s.video}}
-	if opts.Audio {
+	if opts.Audio || opts.AudioBeeps {
 		s.audio = &description.Media{
 			Type:    description.MediaTypeAudio,
 			Formats: []format.Format{&format.G711{PayloadTyp: 8, MULaw: false, SampleRate: 8000, ChannelCount: 1}},
@@ -282,6 +286,10 @@ func (s *RTSPServer) run() {
 				return
 			}
 		}
+		if audio != nil && s.opts.AudioBeeps && s.opts.AUs[i%int64(len(s.opts.AUs))].IDR {
+			audio.beepAt = i * 8000 / fps
+			audio.beeping = true
+		}
 		if audio != nil && !audio.writeUntil(s, (i+1)*8000/fps) {
 			return
 		}
@@ -314,6 +322,9 @@ type audioPacer struct {
 	enc   sampleEncoder
 	start uint32
 	sent  int64 // samples sent so far
+
+	beeping bool
+	beepAt  int64 // sample index where the latest beep starts
 }
 
 type sampleEncoder interface {
@@ -321,6 +332,41 @@ type sampleEncoder interface {
 }
 
 const pcmaSilence = 0xd5
+
+// beepSamples is 100 ms at 8 kHz.
+const beepSamples = 800
+
+// beepPeriod is one period of a 1 kHz sine at 8 kHz (8 samples), about
+// -6 dBFS (amplitude 16384), as A-law bytes.
+var beepPeriod = func() [8]byte {
+	var p [8]byte
+	for i := range p {
+		p[i] = alawEncode(int16(math.Round(16384 * math.Sin(2*math.Pi*float64(i)/8))))
+	}
+	return p
+}()
+
+// alawEncode is the G.711 A-law encoder (the reference algorithm over the
+// top 13 bits). 0 encodes to pcmaSilence.
+func alawEncode(pcm int16) byte {
+	v := int(pcm) >> 3
+	mask := byte(0xd5)
+	if v < 0 {
+		mask = 0x55
+		v = -v - 1
+	}
+	seg := 0
+	for seg < 7 && v > (0x20<<seg)-1 {
+		seg++
+	}
+	a := byte(seg << 4)
+	if seg < 2 {
+		a |= byte(v>>1) & 0x0f
+	} else {
+		a |= byte(v>>seg) & 0x0f
+	}
+	return a ^ mask
+}
 
 func newAudioPacer(medi *description.Media, start uint32) (*audioPacer, error) {
 	enc, err := medi.Formats[0].(*format.G711).CreateEncoder()
@@ -333,7 +379,15 @@ func newAudioPacer(medi *description.Media, start uint32) (*audioPacer, error) {
 func (a *audioPacer) writeUntil(s *RTSPServer, target int64) bool {
 	const frame = 160
 	for a.sent+frame <= target {
-		pkts, err := a.enc.Encode(bytes.Repeat([]byte{pcmaSilence}, frame))
+		buf := bytes.Repeat([]byte{pcmaSilence}, frame)
+		if a.beeping {
+			for k := range buf {
+				if n := a.sent + int64(k) - a.beepAt; n >= 0 && n < beepSamples {
+					buf[k] = beepPeriod[n%8]
+				}
+			}
+		}
+		pkts, err := a.enc.Encode(buf)
 		if err != nil {
 			s.t.Errorf("testutil.RTSPServer: encode audio: %v", err)
 			return false
