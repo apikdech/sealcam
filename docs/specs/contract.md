@@ -26,7 +26,7 @@ This document is now the **single source of truth**. The two component specs ref
 | D7 | A random DEK per clip, wrapped with a key derived from the master key. | Makes counter nonces safe. Rotation can rewrap DEKs without re-encrypting video. The key is identifiable by `key_id`. |
 | D8 | Web app code is **never** served by the storage host. | Otherwise a D4 adversary can serve modified JavaScript that captures the key (see zview §2). |
 | D9 | All timestamps and storage paths use UTC. UIs display in local time. | 21:59 WIB is 14:59Z. Local-date folders break at midnight and DST. |
-| D10 | No audio in v2. | Tapo cameras typically send G.711 over RTSP, which browsers will not play inside MP4. The no-transcoding rule stands. |
+| D10 | No audio in v2 by default. Amended: a camera MAY opt in to a G.711 audio track in clips (`record_audio`, see `docs/superpowers/specs/2026-11-23-clip-audio-design.md`). | Tapo cameras typically send G.711 over RTSP, which browsers will not play inside MP4. The no-transcoding rule stands. |
 
 ---
 
@@ -328,7 +328,7 @@ The last two are the non-obvious ones. Trailing bytes that do **not** form whole
 * **Exactly one GOP per fragment.** Every fragment begins with a sync sample (IDR). `tfdt` starts at 0 for the clip. Video timescale is 90 000.
 * **H.264:** `avc1` sample entry, parameter sets in `avcC`.
 * **H.265:** `hvc1` sample entry with parameter sets in `hvcC` (Safari requires `hvc1`, not `hev1`).
-* No audio track (D10).
+* Audio is off by default (D10). When a camera opts in, the clip adds track 2: `alaw` (PCMA) or `ulaw` (PCMU), 8 000 Hz, mono, timescale 8 000, stored as received. Audio goes in audio-only fragments after each video fragment. Fragments never mix tracks. `video.seek_index` lists video fragments only. Details: `docs/superpowers/specs/2026-11-23-clip-audio-design.md`.
 * A change in SPS/PPS/VPS mid-stream MUST end the clip and start a new segment (§6.4, `end_reason: codec_change`).
 * The RFC 6381 codec string (e.g. `avc1.640032`) MUST be recorded in the sidecar so viewers can call `MediaSource.isTypeSupported`.
 
@@ -407,6 +407,7 @@ The last two are the non-obvious ones. Trailing bytes that do **not** form whole
 | `video.codec` | string | ✔ | RFC 6381. |
 | `video.init_segment_bytes` | int | ✔ | Plaintext length of `ftyp` + `moov`. |
 | `video.seek_index` | `[[t_ms, plaintext_offset], …]` | ✔ if complete | One entry per fragment. `t_ms` is the fragment's media time; the offset points at its `moof`. |
+| `audio` | object | — | Absent when the clip has no audio. Else `{"codec":"PCMA"\|"PCMU","sample_rate":8000,"channels":1}`. The schema stays `zrec.sidecar/2`. |
 | `recorder.time_source` | enum | ✔ | `rtcp` (RTCP sender report NTP mapping) or `arrival` (host receive time). |
 
 ### 6.3 Compatibility rules

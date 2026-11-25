@@ -46,7 +46,7 @@ These are added to Contract §1. The numbering continues the Contract's.
 | D14 | Zero-disk stays strict. The egress backlog is memory-only. A circuit breaker with exponential backoff gates uploads. Clips are dropped when the backlog is exhausted. | Owner choice: an encrypted on-disk spool was offered and declined. `egress_backlog_mb` is the lever for longer outage tolerance. |
 | D15 | Retention is a MinIO ILM (lifecycle) rule, not relay code. The relay's credentials cannot delete archive objects. | No code to maintain, and it runs while zrelay is down. A compromised relay host cannot wipe the archive through its own credentials. |
 | D16 | zrelay serves **live view** (WebRTC, WHEP signaling) and an **RTSP restream**. Both carry plaintext from the trusted relay host straight to tailnet clients, and never touch storage. | Owner requirement (replaces iptv-seer). The relay host already sees plaintext (Contract §2.2), so this adds no new trusted party. |
-| D17 | Live audio passes through as G.711 when the camera sends it. Clips stay video-only (D10 unchanged). | WebRTC supports PCMA/PCMU natively. MP4 in browsers does not. |
+| D17 | Live audio passes through as G.711 when the camera sends it. Clips stay video-only unless the camera sets `record_audio` (amends D10; see `2026-11-23-clip-audio-design.md`). | WebRTC supports PCMA/PCMU natively. MP4 in browsers does not. |
 | D18 | zview is single-origin: `zview-server --mode both` serves the SPA, `/api/v1/*` and `/live/*` under one `tailscale serve` HTTPS host. CORS, `data_origin`, `/config.json` and presigned links are removed. | Both containers are on the trusted Mac mini, and MinIO is tailnet-only. Topology A (split origins) moves to future work. |
 | D19 | The fMP4 muxer uses `bluenviron/mediacommon/v2` (`pkg/formats/fmp4`), not `Eyevinn/mp4ff`. | Same family as gortsplib v5, already proven in iptv-seer. |
 
@@ -110,7 +110,7 @@ docs/specs/        normative specs; docs/superpowers/ design and plans
 * One gortsplib **v5** client per camera over **TCP** (camera Wi-Fi drops UDP; iptv-seer). H.264 is required. H.265 is accepted if the camera offers it.
 * The session reads codec parameters from the SDP and from in-band parameter sets. A change bumps a **parameter-set generation** counter carried on each access unit.
 * It reassembles RTP into **access units**: `{PTS, DTS, IDR, NALUs, ParamGen, Wall time}`. The wall clock comes from the RTCP sender report NTP mapping (`time_source: rtcp`), falling back to arrival time (`arrival`).
-* G.711 audio RTP (8 kHz mono, as iptv-seer accepts) is always set up when the camera offers it. Live view and the restream share it. Audio never reaches the recorder.
+* G.711 audio RTP (8 kHz mono, as iptv-seer accepts) is always set up when the camera offers it. Live view and the restream share it. Audio reaches the recorder only when the camera sets `record_audio` (`2026-11-23-clip-audio-design.md`).
 * **Hub:** subscribers register with a bounded channel and a class (`recorder` or `viewer`).
   * The camera read loop never blocks. A full subscriber channel marks the subscriber **lagged**: its queue is cleared, and it resumes at the next IDR.
   * A lagged `recorder` subscriber increments `zrelay_recorder_lag_total{camera}`, and the open clip finalizes as `stream_lost`. Losing the middle of a GOP would corrupt the fragment.

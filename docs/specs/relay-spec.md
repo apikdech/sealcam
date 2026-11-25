@@ -12,7 +12,7 @@
 * **Clip lifecycle.** An explicit state machine covers split, stream-loss, codec-change, backlog-overflow and shutdown.
 * **Resources.** A per-camera memory budget formula is enforced through `GOMEMLIMIT`, with a byte-accounted backlog and a defined overflow policy.
 * **Health data.** Heartbeat and hourly coverage objects let viewers distinguish "no events" from "recorder down".
-* **Time and naming.** UTC everywhere, ms + ULID filenames, audio dropped (Contract D9, D10).
+* **Time and naming.** UTC everywhere, ms + ULID filenames, audio dropped unless `record_audio` is set (Contract D9, D10).
 * **Secrets.** Config secrets now use `ENV:` / `FILE:` / `KEYCHAIN:` references. SFTP host-key verification is added (the SFTP driver itself is deferred in v2.2, §4.9).
 * **Tooling.** New `zrelay key …` commands; `zdecrypt` no longer takes the key as a literal flag.
 * **Documentation fixes.** The GCM tag is correctly described (GHASH, not Poly1305). The sidecar struct now matches the JSON. Performance numbers are restated as benchmark targets.
@@ -138,7 +138,7 @@ Upload bandwidth has to keep up too. Three cameras recording at once need about 
 * **Access units:** reassemble NAL units into access units carrying PTS, DTS, an IDR flag and bytes.
 * **Wall-clock mapping:** use the RTCP sender report NTP↔RTP mapping when the camera provides it (`time_source: rtcp`). Otherwise use the host arrival time of the first packet (`time_source: arrival`). The host MUST run NTP.
 * **GOP measurement:** track the maximum observed GOP duration and export it as `zrelay_gop_max_seconds`. Log a warning if it exceeds `max_gop_seconds`. Some "smart" encoding modes stretch GOPs to 10 s or more, which inflates pre-roll and memory.
-* Audio RTP streams are not set up (D10).
+* Audio RTP streams are not set up (D10). Amended: with `record_audio: true`, G.711 8 kHz mono audio is set up and recorded as track 2 of the clip, with no transcoding. See `docs/superpowers/specs/2026-11-23-clip-audio-design.md`.
 
 ### 4.3 Pre-roll ring buffer
 
@@ -146,6 +146,7 @@ Upload bandwidth has to keep up too. Three cameras recording at once need about 
 * **Retention rule:** keep the newest GOP that starts at or before `now − pre_roll`, plus every GOP after it. Evict older GOPs whole.
 * **Hard cap:** if the byte total exceeds `ring_bytes` (§3.2), evict the oldest GOP anyway and increment `zrelay_preroll_truncated_total`.
 * Buffers come from a size-classed `sync.Pool` to limit GC churn. No per-frame allocation on the hot path beyond pool misses.
+* With `record_audio: true`, audio packets are kept in the ring with the GOP they arrive in. They count toward the GOP byte total. See `docs/superpowers/specs/2026-11-23-clip-audio-design.md`.
 * On clip open, the ring hands the retained GOPs to the muxer by reference. It keeps receiving new GOPs, which become shared by both until the clip consumes them.
 
 ### 4.4 Event sources
