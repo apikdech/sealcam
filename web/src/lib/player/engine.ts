@@ -102,6 +102,8 @@ class PlayerImpl implements Player {
   #audio: ClipAudio | null = null;
   /** True once the filter has seen the clip's moov and the audio track (if any) is announced. */
   #trackSet = false;
+  /** One AudioContext for the player, created on the first setSound(true) and shared by every clip. */
+  #ctx: AudioContext | null = null;
   #destroyed = false;
   readonly #win;
   readonly #blobs: BlobLru<BlobEntry>;
@@ -171,8 +173,13 @@ class PlayerImpl implements Player {
     this.#autoAdvance = on;
   }
 
+  #context(): AudioContext {
+    return (this.#ctx ??= new AudioContext());
+  }
+
   setSound(on: boolean): void {
     this.#sound = on;
+    if (on) this.#context();
     this.#audio?.setEnabled(on);
   }
 
@@ -183,12 +190,15 @@ class PlayerImpl implements Player {
     const g = this.#gen;
     this.#clipId = clipId;
     this.#set({ ...initialState(), clipId });
-    const audio = new ClipAudio(this.video);
+    const audio = new ClipAudio(this.video, () => this.#context());
     if (this.#sound) audio.setEnabled(true);
     this.#audio = audio;
     // Audio runs only count while this clip's filter is the current one (a stale fill never reaches it anyway).
     const filter: Fmp4Filter = new Fmp4Filter((run) => {
-      if (this.#filter === filter) audio.add(run);
+      if (this.#filter !== filter) return;
+      // The track must be known before the first run: the moov and its audio can arrive in one chunk.
+      this.#announceTrack(filter);
+      audio.add(run);
     });
     this.#filter = filter;
 
@@ -483,8 +493,6 @@ class PlayerImpl implements Player {
   }
 
   #fail(e: unknown, chunk: number): void {
-    // No audio plays past the last authenticated byte.
-    this.#audio?.clear();
     const o = this.#integrityFailure(e, chunk);
     if (o === null) {
       this.#set({ message: e instanceof Error ? e.message : 'Playback failed.' });
@@ -587,7 +595,6 @@ class PlayerImpl implements Player {
     // ui-spec §4.3.2 step 2: drop the old fetches (their results are ignored), reset the parser, fetch the fragment.
     const g = ++this.#gen;
     this.#filter?.reset();
-    this.#audio?.clear();
     this.#fetching = { fragmentMs: plan.fragmentMs, gen: g };
     this.#signal();
     target = Math.max(target, plan.fragmentMs);
@@ -645,8 +652,8 @@ class PlayerImpl implements Player {
       try {
         // The stopped fill may have been part-way through a fragment: reset the parser before appending again.
         await sink.abort();
-        this.#filter?.reset();
         if (g !== this.#gen) return;
+        this.#filter?.reset();
         await this.#evictAhead(g, open, sink, tMs / 1000);
         if (g !== this.#gen) return;
         // Plan from the buffer as the trim left it: it can end in the middle of a fragment.
@@ -713,6 +720,8 @@ class PlayerImpl implements Player {
     if (this.#destroyed) return;
     this.#destroyed = true;
     this.#teardown();
+    void this.#ctx?.close?.();
+    this.#ctx = null;
     this.#blobs.clear();
     this.video.removeEventListener('timeupdate', this.#onTime);
     this.video.removeEventListener('seeking', this.#onSeeking);

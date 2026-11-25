@@ -11,27 +11,39 @@ import { createPlayer, type Player, type PlayerState } from './engine';
 
 type Call = ['setTrack', AudioTrackInfo | null] | ['add', AudioRun] | ['evictBefore', number] | ['clear'] | ['setEnabled', boolean] | ['dispose'];
 
-const fake = vi.hoisted(() => ({ instances: [] as { calls: unknown[][] }[] }));
+const fake = vi.hoisted(() => ({ instances: [] as { calls: unknown[][]; runs: { tfdt: number; bytes: Uint8Array }[]; ctx: unknown }[] }));
+// Faithful to the real ClipAudio: `add` is ignored before `setTrack`, `setTrack` clears, a tfdt is held once,
+// and an injected context is asked for on enable and never closed.
 vi.mock('./audio', () => ({
   ClipAudio: class {
     calls: unknown[][] = [];
-    constructor() {
+    runs: { tfdt: number; bytes: Uint8Array }[] = [];
+    track: unknown = null;
+    ctx: unknown = null;
+    constructor(_v: unknown, private readonly makeContext: () => unknown) {
       fake.instances.push(this);
     }
     setTrack(i: unknown) {
       this.calls.push(['setTrack', i]);
+      this.track = i;
+      this.runs = [];
     }
-    add(r: unknown) {
+    add(r: { tfdt: number; bytes: Uint8Array }) {
       this.calls.push(['add', r]);
+      if (!this.track || this.runs.some((x) => x.tfdt === r.tfdt)) return;
+      this.runs.push(r);
     }
     evictBefore(t: number) {
       this.calls.push(['evictBefore', t]);
+      this.runs = this.runs.filter((r) => (r.tfdt + r.bytes.length) / 8000 >= t);
     }
     clear() {
       this.calls.push(['clear']);
+      this.runs = [];
     }
     setEnabled(on: boolean) {
       this.calls.push(['setEnabled', on]);
+      if (on) this.ctx = this.makeContext();
     }
     dispose() {
       this.calls.push(['dispose']);
@@ -44,6 +56,9 @@ let audio: FixtureClip;
 let plain: FixtureClip;
 beforeEach(async () => {
   env = installMedia({ mms: false });
+  (globalThis as unknown as Record<string, unknown>).AudioContext ??= class {
+    close() {}
+  };
   fake.instances.length = 0;
   audio ??= await loadFixtureClip('audio');
   plain ??= await loadFixtureClip('complete');
@@ -145,11 +160,14 @@ describe('engine clip audio', () => {
     await p.seek(10_000);
     client.releaseAll();
     const after = calls().slice(before);
-    const clearAt = after.findIndex((c) => c[0] === 'clear');
-    expect(clearAt).toBeGreaterThanOrEqual(0);
-    const fed = adds(after.slice(clearAt));
+    // Fetch seeks keep the audio of older buffered ranges.
+    expect(after.some((c) => c[0] === 'clear')).toBe(false);
+    const held = fake.instances[0]!.runs;
+    expect(held.some((r) => startOf(r) < 2)).toBe(true);
+    const fed = adds(after);
     expect(fed.length).toBeGreaterThan(0);
     expect(Math.min(...fed.map(startOf))).toBeGreaterThanOrEqual(9);
+    expect(new Set(held.map((r) => r.tfdt)).size).toBe(held.length);
   });
 
   it('evicts audio together with the video behind the playhead', async () => {
@@ -166,12 +184,13 @@ describe('engine clip audio', () => {
     await until(() => last(states).integrity === 'tampered', 'tampered');
     await finished();
     const c = calls();
-    expect(c[c.length - 1]).toEqual(['clear']);
-    // Nothing from the failing chunk or after it was fed: what was fed is what chunks 0..7 yield.
+    expect(c.some((x) => x[0] === 'clear')).toBe(false);
+    // Nothing from the failing chunk or after it was fed, and what was verified stays.
     const reference: AudioRun[] = [];
     const f = new Fmp4Filter((r) => reference.push(r));
     for (let i = 0; i < 8; i++) f.push(new Uint8Array(await audio.read(i)));
     expect(adds(c)).toEqual(reference);
+    expect(fake.instances[0]!.runs.length).toBeGreaterThan(0);
   });
 
   it('the Blob path filters too', async () => {
@@ -210,5 +229,48 @@ describe('engine clip audio', () => {
     expect(calls(1).find((c) => c[0] === 'setEnabled')).toEqual(['setEnabled', true]);
     p.setSound(false);
     expect(calls(1).at(-1)).toEqual(['setEnabled', false]);
+  });
+
+  it('keeps the audio of a chunk that holds the moov', async () => {
+    const whole = await audio.plain();
+    const reference: AudioRun[] = [];
+    const f = new Fmp4Filter((r) => reference.push(r));
+    f.push(whole);
+    expect(reference.length).toBeGreaterThan(0);
+    const client = new FakeClient({
+      open: { ...audio.open, numChunks: 1 },
+      read: () => ({ plaintext: whole.buffer.slice(whole.byteOffset, whole.byteOffset + whole.length) as ArrayBuffer, final: true }),
+    });
+    const { p } = make(client);
+    await p.load(CLIP);
+    await finished();
+    expect(fake.instances[0]!.runs).toEqual(reference);
+  });
+
+  it('uses one AudioContext for the player and closes it on destroy', async () => {
+    const closed = vi.fn(() => Promise.resolve());
+    const made: unknown[] = [];
+    const g = globalThis as unknown as Record<string, unknown>;
+    const saved = g.AudioContext;
+    g.AudioContext = class {
+      close = closed;
+      constructor() {
+        made.push(this);
+      }
+    };
+    try {
+      const { p } = make(clientFor(audio));
+      p.setSound(true);
+      await p.load(CLIP);
+      await p.load('01M893949RGGXBHCCZ8E94D1K6');
+      expect(made).toHaveLength(1);
+      expect(fake.instances[0]!.ctx).toBe(made[0]);
+      expect(fake.instances[1]!.ctx).toBe(made[0]);
+      expect(closed).not.toHaveBeenCalled();
+      p.destroy();
+      expect(closed).toHaveBeenCalledTimes(1);
+    } finally {
+      g.AudioContext = saved;
+    }
   });
 });

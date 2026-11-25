@@ -22,6 +22,7 @@ interface Run {
 /** Plays decoded G.711 runs through Web Audio, kept in step with a video clock. */
 export class ClipAudio {
   private ctx: AudioContext | null = null;
+  private ownsCtx = false;
   private track: AudioTrackInfo | null = null;
   private runs: Run[] = [];
   private sources: AudioBufferSourceNode[] = [];
@@ -51,7 +52,8 @@ export class ClipAudio {
 
   constructor(
     private readonly video: VideoClock,
-    private readonly makeContext: () => AudioContext = () => new AudioContext(),
+    /** Supplies a context that the caller owns and closes. Without it, the context is created here and closed by dispose(). */
+    private readonly makeContext?: () => AudioContext,
   ) {
     for (const [t, f] of this.handlers) video.addEventListener(t, f);
   }
@@ -64,6 +66,7 @@ export class ClipAudio {
   add(run: AudioRun): void {
     if (!this.track) return;
     const start = run.tfdt / this.track.timescale;
+    if (this.runs.some((r) => r.start === start)) return;
     const samples = decodeG711(run.bytes, this.track.codec);
     const r: Run = { start, end: start + samples.length / SAMPLE_RATE, samples };
     this.runs.push(r);
@@ -85,7 +88,10 @@ export class ClipAudio {
       this.stopAll();
       return;
     }
-    if (!this.ctx) this.ctx = this.makeContext();
+    if (!this.ctx) {
+      this.ownsCtx = !this.makeContext;
+      this.ctx = this.makeContext ? this.makeContext() : new AudioContext();
+    }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
     this.schedule();
   }
@@ -97,7 +103,7 @@ export class ClipAudio {
     this.enabled = false;
     const ctx = this.ctx;
     this.ctx = null;
-    void ctx?.close?.();
+    if (this.ownsCtx) void ctx?.close?.();
   }
 
   private stopAll(): void {

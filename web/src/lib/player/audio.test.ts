@@ -47,7 +47,8 @@ class FakeCtx {
   }
   createBufferSource() { return new FakeSource(this.starts); }
   resume() { this.resumed++; this.state = 'running'; return Promise.resolve(); }
-  close() { return Promise.resolve(); }
+  closed = 0;
+  close() { this.closed++; return Promise.resolve(); }
 }
 
 function setup() {
@@ -246,5 +247,21 @@ describe('ClipAudio', () => {
     const n = ctx.starts.length;
     v.emit('play');
     expect(ctx.starts).toHaveLength(n);
+  });
+
+  it('adding the same tfdt twice keeps one run', () => {
+    const { v, ctx, a } = setup();
+    v.paused = false;
+    a.add(run(0));
+    a.add(run(0));
+    a.setEnabled(true);
+    expect(live(ctx)).toHaveLength(1);
+  });
+
+  it('dispose does not close an injected context', () => {
+    const { ctx, a } = setup();
+    a.setEnabled(true);
+    a.dispose();
+    expect(ctx.closed).toBe(0);
   });
 });
