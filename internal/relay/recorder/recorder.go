@@ -138,7 +138,7 @@ func (r *Recorder) Open(o clip.OpenInfo) (clip.ClipWriter, error) {
 		return nil, fmt.Errorf("recorder: %w", err)
 	}
 	late := &lateWriter{}
-	mx, err := mux.New(late, o.Codec)
+	mx, err := mux.New(late, o.Codec, o.AudioCodec)
 	if err != nil {
 		return nil, fmt.Errorf("recorder: %w", err)
 	}

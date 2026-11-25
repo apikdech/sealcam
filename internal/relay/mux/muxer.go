@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"time"
 
 	"github.com/bluenviron/mediacommon/v2/pkg/codecs/h264"
 	"github.com/bluenviron/mediacommon/v2/pkg/formats/fmp4"
@@ -37,6 +38,8 @@ type Stats struct {
 	SeekIndex [][2]int64
 	// DurationMs is the media duration written so far.
 	DurationMs int64
+	// AudioCodec is "PCMA" or "PCMU" when the clip has an audio track, else "".
+	AudioCodec string
 }
 
 // Muxer writes one clip. It is not safe for concurrent use.
@@ -50,10 +53,19 @@ type Muxer struct {
 	lastDur uint32
 	endDTS  int64 // DTS just after the last written sample
 	stats   Stats
+
+	audioCodec string
+	origin     time.Time // Start of the first GOP: audio tfdt 0
+	audioEnd   int64     // end of the last written audio sample, 8 kHz ticks
+	havePrev   bool      // an audio packet has been written
+	prevTS     uint32    // RTP timestamp of the last written packet
+	prevLen    int       // payload length of the last written packet
 }
 
 // New returns a muxer for c and writes the init segment to w immediately.
-func New(w io.Writer, c camera.Codec) (*Muxer, error) {
+// audioCodec is "" for a video-only clip, else "PCMA" or "PCMU", which adds
+// the audio track (track 2).
+func New(w io.Writer, c camera.Codec, audioCodec string) (*Muxer, error) {
 	var codec codecs.Codec
 	switch c.Kind {
 	case "h264":
@@ -67,6 +79,18 @@ func New(w io.Writer, c camera.Codec) (*Muxer, error) {
 	init := fmp4.Init{Tracks: []*fmp4.InitTrack{{ID: trackID, TimeScale: timescale, Codec: codec}}}
 	if err := init.Marshal(&m.buf); err != nil {
 		return nil, fmt.Errorf("mux: init segment: %w", err)
+	}
+	if audioCodec != "" {
+		b, err := withAudioTrack(m.buf.Bytes(), audioCodec)
+		if err != nil {
+			return nil, err
+		}
+		m.buf.Reset()
+		if _, err := m.buf.Write(b); err != nil {
+			return nil, fmt.Errorf("mux: init segment: %w", err)
+		}
+		m.audioCodec = audioCodec
+		m.stats.AudioCodec = audioCodec
 	}
 	n, err := m.flush()
 	m.stats.InitSegmentBytes = n
@@ -89,12 +113,14 @@ func (m *Muxer) flush() (int64, error) {
 }
 
 // WriteGOP writes g as one moof+mdat. Only the first sample is a sync sample.
+// With an audio track, the GOP's audio packets follow as audio-only fragments.
 func (m *Muxer) WriteGOP(g *ring.GOP) error {
 	if len(g.AUs) == 0 {
 		return errors.New("mux: empty GOP")
 	}
 	if !m.started {
 		m.first = g.StartDTS
+		m.origin = g.Start
 	}
 	base := g.StartDTS - m.first
 	if base < 0 {
@@ -142,6 +168,9 @@ func (m *Muxer) WriteGOP(g *ring.GOP) error {
 	m.endDTS = last.DTS + int64(lastDur)
 	m.stats.SeekIndex = append(m.stats.SeekIndex, [2]int64{base * 1000 / timescale, offset})
 	m.stats.DurationMs = (m.endDTS - m.first) * 1000 / timescale
+	if m.audioCodec != "" {
+		return m.writeAudio(g.Audio)
+	}
 	return nil
 }
 

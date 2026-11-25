@@ -419,7 +419,7 @@ func TestStagingSidecarHasAllRecoveryFields(t *testing.T) {
 		t.Errorf("video = %+v", v)
 	}
 	var probe bytes.Buffer
-	if _, err := mux.New(&probe, c); err != nil {
+	if _, err := mux.New(&probe, c, ""); err != nil {
 		t.Fatal(err)
 	}
 	if v.InitSegmentBytes != int64(probe.Len()) {

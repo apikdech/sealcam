@@ -94,7 +94,7 @@ func muxAll(t *testing.T, path, kind string) (*mux.Muxer, *bytes.Buffer, []*ring
 	t.Helper()
 	c, gops := fixture(t, path, kind)
 	var buf bytes.Buffer
-	m, err := mux.New(&buf, c)
+	m, err := mux.New(&buf, c, "")
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -248,7 +248,7 @@ func TestInitBytesMatchesFtypMoov(t *testing.T) {
 func TestNewWritesInitImmediately(t *testing.T) {
 	c, _ := fixture(t, h264Fixture, "h264")
 	var buf bytes.Buffer
-	m, err := mux.New(&buf, c)
+	m, err := mux.New(&buf, c, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,7 +270,7 @@ func TestTfdtRelativeToFirstGOP(t *testing.T) {
 		}
 	}
 	var buf bytes.Buffer
-	m, err := mux.New(&buf, c)
+	m, err := mux.New(&buf, c, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -328,7 +328,7 @@ func TestH265UsesHvc1(t *testing.T) {
 
 func TestWriteGOPRejectsEmpty(t *testing.T) {
 	c, _ := fixture(t, h264Fixture, "h264")
-	m, err := mux.New(&bytes.Buffer{}, c)
+	m, err := mux.New(&bytes.Buffer{}, c, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -352,14 +352,14 @@ func (w *limitWriter) Write(p []byte) (int, error) {
 
 func TestWriteErrorsPropagate(t *testing.T) {
 	c, gops := fixture(t, h264Fixture, "h264")
-	if _, err := mux.New(&limitWriter{}, c); !errors.Is(err, errWrite) {
+	if _, err := mux.New(&limitWriter{}, c, ""); !errors.Is(err, errWrite) {
 		t.Fatalf("New error = %v, want write error", err)
 	}
 	var probe bytes.Buffer
-	if _, err := mux.New(&probe, c); err != nil {
+	if _, err := mux.New(&probe, c, ""); err != nil {
 		t.Fatal(err)
 	}
-	m, err := mux.New(&limitWriter{n: probe.Len()}, c)
+	m, err := mux.New(&limitWriter{n: probe.Len()}, c, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -383,7 +383,7 @@ func TestInBandParameterSetsAreDropped(t *testing.T) {
 			g.AUs[0].NALUs = append(append([][]byte{}, ps...), g.AUs[0].NALUs...)
 		}
 		var buf bytes.Buffer
-		m, err := mux.New(&buf, c)
+		m, err := mux.New(&buf, c, "")
 		if err != nil {
 			t.Fatal(err)
 		}
