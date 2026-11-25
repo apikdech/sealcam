@@ -516,14 +516,25 @@ func (a *assembler) audio(p *AudioPacket, arrival time.Time) {
 		return
 	}
 	ticks := a.audioUnwrap.unwrap(p.Timestamp)
-	if !a.audioStarted {
-		a.audioStarted, a.audioFirst, a.audioAnchor = true, ticks, arrival.UTC()
-	}
-	wall := a.audioAnchor.Add(audioTicksToDuration(ticks - a.audioFirst))
-	if a.timeSource == TimeSourceRTCP && a.audioNTP != nil {
-		if t, ok := a.audioNTP(p.Timestamp); ok {
-			wall = t.UTC()
+	var wall time.Time
+	if a.timeSource == TimeSourceRTCP {
+		// Without a sender report for the audio media the packet cannot be
+		// placed on the camera's clock, and an arrival-based value would
+		// stay offset from video for the whole session (the floor never
+		// lets NTP catch up). Drop it until the mapping exists.
+		if a.audioNTP == nil {
+			return
 		}
+		t, ok := a.audioNTP(p.Timestamp)
+		if !ok {
+			return
+		}
+		wall = t.UTC()
+	} else {
+		if !a.audioStarted {
+			a.audioStarted, a.audioFirst, a.audioAnchor = true, ticks, arrival.UTC()
+		}
+		wall = a.audioAnchor.Add(audioTicksToDuration(ticks - a.audioFirst))
 	}
 	// Same floor as emit: Wall never runs slower than the media clock.
 	if a.audioHaveWall {

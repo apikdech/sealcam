@@ -357,8 +357,25 @@ func TestAudioWallRTCP(t *testing.T) {
 	a, sink = audioAssembler(TimeSourceRTCP, func(uint32) (time.Time, bool) { return time.Time{}, false })
 	a.audio(&AudioPacket{Timestamp: 1000}, T)
 	a.audio(&AudioPacket{Timestamp: 1160}, T)
-	if !sink.audio[1].Wall.Equal(T.Add(20 * time.Millisecond)) {
-		t.Fatalf("wall = %v, want arrival-based", sink.audio[1].Wall)
+	if len(sink.audio) != 0 {
+		t.Fatalf("forwarded %d packets without an NTP mapping", len(sink.audio))
+	}
+}
+
+func TestAudioWallRTCPFollowsNTPOnceMapped(t *testing.T) {
+	t.Parallel()
+	T := time.Date(2026, 11, 25, 10, 0, 0, 0, time.UTC)
+	n := T.Add(-2 * time.Second) // earlier than arrival
+	calls := 0
+	a, sink := audioAssembler(TimeSourceRTCP, func(uint32) (time.Time, bool) {
+		calls++
+		return n, calls > 2
+	})
+	for i := 0; i < 4; i++ {
+		a.audio(&AudioPacket{Timestamp: 1000 + uint32(i)*160}, T.Add(time.Duration(i)*20*time.Millisecond))
+	}
+	if len(sink.audio) != 2 || !sink.audio[0].Wall.Equal(n) {
+		t.Fatalf("forwarded %d, first wall %v, want 2 and %v", len(sink.audio), sink.audio[0].Wall, n)
 	}
 }
 
