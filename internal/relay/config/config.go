@@ -114,27 +114,29 @@ type Restream struct {
 
 // CameraDefaults are inherited by every camera.
 type CameraDefaults struct {
-	PreRollSeconds        int `yaml:"pre_roll_seconds"`
-	PostRollSeconds       int `yaml:"post_roll_seconds"`
-	MaxClipSeconds        int `yaml:"max_clip_seconds"`
-	MaxBitrateKbps        int `yaml:"max_bitrate_kbps"`
-	MaxGOPSeconds         int `yaml:"max_gop_seconds"`
-	TriggerTimeoutSeconds int `yaml:"trigger_timeout_seconds"`
-	RecorderQueueFrames   int `yaml:"recorder_queue_frames"`
-	ViewerQueueFrames     int `yaml:"viewer_queue_frames"`
+	PreRollSeconds        int  `yaml:"pre_roll_seconds"`
+	PostRollSeconds       int  `yaml:"post_roll_seconds"`
+	MaxClipSeconds        int  `yaml:"max_clip_seconds"`
+	MaxBitrateKbps        int  `yaml:"max_bitrate_kbps"`
+	MaxGOPSeconds         int  `yaml:"max_gop_seconds"`
+	TriggerTimeoutSeconds int  `yaml:"trigger_timeout_seconds"`
+	RecorderQueueFrames   int  `yaml:"recorder_queue_frames"`
+	ViewerQueueFrames     int  `yaml:"viewer_queue_frames"`
+	RecordAudio           bool `yaml:"record_audio"`
 }
 
 // CameraOverrides are the per-camera overrides of CameraDefaults, written
 // at the camera level with the same keys. Nil means inherit.
 type CameraOverrides struct {
-	PreRollSeconds        *int `yaml:"pre_roll_seconds"`
-	PostRollSeconds       *int `yaml:"post_roll_seconds"`
-	MaxClipSeconds        *int `yaml:"max_clip_seconds"`
-	MaxBitrateKbps        *int `yaml:"max_bitrate_kbps"`
-	MaxGOPSeconds         *int `yaml:"max_gop_seconds"`
-	TriggerTimeoutSeconds *int `yaml:"trigger_timeout_seconds"`
-	RecorderQueueFrames   *int `yaml:"recorder_queue_frames"`
-	ViewerQueueFrames     *int `yaml:"viewer_queue_frames"`
+	PreRollSeconds        *int  `yaml:"pre_roll_seconds"`
+	PostRollSeconds       *int  `yaml:"post_roll_seconds"`
+	MaxClipSeconds        *int  `yaml:"max_clip_seconds"`
+	MaxBitrateKbps        *int  `yaml:"max_bitrate_kbps"`
+	MaxGOPSeconds         *int  `yaml:"max_gop_seconds"`
+	TriggerTimeoutSeconds *int  `yaml:"trigger_timeout_seconds"`
+	RecorderQueueFrames   *int  `yaml:"recorder_queue_frames"`
+	ViewerQueueFrames     *int  `yaml:"viewer_queue_frames"`
+	RecordAudio           *bool `yaml:"record_audio"`
 }
 
 // Camera is one camera entry. The YAML fields keep what the file says; the
@@ -168,6 +170,7 @@ type Camera struct {
 	TriggerTimeout      time.Duration `yaml:"-"`
 	RecorderQueueFrames int           `yaml:"-"`
 	ViewerQueueFrames   int           `yaml:"-"`
+	RecordAudio         bool          `yaml:"-"`
 
 	// Rules are the event rules from events.rules. They stay empty for a
 	// tapo camera without rules; the built-in Tapo rules (design §4.3) are
@@ -382,6 +385,12 @@ func (c *Config) applyCameraDefaults() {
 		}
 		return d
 	}
+	pickBool := func(o *bool, d bool) bool {
+		if o != nil {
+			return *o
+		}
+		return d
+	}
 	sec := func(n int) time.Duration { return time.Duration(n) * time.Second }
 	d := c.Defaults
 	for i := range c.Cameras {
@@ -404,6 +413,7 @@ func (c *Config) applyCameraDefaults() {
 		cam.TriggerTimeout = sec(pick(o.TriggerTimeoutSeconds, d.TriggerTimeoutSeconds))
 		cam.RecorderQueueFrames = pick(o.RecorderQueueFrames, d.RecorderQueueFrames)
 		cam.ViewerQueueFrames = pick(o.ViewerQueueFrames, d.ViewerQueueFrames)
+		cam.RecordAudio = pickBool(o.RecordAudio, d.RecordAudio)
 		cam.Rules = make([]RuleConfig, len(cam.Events.Rules))
 		for j, r := range cam.Events.Rules {
 			if r.ActiveValue == "" {

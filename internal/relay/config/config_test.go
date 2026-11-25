@@ -499,3 +499,43 @@ func TestLoadMissingFile(t *testing.T) {
 		t.Fatal("Load of missing file: want error, got nil")
 	}
 }
+
+func loadRecordAudio(t *testing.T, camExtra, defaults string) *Config {
+	t.Helper()
+	t.Setenv("ZR_TEST_MASTER", "zk1-x")
+	t.Setenv("CAM_USER", "admin")
+	t.Setenv("CAM_PASS", "pw")
+	cam := func(id string, extra string) string {
+		return `  - id: "` + id + `"
+    brand: "tapo"
+    host: "192.0.2.33"
+    credentials: { username: "ENV:CAM_USER", password: "ENV:CAM_PASS" }
+    rtsp: { path: "/stream1" }
+` + extra
+	}
+	p := writeFile(t, t.TempDir(), "c.yaml", minimalConfig(cam("cam-a", "")+cam("cam-b", camExtra))+defaults)
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	return cfg
+}
+
+func TestRecordAudioDefaultsOff(t *testing.T) {
+	cfg := loadRecordAudio(t, "", "")
+	for _, cam := range cfg.Cameras {
+		if cam.RecordAudio {
+			t.Errorf("%s: RecordAudio = true, want false", cam.ID)
+		}
+	}
+}
+
+func TestRecordAudioDefaultAndOverride(t *testing.T) {
+	cfg := loadRecordAudio(t, "    record_audio: false\n", "defaults:\n  record_audio: true\n")
+	if !cfg.Cameras[0].RecordAudio {
+		t.Errorf("cam-a RecordAudio = false, want true (from defaults)")
+	}
+	if cfg.Cameras[1].RecordAudio {
+		t.Errorf("cam-b RecordAudio = true, want false (camera override)")
+	}
+}

@@ -49,6 +49,7 @@ defaults:
   max_bitrate_kbps: 4000
   max_gop_seconds: 4
   trigger_timeout_seconds: 60
+  # record_audio: false           # true: record the camera's G.711 audio into clips
   recorder_queue_frames: 256
   viewer_queue_frames: 64
 

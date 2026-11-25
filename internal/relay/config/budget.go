@@ -45,8 +45,12 @@ type BudgetReport struct {
 	OK           bool
 }
 
+// audioBytesPerSecond is G.711 at 8 kHz mono, added to B for a camera with
+// record_audio.
+const audioBytesPerSecond = 8000
+
 // Budget computes the memory budget of c (design §8.1). Per camera, with
-// B = max_bitrate_kbps × 1000 / 8 bytes/s and G = max_gop_seconds:
+// B = max_bitrate_kbps × 1000 / 8 bytes/s (+ 8 000 with record_audio) and G = max_gop_seconds:
 //
 //	ring   = B × (pre_roll_seconds + G) × 1.25
 //	active = 2 × chunk_size + B × G + part_size_mib MiB
@@ -70,6 +74,9 @@ func Budget(c *Config) BudgetReport {
 	r.Total = r.LiveBytes + r.BacklogBytes + r.RuntimeBytes
 	for _, cam := range c.Cameras {
 		b := int64(cam.MaxBitrateKbps) * 1000 / 8
+		if cam.RecordAudio {
+			b += audioBytesPerSecond
+		}
 		g := secs(cam.MaxGOP)
 		cb := CameraBudget{
 			ID:     cam.ID,

@@ -148,3 +148,25 @@ func TestBudgetWriteTable(t *testing.T) {
 		t.Errorf("table at 1024 should say OK, not OVER:\n%s", out)
 	}
 }
+
+func TestBudgetCountsAudio(t *testing.T) {
+	base := Budget(workedExample(1024)).Cameras[0]
+	c := workedExample(1024)
+	c.Cameras[0].RecordAudio = true
+	r := Budget(c)
+	got, plain := r.Cameras[0], Budget(c).Cameras[1]
+	plain.ID = base.ID
+	if plain != base {
+		t.Errorf("camera without audio changed: %+v, want %+v", plain, base)
+	}
+	if want := int64(8000) * (15 + 2) * 5 / 4; got.Ring-base.Ring != want {
+		t.Errorf("Ring grew by %d, want %d", got.Ring-base.Ring, want)
+	}
+	if want := int64(8000) * 2; got.Active-base.Active != want {
+		t.Errorf("Active grew by %d, want %d", got.Active-base.Active, want)
+	}
+	b := int64(3200)*1000/8 + 8000
+	if want := (int64(256) + 64*4) * b / budgetFPSEstimate; got.Queues != want {
+		t.Errorf("Queues = %d, want %d", got.Queues, want)
+	}
+}

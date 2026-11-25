@@ -91,7 +91,7 @@
 
 At startup the process sets `debug.SetMemoryLimit(max_memory_mb)`. `zrelay config check` MUST print the computed budget and fail if it exceeds `max_memory_mb × 0.8`.
 
-Per camera, with `B = max_bitrate_kbps × 1000 / 8` bytes/s and `G = max_gop_seconds`:
+Per camera, with `B = max_bitrate_kbps × 1000 / 8` bytes/s (plus 8 000 bytes/s when the camera has `record_audio`) and `G = max_gop_seconds`:
 
 ```
 ring_bytes    = B × (pre_roll_seconds + G) × 1.25
@@ -489,6 +489,7 @@ defaults:                          # inherited by every camera; override per cam
   max_bitrate_kbps: 4000           # budget input, not an encoder setting
   max_gop_seconds: 4
   trigger_timeout_seconds: 60
+  # record_audio: false           # bool; per camera or here; true adds 8 000 B/s to B (§3.2)
 
 cameras:
   - id: "front-door"               # ^[a-z0-9][a-z0-9-]{0,63}$ (Contract §4.1)
