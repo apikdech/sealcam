@@ -46,6 +46,8 @@ type AudioPacket struct {
 	Payload   []byte
 	Timestamp uint32
 	Seq       uint16
+	// Wall is the packet's wall time, computed like AccessUnit.Wall.
+	Wall time.Time
 }
 
 // TimeSource says where AccessUnit.Wall comes from.
@@ -198,6 +200,8 @@ type assembler struct {
 	// ntp maps an RTP timestamp to wall time once an RTCP sender report
 	// has arrived.
 	ntp func(rtp uint32) (time.Time, bool)
+	// audioNTP is the same mapping for the audio media (nil without audio).
+	audioNTP func(rtp uint32) (time.Time, bool)
 
 	// codec holds the parameter sets in force. announced is the codec of
 	// the latest Codec call (valid once haveAnnounced), and gen its
@@ -239,6 +243,16 @@ type assembler struct {
 	haveWall    bool
 	lastWall    time.Time
 	lastWallDTS int64
+
+	// Audio wall time: arrival anchor of the first forwarded packet, and the
+	// monotonic floor state, as for video.
+	audioUnwrap    unwrapper
+	audioStarted   bool
+	audioFirst     int64
+	audioAnchor    time.Time
+	audioHaveWall  bool
+	audioLastWall  time.Time
+	audioLastTicks int64
 }
 
 func newAssembler(rules codecRules, vps, sps, pps []byte, sink SessionSink, ntp func(uint32) (time.Time, bool)) *assembler {
@@ -495,11 +509,36 @@ func (a *assembler) withParamSets(nalus [][]byte, idr bool) [][]byte {
 	return append(out, nalus...)
 }
 
-// audio forwards one G.711 packet once video has started.
-func (a *assembler) audio(p *AudioPacket) {
-	if a.decided {
-		a.sink.Audio(p)
+// audio stamps one G.711 packet with its wall time and forwards it once video
+// has started. arrival is when the packet was received.
+func (a *assembler) audio(p *AudioPacket, arrival time.Time) {
+	if !a.decided {
+		return
 	}
+	ticks := a.audioUnwrap.unwrap(p.Timestamp)
+	if !a.audioStarted {
+		a.audioStarted, a.audioFirst, a.audioAnchor = true, ticks, arrival.UTC()
+	}
+	wall := a.audioAnchor.Add(audioTicksToDuration(ticks - a.audioFirst))
+	if a.timeSource == TimeSourceRTCP && a.audioNTP != nil {
+		if t, ok := a.audioNTP(p.Timestamp); ok {
+			wall = t.UTC()
+		}
+	}
+	// Same floor as emit: Wall never runs slower than the media clock.
+	if a.audioHaveWall {
+		if floor := a.audioLastWall.Add(audioTicksToDuration(ticks - a.audioLastTicks)); wall.Before(floor) {
+			wall = floor
+		}
+	}
+	a.audioHaveWall, a.audioLastWall, a.audioLastTicks = true, wall, ticks
+	p.Wall = wall
+	a.sink.Audio(p)
+}
+
+// audioTicksToDuration converts 8 kHz G.711 ticks to a duration.
+func audioTicksToDuration(t int64) time.Duration {
+	return time.Duration(t) * time.Second / 8000
 }
 
 // cloneNALUs copies nalus into one allocation, detaching them from RTP

@@ -244,13 +244,14 @@ func setupAudio(c *gortsplib.Client, desc *description.Session, a *assembler) er
 	if _, err := c.Setup(desc.BaseURL, medi, 0, 0); err != nil {
 		return err
 	}
+	a.audioNTP = ntpFunc(c, medi, g711)
 	c.OnPacketRTP(medi, g711, func(pkt *rtp.Packet) {
 		a.audio(&AudioPacket{
 			Codec:     codec,
 			Payload:   bytes.Clone(pkt.Payload),
 			Timestamp: pkt.Timestamp,
 			Seq:       pkt.SequenceNumber,
-		})
+		}, time.Now())
 	})
 	return nil
 }

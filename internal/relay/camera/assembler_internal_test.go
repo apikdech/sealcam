@@ -26,13 +26,16 @@ type sinkEvent struct {
 	video *AccessUnit
 }
 
-type memSink struct{ events []sinkEvent }
+type memSink struct {
+	events []sinkEvent
+	audio  []*AudioPacket
+}
 
 func (s *memSink) Codec(c Codec, ts TimeSource) {
 	s.events = append(s.events, sinkEvent{codec: &c, ts: ts})
 }
 func (s *memSink) Video(au *AccessUnit) { s.events = append(s.events, sinkEvent{video: au}) }
-func (s *memSink) Audio(*AudioPacket)   {}
+func (s *memSink) Audio(p *AudioPacket) { s.audio = append(s.audio, p) }
 
 func (s *memSink) videos() []*AccessUnit {
 	var out []*AccessUnit
@@ -323,5 +326,68 @@ func TestWallClockRTCPNeverStepsBack(t *testing.T) {
 	}
 	if want := base.Add(ticksToDuration(got[20].DTS) + 5*time.Second); !got[20].Wall.Equal(want) {
 		t.Fatalf("AU 20 after the forward step: Wall %v, want %v", got[20].Wall, want)
+	}
+}
+
+func audioAssembler(ts TimeSource, ntp func(uint32) (time.Time, bool)) (*assembler, *memSink) {
+	sink := &memSink{}
+	return &assembler{sink: sink, decided: true, timeSource: ts, audioNTP: ntp}, sink
+}
+
+func TestAudioWallArrival(t *testing.T) {
+	t.Parallel()
+	a, sink := audioAssembler(TimeSourceArrival, nil)
+	T := time.Date(2026, 11, 25, 10, 0, 0, 0, time.UTC)
+	a.audio(&AudioPacket{Timestamp: 1000}, T)
+	a.audio(&AudioPacket{Timestamp: 1160}, T.Add(time.Second)) // arrival jitter is ignored
+	if len(sink.audio) != 2 || !sink.audio[0].Wall.Equal(T) || !sink.audio[1].Wall.Equal(T.Add(20*time.Millisecond)) {
+		t.Fatalf("walls = %v", sink.audio)
+	}
+}
+
+func TestAudioWallRTCP(t *testing.T) {
+	t.Parallel()
+	T := time.Date(2026, 11, 25, 10, 0, 0, 0, time.UTC)
+	n := T.Add(5 * time.Hour)
+	a, sink := audioAssembler(TimeSourceRTCP, func(uint32) (time.Time, bool) { return n, true })
+	a.audio(&AudioPacket{Timestamp: 1000}, T)
+	if !sink.audio[0].Wall.Equal(n) {
+		t.Fatalf("wall = %v, want %v", sink.audio[0].Wall, n)
+	}
+	a, sink = audioAssembler(TimeSourceRTCP, func(uint32) (time.Time, bool) { return time.Time{}, false })
+	a.audio(&AudioPacket{Timestamp: 1000}, T)
+	a.audio(&AudioPacket{Timestamp: 1160}, T)
+	if !sink.audio[1].Wall.Equal(T.Add(20 * time.Millisecond)) {
+		t.Fatalf("wall = %v, want arrival-based", sink.audio[1].Wall)
+	}
+}
+
+func TestAudioWallWrapsAndNeverStepsBack(t *testing.T) {
+	t.Parallel()
+	T := time.Date(2026, 11, 25, 10, 0, 0, 0, time.UTC)
+	a, sink := audioAssembler(TimeSourceArrival, nil)
+	a.audio(&AudioPacket{Timestamp: 0xFFFFFF00}, T)
+	a.audio(&AudioPacket{Timestamp: 0x00000060}, T) // 352 ticks later
+	if got, want := sink.audio[1].Wall, T.Add(44*time.Millisecond); !got.Equal(want) {
+		t.Fatalf("wrapped wall = %v, want %v", got, want)
+	}
+
+	var step int
+	ntps := []time.Time{T, T.Add(-time.Hour)} // the second mapping steps back
+	a, sink = audioAssembler(TimeSourceRTCP, func(uint32) (time.Time, bool) { step++; return ntps[step-1], true })
+	a.audio(&AudioPacket{Timestamp: 1000}, T)
+	a.audio(&AudioPacket{Timestamp: 1160}, T)
+	if got, want := sink.audio[1].Wall, T.Add(20*time.Millisecond); !got.Equal(want) {
+		t.Fatalf("floored wall = %v, want %v", got, want)
+	}
+}
+
+func TestAudioBeforeVideoDecidedDropped(t *testing.T) {
+	t.Parallel()
+	a, sink := audioAssembler(TimeSourceArrival, nil)
+	a.decided = false
+	a.audio(&AudioPacket{Timestamp: 1}, time.Now())
+	if len(sink.audio) != 0 {
+		t.Fatalf("forwarded %d packets before decided", len(sink.audio))
 	}
 }
