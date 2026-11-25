@@ -372,3 +372,53 @@ func TestLostOnFullQueueIsNotLag(t *testing.T) {
 		t.Fatalf("events after reconnect = %+v, want codec then IDR", evs)
 	}
 }
+
+func TestRecorderGetsNoAudioByDefault(t *testing.T) {
+	t.Parallel()
+	h := camera.NewHub("front")
+	rec := h.Subscribe(camera.ClassRecorder, 16)
+	defer rec.Close()
+
+	h.Audio(&camera.AudioPacket{Codec: "PCMA", Seq: 1})
+	if evs := pending(rec); len(evs) != 0 {
+		t.Fatalf("recorder without WithAudio got %+v", evs)
+	}
+}
+
+func TestRecorderWithAudioGetsAudio(t *testing.T) {
+	t.Parallel()
+	h := camera.NewHub("front")
+	rec := h.Subscribe(camera.ClassRecorder, 16, camera.WithAudio())
+	defer rec.Close()
+
+	h.Audio(&camera.AudioPacket{Codec: "PCMA", Seq: 7})
+	ev := recv(t, rec)
+	if ev.Kind != camera.EventAudio || ev.Audio.Seq != 7 {
+		t.Fatalf("got %+v, want audio seq 7", ev)
+	}
+}
+
+func TestRecorderAudioNeverLags(t *testing.T) {
+	t.Parallel()
+	h := camera.NewHub("front")
+	rec := h.Subscribe(camera.ClassRecorder, 3, camera.WithAudio())
+	defer rec.Close()
+
+	h.Video(au(0, true))
+	h.Video(au(3000, false))
+	h.Video(au(6000, false)) // queue full (3)
+	h.Audio(&camera.AudioPacket{Codec: "PCMA", Seq: 1})
+	if rec.Lagged() != 0 {
+		t.Fatalf("Lagged = %d after audio on a full queue, want 0", rec.Lagged())
+	}
+	for i := range 3 {
+		if ev := recv(t, rec); ev.Kind != camera.EventVideo || ev.AU.DTS != int64(i)*3000 {
+			t.Fatalf("event %d = %+v, want video untouched", i, ev)
+		}
+	}
+	h.Video(au(9000, false))
+	evs := pending(rec)
+	if len(evs) != 1 || evs[0].Kind != camera.EventVideo || evs[0].AU.DTS != 9000 {
+		t.Fatalf("after room, got %+v, want only the next video (audio dropped)", evs)
+	}
+}

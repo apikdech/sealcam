@@ -36,7 +36,8 @@ type Class int
 
 // Subscriber classes.
 const (
-	// ClassRecorder receives codec, video and loss events, never audio.
+	// ClassRecorder receives codec, video and loss events. It receives
+	// audio only if subscribed WithAudio.
 	ClassRecorder Class = iota
 	// ClassViewer (live view, restream) also receives audio.
 	ClassViewer
@@ -73,9 +74,17 @@ type Sub struct {
 	class   Class
 	ch      chan Event
 	lagged  atomic.Uint64
+	audio   bool // receives audio although not a viewer
 	waitIDR bool // guarded by hub.mu
 	closed  bool // guarded by hub.mu
 }
+
+// SubOption changes how Subscribe sets up a subscription.
+type SubOption func(*Sub)
+
+// WithAudio makes a recorder subscription receive audio. Audio to a recorder
+// is best effort: when its queue is full the packet is dropped, without lag.
+func WithAudio() SubOption { return func(s *Sub) { s.audio = true } }
 
 // Subscribe registers a subscriber with a queue of the given size (at
 // least 2). If the Hub knows the current codec, it is the first event. Video
@@ -87,8 +96,11 @@ type Sub struct {
 // Consumers must therefore expect an EventCodec right after an EventLost
 // even when the codec has not changed. A full queue met by Lost is cleared
 // the same way but does not count as lag.
-func (h *Hub) Subscribe(class Class, queue int) *Sub {
+func (h *Hub) Subscribe(class Class, queue int, opts ...SubOption) *Sub {
 	s := &Sub{hub: h, class: class, ch: make(chan Event, max(queue, minQueue)), waitIDR: true}
+	for _, o := range opts {
+		o(s)
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.hasCodec {
@@ -157,14 +169,21 @@ func (h *Hub) Video(au *AccessUnit) {
 	}
 }
 
-// Audio broadcasts p to viewers (SessionSink).
+// Audio broadcasts p to viewers and to recorders subscribed WithAudio
+// (SessionSink). A full recorder queue drops the packet and never lags.
 func (h *Hub) Audio(p *AudioPacket) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	ev := Event{Kind: EventAudio, Audio: p}
 	for s := range h.subs {
-		if s.class == ClassViewer {
+		switch {
+		case s.class == ClassViewer:
 			h.deliver(s, ev)
+		case s.audio:
+			select {
+			case s.ch <- ev:
+			default:
+			}
 		}
 	}
 }
