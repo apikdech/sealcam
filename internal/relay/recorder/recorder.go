@@ -198,6 +198,10 @@ func (w *clipWriter) sidecar() *sidecar.Sidecar {
 	if tags == nil {
 		tags = []string{}
 	}
+	var audio *sidecar.Audio
+	if o.AudioCodec != "" {
+		audio = &sidecar.Audio{Codec: o.AudioCodec, SampleRate: 8000, Channels: 1}
+	}
 	return &sidecar.Sidecar{
 		Schema:       sidecar.Schema,
 		Status:       sidecar.StatusIncomplete,
@@ -220,6 +224,7 @@ func (w *clipWriter) sidecar() *sidecar.Sidecar {
 			Height:           o.Codec.Height,
 			InitSegmentBytes: w.initBytes,
 		},
+		Audio:    audio,
 		Recorder: sidecar.Recorder{RelayID: cfg.RelayID, Version: cfg.Version, TimeSource: string(o.TimeSource)},
 	}
 }

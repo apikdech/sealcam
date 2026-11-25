@@ -867,3 +867,35 @@ func TestRecorderEndToEndLocal(t *testing.T) {
 		t.Errorf("ffprobe streams = %+v", probe.Streams)
 	}
 }
+
+func TestSidecarAudioFromOpenInfo(t *testing.T) {
+	for _, codec := range []string{"", "PCMA", "PCMU"} {
+		t.Run("codec="+codec, func(t *testing.T) {
+			d, base := newLocal(t)
+			rec := newRecorder(t, d, 64<<10)
+			c, gops := fixture(t, t0)
+			info := openInfo(t, c, t0, 0)
+			info.AudioCodec = codec
+			fin := clip.FinalInfo{End: t0.Add(4 * time.Second), DurationMs: 4000, Reason: clip.ReasonPostRollElapsed}
+			recordClip(t, rec, c, gops[:2], info, fin)
+
+			raw := readFile(t, base, sidecar.ClipKeys(cameraID, t0, info.ClipID).Sidecar)
+			sc, err := sidecar.Decode(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := sc.Validate(); err != nil {
+				t.Fatalf("Validate: %v", err)
+			}
+			if codec == "" {
+				if sc.Audio != nil || bytes.Contains(raw, []byte(`"audio"`)) {
+					t.Errorf("sidecar has audio without an audio codec: %s", raw)
+				}
+				return
+			}
+			if sc.Audio == nil || *sc.Audio != (sidecar.Audio{Codec: codec, SampleRate: 8000, Channels: 1}) {
+				t.Errorf("audio = %+v", sc.Audio)
+			}
+		})
+	}
+}

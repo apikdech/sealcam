@@ -85,7 +85,29 @@ type Sidecar struct {
 	EndReason    string    `json:"end_reason"`
 	Triggers     []Trigger `json:"triggers"`
 	Video        Video     `json:"video"`
+	Audio        *Audio    `json:"audio,omitempty"`
 	Recorder     Recorder  `json:"recorder"`
+}
+
+// Audio is a UI hint that the clip carries a G.711 audio track. It is absent
+// for clips without audio.
+type Audio struct {
+	Codec      string `json:"codec"`
+	SampleRate int    `json:"sample_rate"`
+	Channels   int    `json:"channels"`
+}
+
+func (a *Audio) validate() error {
+	if a.Codec != "PCMA" && a.Codec != "PCMU" {
+		return fieldErr("audio.codec", "must be PCMA or PCMU, got %q", a.Codec)
+	}
+	if a.SampleRate != 8000 {
+		return fieldErr("audio.sample_rate", "must be 8000, got %d", a.SampleRate)
+	}
+	if a.Channels != 1 {
+		return fieldErr("audio.channels", "must be 1, got %d", a.Channels)
+	}
+	return nil
 }
 
 // Camera identifies the source camera. Name, Brand and Tags are untrusted
@@ -230,6 +252,11 @@ func (s *Sidecar) Validate() error {
 	}
 	if err := s.Video.validate(complete); err != nil {
 		return err
+	}
+	if s.Audio != nil {
+		if err := s.Audio.validate(); err != nil {
+			return err
+		}
 	}
 	if !timeSources[s.Recorder.TimeSource] {
 		return fieldErr("recorder.time_source", "unknown value %q", s.Recorder.TimeSource)
