@@ -499,9 +499,7 @@ func (a *app) startCamera(ctx context.Context, cm *cam, keys zrec.Keys) error {
 		ChunkSize: a.cfg.Encryption.ChunkSizeKiB << 10,
 		Clock:     a.clk,
 	}, a.eg)
-	b := int64(c.MaxBitrateKbps) * 1000 / 8
-	capBytes := b * int64((c.PreRoll+c.MaxGOP)/time.Second) * 5 / 4 // the budget's ring term
-	r := ring.New(c.PreRoll, capBytes, func() {
+	r := ring.New(c.PreRoll, c.RingCapBytes(), func() { // the cap is the budget's ring term
 		a.m.PreRollTruncated(c.ID)
 		slog.Warn("pre-roll ring truncated by its byte cap", "camera", c.ID)
 	})
@@ -509,13 +507,13 @@ func (a *app) startCamera(ctx context.Context, cm *cam, keys zrec.Keys) error {
 	out := &countingOutput{Output: rec, camera: c.ID, m: a.m}
 	cm.machine = clip.New(clip.Config{Camera: c.ID, PostRoll: c.PostRoll, MaxClip: c.MaxClip, RecordAudio: c.RecordAudio}, a.clk, r, out)
 
-	// Audio adds about 50 events/s to the queue; the larger queue keeps the
-	// video headroom.
+	// Audio adds about 50 events/s to the queue; RecorderQueue is larger for
+	// it, and the budget charges the same depth.
 	var sub *camera.Sub
 	if c.RecordAudio {
-		sub = cm.handle.Hub.Subscribe(camera.ClassRecorder, c.RecorderQueueFrames*3, camera.WithAudio())
+		sub = cm.handle.Hub.Subscribe(camera.ClassRecorder, c.RecorderQueue(), camera.WithAudio())
 	} else {
-		sub = cm.handle.Hub.Subscribe(camera.ClassRecorder, c.RecorderQueueFrames)
+		sub = cm.handle.Hub.Subscribe(camera.ClassRecorder, c.RecorderQueue())
 	}
 	a.m.RegisterCamera(c.ID, metrics.CameraSources{
 		RingBytes:   r.Bytes,

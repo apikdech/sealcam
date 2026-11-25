@@ -166,7 +166,32 @@ func TestBudgetCountsAudio(t *testing.T) {
 		t.Errorf("Active grew by %d, want %d", got.Active-base.Active, want)
 	}
 	b := int64(3200)*1000/8 + 8000
-	if want := (int64(256) + 64*4) * b / budgetFPSEstimate; got.Queues != want {
+	if want := (int64(256*3) + 64*4) * b / budgetFPSEstimate; got.Queues != want {
 		t.Errorf("Queues = %d, want %d", got.Queues, want)
+	}
+}
+
+func TestCameraRecorderQueue(t *testing.T) {
+	c := Camera{RecorderQueueFrames: 256}
+	if got := c.RecorderQueue(); got != 256 {
+		t.Errorf("without audio = %d, want 256", got)
+	}
+	c.RecordAudio = true
+	if got := c.RecorderQueue(); got != 768 {
+		t.Errorf("with audio = %d, want 768", got)
+	}
+}
+
+func TestCameraRingCapBytesIncludesAudio(t *testing.T) {
+	c := Camera{PreRoll: 15 * time.Second, MaxBitrateKbps: 3200, MaxGOP: 2 * time.Second}
+	if got, want := c.RingCapBytes(), int64(8_500_000); got != want {
+		t.Errorf("without audio = %d, want %d", got, want)
+	}
+	c.RecordAudio = true
+	if got, want := c.RingCapBytes(), int64(408000)*17*5/4; got != want {
+		t.Errorf("with audio = %d, want %d", got, want)
+	}
+	if got := Budget(&Config{Cameras: []Camera{c}}).Cameras[0].Ring; got != c.RingCapBytes() {
+		t.Errorf("Budget ring %d != RingCapBytes %d", got, c.RingCapBytes())
 	}
 }

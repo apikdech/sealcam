@@ -49,6 +49,33 @@ type BudgetReport struct {
 // record_audio.
 const audioBytesPerSecond = 8000
 
+// BytesPerSecond is B of the budget: max_bitrate_kbps × 1000 / 8, plus the
+// G.711 rate with record_audio.
+func (c *Camera) BytesPerSecond() int64 {
+	b := int64(c.MaxBitrateKbps) * 1000 / 8
+	if c.RecordAudio {
+		b += audioBytesPerSecond
+	}
+	return b
+}
+
+// RingCapBytes is the budget's ring term, B × (pre_roll_seconds + G) × 1.25.
+// The ring uses it as its byte cap.
+func (c *Camera) RingCapBytes() int64 {
+	return c.BytesPerSecond() * (int64(c.PreRoll/time.Second) + int64(c.MaxGOP/time.Second)) * 5 / 4
+}
+
+// RecorderQueue is the recorder subscription depth in events. A camera with
+// record_audio gets three times recorder_queue_frames, because audio adds
+// about 50 events/s and a stalled recorder can fill every slot with video.
+// The budget's queue term uses the same value.
+func (c *Camera) RecorderQueue() int {
+	if c.RecordAudio {
+		return c.RecorderQueueFrames * 3
+	}
+	return c.RecorderQueueFrames
+}
+
 // Budget computes the memory budget of c (design §8.1). Per camera, with
 // B = max_bitrate_kbps × 1000 / 8 bytes/s (+ 8 000 with record_audio) and G = max_gop_seconds:
 //
@@ -56,6 +83,8 @@ const audioBytesPerSecond = 8000
 //	active = 2 × chunk_size + B × G + part_size_mib MiB
 //	queues = (recorder_queue_frames + viewer_queue_frames × live.max_viewers) × B / fps_est
 //
+// with recorder_queue_frames × 3 for a camera with record_audio (Camera.RecorderQueue)
+// and
 // and total = Σ cameras + live.max_viewers × LivePerViewerBytes +
 // egress_backlog_mb MiB + 32 MiB. Every product is taken before its
 // integer division.
@@ -72,17 +101,15 @@ func Budget(c *Config) BudgetReport {
 		Limit:        int64(c.Relay.MaxMemoryMB) * mib * 8 / 10,
 	}
 	r.Total = r.LiveBytes + r.BacklogBytes + r.RuntimeBytes
-	for _, cam := range c.Cameras {
-		b := int64(cam.MaxBitrateKbps) * 1000 / 8
-		if cam.RecordAudio {
-			b += audioBytesPerSecond
-		}
+	for i := range c.Cameras {
+		cam := &c.Cameras[i]
+		b := cam.BytesPerSecond()
 		g := secs(cam.MaxGOP)
 		cb := CameraBudget{
 			ID:     cam.ID,
-			Ring:   b * (secs(cam.PreRoll) + g) * 5 / 4,
+			Ring:   cam.RingCapBytes(),
 			Active: 2*chunk + b*g + part,
-			Queues: (int64(cam.RecorderQueueFrames) + int64(cam.ViewerQueueFrames)*viewers) * b / budgetFPSEstimate,
+			Queues: (int64(cam.RecorderQueue()) + int64(cam.ViewerQueueFrames)*viewers) * b / budgetFPSEstimate,
 		}
 		cb.Total = cb.Ring + cb.Active + cb.Queues
 		r.Cameras = append(r.Cameras, cb)

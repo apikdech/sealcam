@@ -96,9 +96,12 @@ Per camera, with `B = max_bitrate_kbps × 1000 / 8` bytes/s (plus 8 000 bytes/s 
 ```
 ring_bytes    = B × (pre_roll_seconds + G) × 1.25
 active_bytes  = 2 × chunk_size + B × G + part_buffer      // part_buffer: s3.part_size_mib (s3 deferred); smb, local (and sftp, deferred): 0
-camera_bytes  = ring_bytes + active_bytes
-total         = Σ camera_bytes + egress_backlog_mb + 32 MiB runtime overhead
+queue_bytes   = (recorder_queue_frames + viewer_queue_frames × live.max_viewers) × B / fps_est   // fps_est = 15
+camera_bytes  = ring_bytes + active_bytes + queue_bytes
+total         = Σ camera_bytes + live.max_viewers × per-viewer live memory + egress_backlog_mb + 32 MiB runtime overhead
 ```
+
+A camera with `record_audio` uses `3 × recorder_queue_frames` in the queue term. Audio adds about 50 events/s to the recorder queue, and a stalled recorder can fill every slot with video. The recorder subscribes with the same depth.
 
 `part_buffer` accounts for the **replay window** — bytes accepted by `ObjectWriter.Write` that are not yet durable and may need re-sending after a resume (§4.8). Those bytes live in the backlog ring, not inside the driver, so the term is charged once. For `smb` and `local` (and the deferred `sftp`) the window is zero because `Write` returns only on acknowledgement (an SMB WRITE response, or the operating system accepting the write) and `DurableOffset` tracks it; for the deferred `s3` it is one in-flight part.
 
@@ -138,7 +141,7 @@ Upload bandwidth has to keep up too. Three cameras recording at once need about 
 * **Access units:** reassemble NAL units into access units carrying PTS, DTS, an IDR flag and bytes.
 * **Wall-clock mapping:** use the RTCP sender report NTP↔RTP mapping when the camera provides it (`time_source: rtcp`). Otherwise use the host arrival time of the first packet (`time_source: arrival`). The host MUST run NTP.
 * **GOP measurement:** track the maximum observed GOP duration and export it as `zrelay_gop_max_seconds`. Log a warning if it exceeds `max_gop_seconds`. Some "smart" encoding modes stretch GOPs to 10 s or more, which inflates pre-roll and memory.
-* Audio RTP streams are not set up (D10). Amended: with `record_audio: true`, G.711 8 kHz mono audio is set up and recorded as track 2 of the clip, with no transcoding. See `docs/superpowers/specs/2026-11-23-clip-audio-design.md`.
+* Audio RTP streams are not set up (D10). Amended: G.711 audio is always set up when the camera offers it (live view and restream; v2 design §4.1). Only delivery to the recorder is gated by `record_audio`: with `record_audio: true`, G.711 8 kHz mono audio is recorded as track 2 of the clip, with no transcoding. See `docs/superpowers/specs/2026-11-23-clip-audio-design.md`.
 
 ### 4.3 Pre-roll ring buffer
 
