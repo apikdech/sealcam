@@ -66,3 +66,21 @@ func TestAudioInvalid(t *testing.T) {
 		})
 	}
 }
+
+func TestAudioNullIsAbsent(t *testing.T) {
+	b, err := json.Marshal(validFixture(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b = append(b[:len(b)-1], []byte(`,"audio":null}`)...)
+	sc, err := Decode(b)
+	if err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	if sc.Audio != nil {
+		t.Errorf("audio = %+v, want nil", sc.Audio)
+	}
+	if err := sc.Validate(); err != nil {
+		t.Errorf("Validate: %v", err)
+	}
+}

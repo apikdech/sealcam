@@ -78,6 +78,7 @@ type Summary struct {
 	EndReason    string            `json:"end_reason"`
 	Triggers     []sidecar.Trigger `json:"triggers"`
 	Video        VideoSummary      `json:"video"`
+	Audio        *sidecar.Audio    `json:"audio,omitempty"`
 	Recorder     sidecar.Recorder  `json:"recorder"`
 	VideoHref    string            `json:"video_href"`
 }
@@ -103,6 +104,7 @@ func newSummary(sc *sidecar.Sidecar) Summary {
 			Container: v.Container, Codec: v.Codec, Width: v.Width, Height: v.Height,
 			InitSegmentBytes: v.InitSegmentBytes,
 		},
+		Audio:     sc.Audio,
 		Recorder:  sc.Recorder,
 		VideoHref: "/api/v1/clips/" + sc.ClipID.String() + "/video",
 	}

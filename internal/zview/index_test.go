@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -628,5 +629,32 @@ func TestFutureDaysDoNotTouchStorage(t *testing.T) {
 	}
 	if n := cr.listCount(); n != 0 {
 		t.Errorf("listed %d prefixes for days that cannot hold clips yet", n)
+	}
+}
+
+func TestSummaryAudio(t *testing.T) {
+	// Decode a real sidecar so the test does not depend on fixture helpers.
+	raw, err := os.ReadFile("../../testdata/sidecars/valid_complete.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sc, err := sidecar.Decode(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(newSummary(sc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), `"audio"`) {
+		t.Errorf("summary without audio has an audio key: %s", b)
+	}
+	sc.Audio = &sidecar.Audio{Codec: "PCMA", SampleRate: 8000, Channels: 1}
+	b, err = json.Marshal(newSummary(sc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `"audio":{"codec":"PCMA","sample_rate":8000,"channels":1}`) {
+		t.Errorf("summary with audio lacks the audio object: %s", b)
 	}
 }
